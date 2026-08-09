@@ -1,0 +1,220 @@
+{
+  "description": "Test cases for shell-script-reviewer. Each case's script should be written to a temp file with the given extension and reviewed per SKILL.md. expected_findings defines the minimum bar for recall (every listed finding must be surfaced, at >= the given severity); must_not_exceed_severity is a precision check for the clean cases; must_not_mention is a policy check -- e.g. verifying the reviewer never recommends adding set -e/set -u, since this skill treats their presence as a finding rather than their absence.",
+  "cases": [
+    {
+      "id": "bash-unquoted-injection",
+      "dialect": "bash",
+      "extension": ".sh",
+      "focus": "unquoted variable injection risk",
+      "script": "#!/bin/bash\n# Deletes a user-provided list of files.\ncleanup() {\n  local files=$1\n  rm -rf $files\n}\n\ncleanup \"$1\"\n",
+      "expected_findings": [
+        {
+          "category": "security",
+          "severity": "Critical",
+          "shellcheck_code": "SC2086",
+          "must_mention_any": ["word splitting", "word-splitting", "unquoted", "SC2086"],
+          "reason": "$files is unquoted in rm -rf $files; a value like '* --no-preserve-root' or multiple space-separated paths expands to unintended targets"
+        }
+      ]
+    },
+    {
+      "id": "bash-missing-error-checks",
+      "dialect": "bash",
+      "extension": ".sh",
+      "focus": "unchecked critical commands -- no set -e present, and none should be recommended",
+      "script": "#!/bin/bash\nBUILD_DIR=build\ncd $BUILD_DIR\nrm -rf ./*\nmkdir artifacts\ncp ../dist/* artifacts/\necho \"done\"\n",
+      "expected_findings": [
+        {
+          "category": "correctness",
+          "severity": "High",
+          "shellcheck_code": "SC2164",
+          "must_mention_any": ["cd", "fails", "|| exit"],
+          "reason": "cd $BUILD_DIR has no failure check; if it fails, rm -rf ./* runs in the original directory"
+        },
+        {
+          "category": "correctness",
+          "severity": "Medium",
+          "must_mention_any": ["explicit", "|| exit", "exit status", "check"],
+          "reason": "mkdir and cp have no explicit exit-status checks; a failure in either is silently ignored and the script reports 'done' regardless"
+        }
+      ],
+      "must_not_mention": ["add set -e", "add set -euo pipefail", "recommend set -e"],
+      "note": "the fix here is explicit per-command checks, not adding a strict-mode header -- this skill flags -e/-u as an anti-pattern, so the review must not recommend adding them"
+    },
+    {
+      "id": "bash-unsafe-eval",
+      "dialect": "bash",
+      "extension": ".sh",
+      "focus": "unsafe eval on untrusted input",
+      "script": "#!/bin/bash\n# Runs a named build step.\nstep=\"$1\"\neval \"run_$step\"\n\nrun_build() { echo building; }\nrun_test() { echo testing; }\n",
+      "expected_findings": [
+        {
+          "category": "security",
+          "severity": "Critical",
+          "must_mention_any": ["eval", "arbitrary", "injection", "allowlist"],
+          "reason": "eval \"run_$step\" executes attacker-controlled shell code if $step contains shell metacharacters (e.g. 'build; rm -rf /')"
+        }
+      ]
+    },
+    {
+      "id": "bash-style-noncompliant-but-correct",
+      "dialect": "bash",
+      "extension": ".sh",
+      "focus": "stylistically non-compliant but functionally correct",
+      "script": "#!/bin/bash\nset -o pipefail\nDir=\"$1\"\nCount=`ls \"$Dir\" | wc -l`\nif [ \"$Count\" -gt 0 ]\nthen\n\techo \"Found $Count files\"\nfi\n",
+      "expected_findings": [
+        {
+          "category": "style",
+          "severity": "Low",
+          "must_mention_any": ["backtick", "SC2006", "naming", "lowercase"],
+          "reason": "backticks instead of $(...), PascalCase variable names instead of lowercase_with_underscores, then/do not on the same line as if"
+        }
+      ],
+      "must_not_exceed_severity": "Medium",
+      "note": "quoting is already correct and only pipefail (this skill's recommended baseline, no -e/-u) is present, so nothing here should be scored Critical or High"
+    },
+    {
+      "id": "bash-strict-mode-anti-pattern",
+      "dialect": "bash",
+      "extension": ".sh",
+      "focus": "set -euo pipefail present with no explicit checks -- should itself be flagged under this skill's policy",
+      "script": "#!/bin/bash\nset -euo pipefail\ninput_dir=\"$1\"\noutput_dir=\"$2\"\nmkdir -p \"$output_dir\"\ncp \"$input_dir\"/*.log \"$output_dir\"/\necho \"copied logs\"\n",
+      "expected_findings": [
+        {
+          "category": "style",
+          "severity": "Low",
+          "must_mention_any": ["set -e", "set -u", "explicit", "pipefail"],
+          "reason": "set -euo pipefail is present with no explicit per-command checks of its own; per this skill's convention, -e/-u should be removed in favor of explicit `cmd || exit` checks -- set -o pipefail alone is fine to keep"
+        }
+      ],
+      "must_not_exceed_severity": "Medium",
+      "note": "everything else in this script is already correct (quoting, no destructive unguarded glob, no eval) -- this case exists specifically to verify the reviewer flags -e/-u presence itself rather than treating it as a good practice"
+    },
+    {
+      "id": "zsh-unquoted-injection",
+      "dialect": "zsh",
+      "extension": ".zsh",
+      "focus": "unquoted expansion injection risk that survives zsh's word-splitting defaults",
+      "script": "#!/usr/bin/env zsh\ntargets=(\"$@\")\nfor t in ${targets[@]}; do\n  rsync -a $t /backup/\ndone\n",
+      "expected_findings": [
+        {
+          "category": "security",
+          "severity": "High",
+          "must_mention_any": ["quote", "${targets[@]}", "$t", "array expansion"],
+          "reason": "array expansions and $t are unquoted; array-element splitting still applies in zsh regardless of SH_WORD_SPLIT, and a path with a leading '-' could be parsed as an rsync flag"
+        }
+      ]
+    },
+    {
+      "id": "zsh-missing-error-checks",
+      "dialect": "zsh",
+      "extension": ".zsh",
+      "focus": "no explicit error handling on critical commands -- setopt ERR_EXIT/NO_UNSET should not be the recommended fix",
+      "script": "#!/usr/bin/env zsh\nsource ./env.zsh\ndeploy_dir=$DEPLOY_DIR/current\ncd $deploy_dir\n./release.sh\n",
+      "expected_findings": [
+        {
+          "category": "correctness",
+          "severity": "High",
+          "must_mention_any": ["cd", "explicit", "check", "|| exit"],
+          "reason": "cd $deploy_dir has no explicit failure check; if it fails, ./release.sh still runs from the original directory"
+        }
+      ],
+      "must_not_mention": ["add setopt ERR_EXIT", "add setopt NO_UNSET", "recommend ERR_EXIT"],
+      "note": "the fix is an explicit cd || exit check, not a setopt ERR_EXIT/NO_UNSET header -- this skill flags those as an anti-pattern"
+    },
+    {
+      "id": "zsh-unsafe-eval",
+      "dialect": "zsh",
+      "extension": ".zsh",
+      "focus": "unsafe eval on untrusted input",
+      "script": "#!/usr/bin/env zsh\nfilter=\"$1\"\neval \"find . -name '$filter'\"\n",
+      "expected_findings": [
+        {
+          "category": "security",
+          "severity": "Critical",
+          "must_mention_any": ["eval", "injection", "arbitrary"],
+          "reason": "$filter is interpolated into a string passed to eval; a value like ''' -o -exec rm -rf {} ; ''' breaks out of the intended find invocation"
+        }
+      ]
+    },
+    {
+      "id": "zsh-style-noncompliant-but-correct",
+      "dialect": "zsh",
+      "extension": ".zsh",
+      "focus": "stylistically non-compliant but functionally correct, includes a 0-index assumption note",
+      "script": "#!/usr/bin/env zsh\nsetopt PIPE_FAIL\narr=(alpha beta gamma)\nfirst=$arr[1]\necho \"first element: $first\"\n",
+      "expected_findings": [
+        {
+          "category": "style",
+          "severity": "Low",
+          "must_mention_any": ["indexed", "1-indexed", "readability", "quote"],
+          "reason": "correct 1-indexed usage for zsh but unquoted $arr[1] access and no comment noting the indexing differs from bash for readers porting code"
+        }
+      ],
+      "must_not_exceed_severity": "Medium",
+      "note": "arr[1] correctly returns 'alpha' in zsh (1-indexed) -- reviewer must not flag this as an off-by-one bug. Only PIPE_FAIL is set (no ERR_EXIT/NO_UNSET), matching this skill's recommended baseline, so that should not be flagged either"
+    },
+    {
+      "id": "fish-unquoted-injection",
+      "dialect": "fish",
+      "extension": ".fish",
+      "focus": "unquoted expansion used to build a destructive command",
+      "script": "#!/usr/bin/env fish\nset target $argv[1]\nrm -rf $target/*\n",
+      "expected_findings": [
+        {
+          "category": "security",
+          "severity": "Critical",
+          "must_mention_any": ["quote", "\\$target", "empty", "validate"],
+          "reason": "no validation that $argv[1] was actually provided; an empty $target makes rm -rf $target/* equivalent to rm -rf /*"
+        }
+      ]
+    },
+    {
+      "id": "fish-missing-strict-mode",
+      "dialect": "fish",
+      "extension": ".fish",
+      "focus": "missing $status checks -- fish has no errexit equivalent",
+      "script": "#!/usr/bin/env fish\nmkdir /tmp/build\ncd /tmp/build\ntar xf archive.tar.gz\n./configure\nmake\n",
+      "expected_findings": [
+        {
+          "category": "correctness",
+          "severity": "High",
+          "must_mention_any": ["\\$status", "and", "or", "errexit"],
+          "reason": "no $status checks or and/or chaining after mkdir/cd/tar; fish has no set -e equivalent so failures are silently ignored and later commands run in the wrong state"
+        }
+      ]
+    },
+    {
+      "id": "fish-unsafe-eval",
+      "dialect": "fish",
+      "extension": ".fish",
+      "focus": "unsafe eval on untrusted input",
+      "script": "#!/usr/bin/env fish\nset cmd $argv[1]\neval $cmd\n",
+      "expected_findings": [
+        {
+          "category": "security",
+          "severity": "Critical",
+          "must_mention_any": ["eval", "arbitrary", "injection", "allowlist"],
+          "reason": "fish's eval builtin executes $cmd as shell code; passing it directly from argv is arbitrary command execution"
+        }
+      ]
+    },
+    {
+      "id": "fish-style-noncompliant-but-correct",
+      "dialect": "fish",
+      "extension": ".fish",
+      "focus": "stylistically non-compliant but functionally correct",
+      "script": "#!/usr/bin/env fish\nfunction GetCount\nset f $argv[1]\nset c (cat $f | wc -l | string trim)\necho $c\nend\nGetCount data.txt\n",
+      "expected_findings": [
+        {
+          "category": "style",
+          "severity": "Low",
+          "must_mention_any": ["snake_case", "naming", "indent", "builtin"],
+          "reason": "PascalCase function name instead of snake_case, no indentation inside the function body, and shells out to cat/wc where fish's own tooling (or wc alone via redirection) would suffice"
+        }
+      ],
+      "must_not_exceed_severity": "Medium",
+      "note": "cat $f | wc -l works correctly here; this is a style-only finding, not a correctness bug"
+    }
+  ]
+}

@@ -65,10 +65,11 @@ claude code plugins install security-hooks
 - `/manager` - Project orchestration
 - `/specify` - Technical specifications
 - `/taskify` - Task decomposition
+- `/shell-script-reviewer` - Bash/Zsh/Fish script review
 
 **Features**:
 
-- 7 specialized development skills
+- 8 specialized development skills
 - Expert knowledge in Go, documentation, and architecture
 - Project management and task coordination
 
