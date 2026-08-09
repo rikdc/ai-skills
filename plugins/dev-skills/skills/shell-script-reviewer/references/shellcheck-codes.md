@@ -1,6 +1,6 @@
 # ShellCheck Code Reference
 
-Curated from https://www.shellcheck.net/wiki/ — treat these as ground truth
+Curated from <https://www.shellcheck.net/wiki/> — treat these as ground truth
 for Bash/POSIX findings. When ShellCheck reports one of these, cite the
 code, explain the risk in the script's actual context, and show the fix;
 don't re-derive the rule from scratch.
@@ -25,7 +25,7 @@ don't re-derive the rule from scratch.
 | SC2076 | Don't quote the right-hand side of `=~` | `[[ $x =~ "^foo$" ]]` | Quoting forces literal string matching instead of regex — the pattern silently stops being a regex | Drop the quotes and escape special characters instead: `[[ $x =~ ^foo$ ]]` |
 | SC2016 | Expressions don't expand in single quotes | `$var` or `$(cmd)` written inside `'...'` | Output is the literal text `$var`, not its value — usually not what was intended | Use double quotes if expansion is wanted; keep single quotes (and silence the warning) if the literal text is intentional |
 | SC1091 | Not following sourced file | ShellCheck can't resolve a `source`/`.` target (missing file, not passed on the command line, dynamic path) | Bugs inside the sourced file go unchecked | Add `# shellcheck source=path/to/file`, or `source=/dev/null` if it's genuinely unavailable to the checker |
-| SC2166 | Avoid `-a`/`-o` in `[ ]` | `[ p -a q ]` / `[ p -o q ]` | POSIX deprecated these — behavior is ambiguous once arguments contain `-` or `!` | `[ p ] && [ q ]` / `[ p ] || [ q ]` |
+| SC2166 | Avoid `-a`/`-o` in `[ ]` | `[ p -a q ]` / `[ p -o q ]` | POSIX deprecated these — behavior is ambiguous once arguments contain `-` or `!` | `[ p ] && [ q ]` / `[ p ] \|\| [ q ]` |
 | SC2129 | Consolidate multiple redirects | Repeated `cmd >> file` for a sequence of commands | Reopens the file for every command; unnecessarily slow and can interact oddly with traps | Group the commands and redirect once: `{ cmd1; cmd2; cmd3; } >> file` |
 | SC2059 | Don't put variables in printf's format string | `printf "$msg\n"` | If `$msg` contains `%` or backslash escapes, printf misinterprets them | `printf '%s\n' "$msg"` |
 | SC2236 | Use `-n`/`-z` directly instead of `! -z`/`! -n` | `[ ! -z "$x" ]` | Purely a readability nit — double negative | `[ -n "$x" ]` |

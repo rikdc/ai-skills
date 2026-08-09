@@ -97,7 +97,7 @@ avoid `ERR_EXIT`/`NO_UNSET` as a blanket header.
 | Bash | Zsh | Recommendation |
 |------|-----|-----------------|
 | `set -o pipefail` | `setopt PIPE_FAIL` | Keep. Pipeline exit status reflects the last non-zero stage instead of always the last stage. |
-| `set -e` | `setopt ERR_EXIT` | Avoid as a blanket header — the same unreliability caveats from `bash-pitfalls.md` apply identically to `ERR_EXIT` (doesn't fire inside a substituted condition, inside `&&`/`||` lists, or for non-final pipeline stages without `PIPE_FAIL`). Use explicit `cmd || exit`/`cmd || return` at each critical step instead. |
+| `set -e` | `setopt ERR_EXIT` | Avoid as a blanket header — the same unreliability caveats from `bash-pitfalls.md` apply identically to `ERR_EXIT` (doesn't fire inside a substituted condition, inside `&&`/`\|\|` lists, or for non-final pipeline stages without `PIPE_FAIL`). Use explicit `cmd \|\| exit`/`cmd \|\| return` at each critical step instead. |
 | `set -u` | `setopt NO_UNSET` | Avoid as a blanket header, same reasoning as Bash's `-u` — it only catches unset-variable bugs on the exact path executed. **Caveat specific to Zsh**: ShellCheck's `--shell=bash` approximation is weaker coverage here than it is for native Bash, so lean more on manual review of variable usage in Zsh scripts than you would for Bash before concluding a script is safe without `NO_UNSET`. |
 
 **What to flag**: `setopt ERR_EXIT`/`NO_UNSET` present → Low/Medium Style

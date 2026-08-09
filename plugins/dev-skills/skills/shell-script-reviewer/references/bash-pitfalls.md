@@ -1,6 +1,6 @@
 # Bash Pitfalls and Strict-Mode Guidance
 
-Primary source for the pitfalls below: https://mywiki.wooledge.org/BashPitfalls
+Primary source for the pitfalls below: <https://mywiki.wooledge.org/BashPitfalls>
 — treat it as the canonical secondary reference alongside ShellCheck
 (`shellcheck-codes.md`) for Bash-specific runtime bugs that static analysis
 sometimes under-explains.

@@ -1,6 +1,6 @@
 # Bash Style Guide (condensed from Google Shell Style Guide)
 
-Source of truth: https://google.github.io/styleguide/shellguide.html — cite
+Source of truth: <https://google.github.io/styleguide/shellguide.html> — cite
 this when a finding is a style violation rather than deriving rules ad hoc.
 
 ## When shell is (and isn't) the right choice
@@ -104,11 +104,11 @@ this when a finding is a style violation rather than deriving rules ad hoc.
   multi-line output — one block instead of N statements:
 
   ```bash
-  # Good
+  # Good (every indent below is a literal tab, not spaces)
   cat <<- EOF
-  	Something
-  	${variable}
-  	EOF
+  <TAB>Something
+  <TAB>${variable}
+  <TAB>EOF
 
   # Avoid
   echo "Something"
@@ -117,7 +117,9 @@ this when a finding is a style violation rather than deriving rules ad hoc.
 
   `<<-` strips **leading tabs** (not spaces) from the body and the closing
   marker, which is what allows the here-doc to be indented with the
-  surrounding code.
+  surrounding code. (`<TAB>` above stands in for an actual tab character —
+  written literally here to survive markdown linting, which rejects real
+  tab characters in this repo.)
 - Quote the marker (`<<- 'EOF'`) when the body must **not** have variables
   or command substitutions expanded — e.g. emitting literal `$` text.
 - If tab-based indentation doesn't work for the context, fall back to an
