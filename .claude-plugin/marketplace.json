@@ -27,9 +27,9 @@
     {
       "name": "dev-skills",
       "source": "./plugins/dev-skills",
-      "description": "Expert development skills for Go, documentation, architecture, and project management",
+      "description": "Expert development skills for Go, documentation, architecture, shell scripting, and project management",
       "version": "1.0.0",
-      "keywords": ["skills", "go", "documentation", "architecture", "mentorship"],
+      "keywords": ["skills", "go", "documentation", "architecture", "mentorship", "shell", "bash"],
       "category": "skills"
     },
     {
