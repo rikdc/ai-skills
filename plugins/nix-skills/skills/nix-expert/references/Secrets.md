@@ -417,6 +417,7 @@ error: Failed to decrypt
 ```
 
 **Check:**
+
 1. Is host SSH key in secrets.nix?
 2. Does /etc/ssh/ssh_host_ed25519_key exist?
 3. Was secret encrypted with correct keys?

@@ -71,6 +71,7 @@ error: infinite recursion encountered
 **Cause**: Circular dependency or self-referencing attribute
 
 **Debug**:
+
 ```nix
 # Problem
 {
@@ -92,6 +93,7 @@ error: attribute 'foo' missing
 ```
 
 **Debug**:
+
 ```bash
 # Check what attributes exist
 nix eval .#nixosConfigurations.hostname --apply builtins.attrNames
@@ -110,6 +112,7 @@ error: value is a set while a string was expected
 ```
 
 **Debug**:
+
 ```bash
 # Check type of value
 nix eval .#value --apply builtins.typeOf
@@ -130,6 +133,7 @@ error: hash mismatch in fixed-output derivation
 ```
 
 **Fix**:
+
 ```bash
 # Copy the "got" hash to your expression
 # Or use nix-prefetch for correct hash
@@ -376,6 +380,7 @@ error: The option `services.foo.enable' is defined multiple times
 ```
 
 **Debug**:
+
 ```bash
 # Find all definitions
 nix eval .#nixosConfigurations.hostname.options.services.foo.enable.definitionsWithLocations
@@ -438,6 +443,7 @@ error: access to absolute path '/home/...' is forbidden in pure eval mode
 ```
 
 **Fix**:
+
 ```nix
 # Don't use absolute paths
 # Bad
