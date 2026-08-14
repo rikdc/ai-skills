@@ -12,6 +12,7 @@ Manage secrets with agenix for NixOS and home-manager.
 ## Quick Commands
 
 ### Basic Operations
+
 ```bash
 # Edit secret
 agenix -e secrets/mySecret.age
@@ -24,6 +25,7 @@ agenix -e secrets/mySecret.age -r
 ```
 
 ### In Configuration
+
 ```nix
 # Use secret in NixOS
 age.secrets.mySecret = {
@@ -39,6 +41,7 @@ services.myservice.passwordFile = config.age.secrets.mySecret.path;
 ## Setup agenix
 
 ### Install agenix
+
 ```nix
 # In flake.nix inputs
 {
@@ -62,6 +65,7 @@ services.myservice.passwordFile = config.age.secrets.mySecret.path;
 ```
 
 ### Install agenix CLI
+
 ```bash
 # Install globally
 nix profile install github:ryantm/agenix
@@ -73,6 +77,7 @@ nix-shell -p agenix
 ## Creating Secrets
 
 ### Define secrets.nix
+
 ```nix
 # secrets/secrets.nix
 let
@@ -102,6 +107,7 @@ in
 ```
 
 ### Get SSH Public Keys
+
 ```bash
 # User SSH key
 cat ~/.ssh/id_ed25519.pub
@@ -119,24 +125,29 @@ ssh-keygen -y -f ~/.ssh/id_ed25519 | ssh-to-age
 ## Encrypt and Edit Secrets
 
 ### Create New Secret
+
 ```bash
 # Create and edit secret
 agenix -e secrets/mySecret.age
 
 # Opens $EDITOR with decrypted content
 # Save and exit to encrypt
+
 ```
 
 ### Edit Existing Secret
+
 ```bash
 # Edit secret
 agenix -e secrets/database-password.age
 
 # Update password in editor
 # Save and exit to re-encrypt
+
 ```
 
 ### Non-Interactive Encryption
+
 ```bash
 # Encrypt from file
 echo "super-secret-value" | agenix -e secrets/mySecret.age
@@ -148,6 +159,7 @@ cat plain-secret.txt | agenix -e secrets/mySecret.age
 ## Using Secrets in Configuration
 
 ### NixOS Configuration
+
 ```nix
 { config, pkgs, ... }:
 
@@ -180,6 +192,7 @@ cat plain-secret.txt | agenix -e secrets/mySecret.age
 ```
 
 ### Home-Manager Configuration
+
 ```nix
 { config, pkgs, ... }:
 
@@ -201,6 +214,7 @@ cat plain-secret.txt | agenix -e secrets/mySecret.age
 ```
 
 ### Secret Options
+
 ```nix
 age.secrets.mySecret = {
   # Path to encrypted secret file
@@ -227,6 +241,7 @@ age.secrets.mySecret = {
 ## Common Secret Patterns
 
 ### Database Credentials
+
 ```nix
 age.secrets.postgres-password = {
   file = ../secrets/postgres-password.age;
@@ -253,6 +268,7 @@ systemd.services.postgres-init = {
 ```
 
 ### API Keys
+
 ```nix
 age.secrets.api-key = {
   file = ../secrets/api-key.age;
@@ -268,6 +284,7 @@ systemd.services.myservice = {
 ```
 
 ### SSH Keys
+
 ```nix
 age.secrets.deploy-key = {
   file = ../secrets/deploy-key.age;
@@ -278,6 +295,7 @@ age.secrets.deploy-key = {
 ```
 
 ### Certificates
+
 ```nix
 age.secrets.tls-cert = {
   file = ../secrets/tls-cert.age;
@@ -303,6 +321,7 @@ services.nginx.virtualHosts."example.com" = {
 ## Re-keying Secrets
 
 ### Add New Host
+
 ```nix
 # 1. Get new host SSH key
 ssh-keyscan new-host
@@ -326,6 +345,7 @@ git commit -m "chore: re-key secrets for new-host"
 ```
 
 ### Rotate User Keys
+
 ```bash
 # 1. Update secrets.nix with new keys
 
@@ -334,9 +354,11 @@ agenix -r
 
 # 3. Old keys can no longer decrypt
 # Ensure all secrets are updated before removing old keys!
+
 ```
 
 ### Emergency Re-key
+
 ```bash
 # If key is compromised
 # 1. Remove compromised key from secrets.nix
@@ -346,11 +368,13 @@ agenix -r
 # 3. Deploy to all systems
 # 4. Verify secrets still work
 # 5. Rotate actual secret values
+
 ```
 
 ## Yubikey Integration
 
 ### Setup Yubikey for Secrets
+
 ```bash
 # Generate age key from yubikey
 age-plugin-yubikey --generate
@@ -360,6 +384,7 @@ age-plugin-yubikey --list
 ```
 
 ### Use Yubikey in secrets.nix
+
 ```nix
 let
   yubikey1 = "age1yubikey1...";
@@ -386,6 +411,7 @@ in
 ## Troubleshooting
 
 ### Cannot Decrypt Secret
+
 ```
 error: Failed to decrypt
 ```
@@ -404,11 +430,13 @@ agenix -r
 ```
 
 ### Secret File Not Found
+
 ```
 error: file 'secrets/mySecret.age' does not exist
 ```
 
 **Fix:**
+
 ```bash
 # Create the secret
 agenix -e secrets/mySecret.age
@@ -418,11 +446,13 @@ ls secrets/
 ```
 
 ### Permission Denied
+
 ```
 error: cannot create symlink
 ```
 
 **Fix:**
+
 ```nix
 # Ensure parent directory exists
 systemd.tmpfiles.rules = [
@@ -440,6 +470,7 @@ age.secrets.mySecret = {
 ## Advanced Patterns
 
 ### Multi-Environment Secrets
+
 ```nix
 # secrets/secrets.nix
 let
@@ -453,6 +484,7 @@ in
 ```
 
 ### Conditional Secrets
+
 ```nix
 { config, lib, ... }:
 
@@ -467,6 +499,7 @@ in
 ```
 
 ### Templated Secrets
+
 ```nix
 # Generate config from secret
 systemd.services.myservice = {
@@ -484,6 +517,7 @@ systemd.services.myservice = {
 ## Migration to agenix
 
 ### From Plain Files
+
 ```bash
 # 1. Create secrets.nix
 
@@ -496,9 +530,11 @@ done
 # 3. Update configuration to use agenix
 
 # 4. Remove plain files after verification
+
 ```
 
 ### From sops-nix
+
 ```bash
 # 1. Decrypt sops secrets
 sops -d secrets.yaml > plaintext.yaml
@@ -512,6 +548,7 @@ for secret in secrets/*; do
 done
 
 # 4. Update configuration
+
 ```
 
 ## Resources

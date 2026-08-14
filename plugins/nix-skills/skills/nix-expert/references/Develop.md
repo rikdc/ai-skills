@@ -12,6 +12,7 @@ Create and use Nix development environments with direnv integration.
 ## Quick Commands
 
 ### Development Shells
+
 ```bash
 # Enter development shell
 nix develop
@@ -28,6 +29,7 @@ nix develop --print-build-logs
 ```
 
 ### direnv Integration
+
 ```bash
 # Create .envrc
 echo "use flake" > .envrc
@@ -45,6 +47,7 @@ direnv status
 ## Creating Development Shells
 
 ### Basic devShell
+
 ```nix
 # flake.nix
 {
@@ -68,6 +71,7 @@ direnv status
 ```
 
 ### Multi-Shell Setup
+
 ```nix
 # Multiple development shells
 {
@@ -97,6 +101,7 @@ direnv status
 ```
 
 ### Access Specific Shell
+
 ```bash
 # Use default shell
 nix develop
@@ -109,6 +114,7 @@ nix develop .#python
 ## Shell Configuration
 
 ### Environment Variables
+
 ```nix
 pkgs.mkShell {
   buildInputs = [ pkgs.go ];
@@ -131,6 +137,7 @@ pkgs.mkShell {
 ```
 
 ### Shell Hooks
+
 ```nix
 pkgs.mkShell {
   buildInputs = [ pkgs.nodejs ];
@@ -158,6 +165,7 @@ pkgs.mkShell {
 ```
 
 ### Package-Specific Shell
+
 ```nix
 # For a specific package's dev environment
 {
@@ -181,9 +189,10 @@ pkgs.mkShell {
 }
 ```
 
-## direnv Integration
+## Using direnv
 
 ### Setup direnv
+
 ```bash
 # Install direnv
 nix profile install nixpkgs#direnv
@@ -197,15 +206,18 @@ eval "$(direnv hook zsh)"
 ```
 
 ### Basic .envrc
+
 ```bash
 # .envrc
 use flake
 
 # Optional: Use specific flake output
 # use flake .#rust
+
 ```
 
 ### Advanced .envrc
+
 ```bash
 # .envrc
 use flake
@@ -227,18 +239,22 @@ fi
 # Layout for different languages
 # layout python  # Auto-create venv
 # layout node    # Add node_modules/.bin to PATH
+
 ```
 
 ### nix-direnv Configuration
+
 ```bash
 # ~/.config/direnv/direnvrc or ~/.direnvrc
 source $HOME/.nix-profile/share/nix-direnv/direnvrc
 
 # Or if installed via home-manager
 # It's automatically configured
+
 ```
 
 ### Performance with nix-direnv
+
 ```bash
 # nix-direnv caches the environment
 # Much faster reloads!
@@ -258,6 +274,7 @@ direnv: using cached flake environment
 ## Common Development Patterns
 
 ### Go Development
+
 ```nix
 {
   devShells.x86_64-linux.default = pkgs.mkShell {
@@ -280,6 +297,7 @@ direnv: using cached flake environment
 ```
 
 ### Rust Development
+
 ```nix
 {
   devShells.x86_64-linux.default = pkgs.mkShell {
@@ -297,6 +315,7 @@ direnv: using cached flake environment
 ```
 
 ### Node.js Development
+
 ```nix
 {
   devShells.x86_64-linux.default = pkgs.mkShell {
@@ -316,6 +335,7 @@ direnv: using cached flake environment
 ```
 
 ### Python Development
+
 ```nix
 {
   devShells.x86_64-linux.default = let
@@ -339,6 +359,7 @@ direnv: using cached flake environment
 ```
 
 ### C/C++ Development
+
 ```nix
 {
   devShells.x86_64-linux.default = pkgs.mkShell {
@@ -361,6 +382,7 @@ direnv: using cached flake environment
 ## Advanced Shell Features
 
 ### Multiple Package Sets
+
 ```nix
 {
   devShells.x86_64-linux.default = let
@@ -376,6 +398,7 @@ direnv: using cached flake environment
 ```
 
 ### Conditional Tools
+
 ```nix
 pkgs.mkShell {
   buildInputs = with pkgs; [
@@ -393,6 +416,7 @@ pkgs.mkShell {
 ```
 
 ### Project-Specific Scripts
+
 ```nix
 pkgs.mkShell {
   buildInputs = [ pkgs.go ];
@@ -419,6 +443,7 @@ pkgs.mkShell {
 ## Development Workflow
 
 ### Typical Session
+
 ```bash
 # Enter project
 cd myproject/
@@ -444,6 +469,7 @@ direnv: unloading
 ```
 
 ### Update Development Environment
+
 ```bash
 # Update flake inputs
 nix flake update
@@ -456,6 +482,7 @@ nix develop
 ```
 
 ### Share Environment
+
 ```bash
 # Commit flake.nix and flake.lock
 git add flake.nix flake.lock
@@ -470,6 +497,7 @@ direnv allow  # Or nix develop
 ## Troubleshooting
 
 ### direnv Not Loading
+
 ```bash
 # Check direnv status
 direnv status
@@ -485,6 +513,7 @@ nix flake check
 ```
 
 ### Slow Shell Activation
+
 ```bash
 # Install nix-direnv for caching
 nix profile install nixpkgs#nix-direnv
@@ -497,6 +526,7 @@ direnv reload
 ```
 
 ### Environment Variables Not Set
+
 ```bash
 # Check environment
 nix develop --command printenv
@@ -509,6 +539,7 @@ direnv exec . env | grep MY_VAR
 ```
 
 ### Binary Cache Issues
+
 ```bash
 # Use substituters
 nix develop --extra-substituters https://cache.nixos.org
@@ -531,6 +562,7 @@ nix develop --no-substitute
 ## Integration with Editors
 
 ### VS Code
+
 ```json
 // .vscode/settings.json
 {
@@ -545,6 +577,7 @@ buildInputs = [ pkgs.nixd ];
 ```
 
 ### Vim/Neovim
+
 ```bash
 # Install LSPs in devShell
 buildInputs = with pkgs; [
@@ -555,6 +588,7 @@ buildInputs = with pkgs; [
 ```
 
 ### Emacs
+
 ```elisp
 ;; direnv integration
 (use-package direnv
@@ -565,6 +599,7 @@ buildInputs = with pkgs; [
 ## Common Patterns
 
 ### Database Development
+
 ```nix
 pkgs.mkShell {
   buildInputs = with pkgs; [
@@ -590,6 +625,7 @@ pkgs.mkShell {
 ```
 
 ### Docker Development
+
 ```nix
 pkgs.mkShell {
   buildInputs = with pkgs; [
@@ -604,6 +640,7 @@ pkgs.mkShell {
 ```
 
 ### Multiple Environments
+
 ```bash
 # .envrc
 # Choose environment based on directory

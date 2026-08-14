@@ -12,6 +12,7 @@ Harden NixOS systems with security best practices and configurations.
 ## Quick Commands
 
 ### Basic Security Configuration
+
 ```nix
 # Firewall
 networking.firewall.enable = true;
@@ -42,6 +43,7 @@ There is no drop-in replacement. Pick the individual options you want and
 justify each one, which is what the profile was doing on your behalf anyway.
 
 ### Applying the pieces individually
+
 ```nix
 {
   # Kernel
@@ -72,6 +74,7 @@ rebuild ladder between each — `dry-activate` will show you what restarts.
 ## Firewall Configuration
 
 ### Default Deny
+
 ```nix
 networking.firewall = {
   enable = true;
@@ -86,6 +89,7 @@ networking.firewall = {
 ```
 
 ### Service-Specific Rules
+
 ```nix
 networking.firewall = {
   enable = true;
@@ -111,6 +115,7 @@ networking.firewall = {
 ```
 
 ### Advanced Firewall
+
 ```nix
 networking.firewall = {
   enable = true;
@@ -136,6 +141,7 @@ networking.firewall = {
 ## AppArmor
 
 ### Enable AppArmor
+
 ```nix
 {
   security.apparmor = {
@@ -153,6 +159,7 @@ networking.firewall = {
 ```
 
 ### Custom AppArmor Profiles
+
 ```nix
 {
   security.apparmor = {
@@ -188,6 +195,7 @@ networking.firewall = {
 ```
 
 ### Check AppArmor Status
+
 ```bash
 # View loaded profiles
 sudo aa-status
@@ -205,6 +213,7 @@ sudo aa-enforce /path/to/program
 ## User and Authentication Security
 
 ### Strong Password Policies
+
 ```nix
 {
   security.pam.services = {
@@ -272,6 +281,7 @@ turns every `wheel` member into passwordless root. To require a password for
 every command instead of caching it, set `Defaults timestamp_timeout=0`.
 
 ### SSH Hardening
+
 ```nix
 {
   services.openssh = {
@@ -315,6 +325,7 @@ every command instead of caching it, set `Defaults timestamp_timeout=0`.
 ## Systemd Service Hardening
 
 ### Service Isolation
+
 ```nix
 {
   systemd.services.myservice = {
@@ -368,6 +379,7 @@ every command instead of caching it, set `Defaults timestamp_timeout=0`.
 ```
 
 ### Analyze Service Security
+
 ```bash
 # Check service security score
 systemd-analyze security myservice.service
@@ -379,6 +391,7 @@ systemd-analyze security --no-pager myservice.service
 ## Application Sandboxing
 
 ### Firejail
+
 ```nix
 {
   # Install firejail
@@ -405,6 +418,7 @@ systemd-analyze security --no-pager myservice.service
 ```
 
 ### Flatpak Sandboxing
+
 ```nix
 {
   services.flatpak.enable = true;
@@ -417,6 +431,7 @@ systemd-analyze security --no-pager myservice.service
 ## Kernel Hardening
 
 ### Kernel Parameters
+
 ```nix
 {
   boot.kernel.sysctl = {
@@ -464,6 +479,7 @@ systemd-analyze security --no-pager myservice.service
 ```
 
 ### Blacklist Kernel Modules
+
 ```nix
 {
   boot.blacklistedKernelModules = [
@@ -491,6 +507,7 @@ systemd-analyze security --no-pager myservice.service
 ## Secrets Management
 
 ### Use agenix
+
 ```nix
 {
   # Never store secrets in plain text
@@ -510,6 +527,7 @@ systemd-analyze security --no-pager myservice.service
 ```
 
 ### Prevent Secrets in Nix Store
+
 ```nix
 {
   # Don't do this:
@@ -527,6 +545,7 @@ systemd-analyze security --no-pager myservice.service
 ## Monitoring and Auditing
 
 ### Audit Framework
+
 ```nix
 {
   # Enable audit framework
@@ -551,6 +570,7 @@ systemd-analyze security --no-pager myservice.service
 ```
 
 ### ClamAV Antivirus
+
 ```nix
 {
   services.clamav = {
@@ -580,6 +600,7 @@ systemd-analyze security --no-pager myservice.service
 ## Network Security
 
 ### OpenSnitch Firewall
+
 ```nix
 {
   # Application-level firewall
@@ -595,6 +616,7 @@ systemd-analyze security --no-pager myservice.service
 ```
 
 ### VPN Configuration
+
 ```nix
 {
   # WireGuard VPN
@@ -634,6 +656,7 @@ systemd-analyze security --no-pager myservice.service
 ## Testing Security Configuration
 
 ### Check Open Ports
+
 ```bash
 # Local ports
 ss -tulpn
@@ -643,6 +666,7 @@ nmap hostname
 ```
 
 ### Verify AppArmor
+
 ```bash
 # Check status
 sudo aa-status
@@ -652,6 +676,7 @@ sudo journalctl -u apparmor
 ```
 
 ### Test Service Hardening
+
 ```bash
 # Analyze security
 systemd-analyze security service-name

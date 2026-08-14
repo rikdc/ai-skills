@@ -157,6 +157,7 @@ src = ./path/to/file;  # Not /absolute/path
 # In pure eval, paths must be relative
 # Don't use: /home/user/file
 # Use: ./file or ./relative/path
+
 ```
 
 ### Import from Derivation (IFD)
@@ -245,6 +246,7 @@ ls -la
 
 # Library not found
 # Add to buildInputs and check PKG_CONFIG_PATH
+
 ```
 
 ### Test Failures
@@ -364,6 +366,7 @@ ls -l result/
 
 # Files should be readable
 # Executables should have +x
+
 ```
 
 **Fix:**
@@ -507,6 +510,7 @@ let x = 1; in x + 1  # Correct
 # 4. Comments
 /* Multi-line comment */
 # Single-line comment
+
 ```
 
 ### Module Conflicts
@@ -555,6 +559,7 @@ lib.splitString "," "a,b,c"  # [ "a" "b" "c" ]
 
 # Check option type
 # Look at option definition to see expected type
+
 ```
 
 ## System Issues
@@ -656,6 +661,7 @@ nix eval --show-stats .#value
 # Use builtins when possible
 # Minimize use of import
 # Cache computed values
+
 ```
 
 ### Slow Builds

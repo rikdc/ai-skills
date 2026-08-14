@@ -12,6 +12,7 @@ Deploy NixOS configurations safely to local and remote systems.
 ## Quick Commands
 
 ### Local Deployment
+
 ```bash
 # Build and switch
 sudo nixos-rebuild switch --flake .
@@ -27,6 +28,7 @@ sudo nixos-rebuild boot --flake .#hostname
 ```
 
 ### Remote Deployment
+
 ```bash
 # Deploy to remote host
 nixos-rebuild switch --flake .#remote-host \
@@ -51,6 +53,7 @@ nixos-rebuild switch --flake .#remote-host \
 4. **Confirm target**: Make sure user wants to deploy to that specific host
 
 ### Pre-Deployment Checks
+
 ```bash
 # 1. Check for uncommitted changes
 git status
@@ -68,9 +71,10 @@ nixos-rebuild build --flake .#hostname
 nixos-rebuild build --flake .#hostname 2>&1 | grep -i warn
 ```
 
-## Local Deployment
+## Local Deployment Workflows
 
 ### Standard Deployment
+
 ```bash
 # Build and switch
 sudo nixos-rebuild switch --flake .
@@ -84,6 +88,7 @@ sudo nixos-rebuild switch --flake .
 ```
 
 ### Test Before Committing
+
 ```bash
 # Test configuration without bootloader
 sudo nixos-rebuild test --flake .#hostname
@@ -97,6 +102,7 @@ sudo nixos-rebuild switch --flake .#hostname
 ```
 
 ### Boot-Only Deployment
+
 ```bash
 # Activate on next reboot
 sudo nixos-rebuild boot --flake .#hostname
@@ -105,9 +111,10 @@ sudo nixos-rebuild boot --flake .#hostname
 sudo reboot
 ```
 
-## Remote Deployment
+## Remote Deployment Workflows
 
 ### SSH Setup
+
 ```bash
 # Ensure SSH access
 ssh user@remote-host
@@ -120,6 +127,7 @@ ssh user@remote-host sudo echo OK
 ```
 
 ### Deploy to Remote
+
 ```bash
 # Full remote deployment
 nixos-rebuild switch --flake .#remote-host \
@@ -134,6 +142,7 @@ nixos-rebuild switch --flake .#remote-host \
 ```
 
 ### Deploy Multiple Hosts
+
 ```bash
 # Deploy to multiple hosts
 for host in host1 host2 host3; do
@@ -147,6 +156,7 @@ done
 ## Repository-Specific Deployment
 
 ### Using Makefile
+
 ```bash
 # Local deployment
 make switch
@@ -164,6 +174,7 @@ make host/hostname/build
 ```
 
 ### Direct Commands
+
 ```bash
 # Build current system
 sudo nixos-rebuild switch --flake .
@@ -180,6 +191,7 @@ nixos-rebuild switch --flake .#hostname \
 ## Deployment Strategies
 
 ### Canary Deployment
+
 ```bash
 # 1. Deploy to test host first
 nixos-rebuild switch --flake .#test-host \
@@ -197,6 +209,7 @@ nixos-rebuild switch --flake .#prod-host \
 ```
 
 ### Rolling Deployment
+
 ```bash
 # Deploy one host at a time
 hosts=(web1 web2 web3)
@@ -221,6 +234,7 @@ done
 ```
 
 ### Blue-Green Deployment
+
 ```bash
 # Deploy to blue environment
 nixos-rebuild boot --flake .#host-blue \
@@ -236,11 +250,13 @@ sleep 60
 # Update load balancer, DNS, etc.
 
 # Deploy to green later
+
 ```
 
 ## Rollback Procedures
 
 ### Immediate Rollback
+
 ```bash
 # List generations
 sudo nixos-rebuild list-generations
@@ -253,6 +269,7 @@ sudo nixos-rebuild switch --switch-generation 42
 ```
 
 ### Remote Rollback
+
 ```bash
 # Rollback remote host
 ssh user@remote-host \
@@ -264,14 +281,17 @@ ssh user@remote-host \
 ```
 
 ### Boot Menu Rollback
+
 ```
 # At boot, select previous generation from bootloader menu
 # GRUB or systemd-boot will show all generations
+
 ```
 
 ## Monitoring Deployment
 
 ### Watch Deployment Progress
+
 ```bash
 # Deploy with verbose output
 sudo nixos-rebuild switch --flake .#hostname --show-trace
@@ -284,6 +304,7 @@ journalctl -f
 ```
 
 ### Verify Deployment
+
 ```bash
 # Check system version
 nixos-version
@@ -314,6 +335,7 @@ journalctl -p err -b
 ## Common Deployment Patterns
 
 ### Update and Deploy
+
 ```bash
 # Update flake inputs
 nix flake update
@@ -330,6 +352,7 @@ sudo nixos-rebuild switch --flake .
 ```
 
 ### Staged Deployment
+
 ```bash
 # 1. Build configuration
 nixos-rebuild build --flake .#hostname
@@ -342,6 +365,7 @@ sudo nixos-rebuild switch --flake .#hostname
 ```
 
 ### Emergency Deploy
+
 ```bash
 # For urgent fixes, can skip dry-build
 # But still test first!
@@ -359,6 +383,7 @@ journalctl -f
 ## Troubleshooting Deployments
 
 ### Build Failures
+
 ```bash
 # Build fails during deployment
 sudo nixos-rebuild switch --flake .#hostname --show-trace
@@ -374,6 +399,7 @@ sudo nixos-rebuild switch --flake .
 ```
 
 ### Service Failures After Deploy
+
 ```bash
 # Check failed services
 systemctl --failed
@@ -389,6 +415,7 @@ sudo nixos-rebuild switch --rollback
 ```
 
 ### SSH Connection Lost
+
 ```bash
 # If remote deployment loses connection
 # Wait for deployment to complete
@@ -405,6 +432,7 @@ ssh user@remote-host systemctl status
 ```
 
 ### Disk Space Issues
+
 ```bash
 # Clean old generations before deploying, keeping recent rollback targets
 sudo nix-collect-garbage --delete-older-than 30d
@@ -419,6 +447,7 @@ df -h /nix
 ## Automation
 
 ### Automated Deployment Script
+
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
@@ -453,6 +482,7 @@ echo "Deployment complete!"
 ```
 
 ### CI/CD Integration
+
 ```bash
 # Example GitHub Actions workflow
 # .github/workflows/deploy.yml
@@ -479,15 +509,18 @@ jobs:
 ## Security Considerations
 
 ### Secrets in Deployment
+
 ```bash
 # Never deploy with secrets in plain text
 # Use agenix for secrets management
 
 # Secrets are deployed encrypted
 # Decrypted at activation time
+
 ```
 
 ### Deployment Authentication
+
 ```bash
 # Use SSH keys, not passwords
 ssh-keygen -t ed25519
@@ -498,6 +531,7 @@ ssh-copy-id user@remote-host
 # Restrict sudo if needed
 # In /etc/sudoers.d/nixos-rebuild:
 # user ALL=(ALL) NOPASSWD: /run/current-system/sw/bin/nixos-rebuild
+
 ```
 
 ## Resources

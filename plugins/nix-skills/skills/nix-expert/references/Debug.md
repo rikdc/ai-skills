@@ -12,6 +12,7 @@ Debug Nix expressions, evaluation errors, and build failures.
 ## Quick Commands
 
 ### Evaluation Debugging
+
 ```bash
 # Show evaluation trace
 nix eval .#package --show-trace
@@ -27,6 +28,7 @@ nix eval .#nixosConfigurations.hostname.config.services
 ```
 
 ### Build Debugging
+
 ```bash
 # Build with full logs
 nix build .#package -L
@@ -43,6 +45,7 @@ nix build .#package -vvv --show-trace -L
 ```
 
 ### Interactive Debugging
+
 ```bash
 # Enter build environment
 nix develop .#package
@@ -60,6 +63,7 @@ buildPhase
 ## Understanding Error Messages
 
 ### Infinite Recursion
+
 ```
 error: infinite recursion encountered
 ```
@@ -82,6 +86,7 @@ error: infinite recursion encountered
 ```
 
 ### Attribute Not Found
+
 ```
 error: attribute 'foo' missing
 ```
@@ -99,6 +104,7 @@ nix eval .#package --show-trace
 ```
 
 ### Type Errors
+
 ```
 error: value is a set while a string was expected
 ```
@@ -116,6 +122,7 @@ nix eval .#value --show-trace
 ```
 
 ### Hash Mismatches
+
 ```
 error: hash mismatch in fixed-output derivation
   got:    sha256-AAAA...
@@ -133,6 +140,7 @@ nix-prefetch-github owner repo --rev commit-hash
 ## Debugging Techniques
 
 ### Trace Values
+
 ```nix
 # Simple trace
 value = builtins.trace "Debug: ${toString someValue}" someValue;
@@ -149,6 +157,7 @@ value = lib.traceValSeqN 3 someNestedValue;
 ```
 
 ### Evaluate Expressions
+
 ```bash
 # Evaluate simple expression
 nix eval --expr '1 + 1'
@@ -167,6 +176,7 @@ nix eval .#package --xml
 ```
 
 ### Check Configuration
+
 ```bash
 # Check NixOS configuration validity
 nixos-rebuild build --flake .#hostname --dry-run
@@ -184,6 +194,7 @@ nixos-option services.nginx.enable
 ## Debugging Build Failures
 
 ### Inspect Build Environment
+
 ```bash
 # Enter build environment
 nix develop .#package
@@ -201,6 +212,7 @@ echo $PKG_CONFIG_PATH
 ```
 
 ### Manual Build Steps
+
 ```bash
 # Enter development shell
 nix develop .#package
@@ -223,6 +235,7 @@ installPhase
 ```
 
 ### Inspect Failed Build
+
 ```bash
 # Build with --keep-failed
 nix build .#package --keep-failed
@@ -243,6 +256,7 @@ make
 ```
 
 ### Debug Build Script
+
 ```bash
 # Show builder script
 nix show-derivation .#package | jq '.[].env.builder'
@@ -257,6 +271,7 @@ nix develop .#package --command printenv
 ## Debugging Evaluation Errors
 
 ### Stack Traces
+
 ```bash
 # Show full stack trace
 nix eval .#package --show-trace
@@ -269,9 +284,11 @@ nix eval .#package --show-trace
 #           42|     baz = foo;
 #              |           ^
 #           43|   };
+
 ```
 
 ### Find Definition Location
+
 ```bash
 # Find where option is defined
 nix eval .#nixosConfigurations.hostname.options.services.nginx.enable.definitionsWithLocations
@@ -281,6 +298,7 @@ nix eval .#nixosConfigurations.hostname.options.services.nginx.enable.files
 ```
 
 ### Check Module Evaluation
+
 ```bash
 # Evaluate specific module
 nix eval -f ./module.nix
@@ -295,6 +313,7 @@ nix-instantiate --eval --strict ./module.nix
 ## Debugging Package Builds
 
 ### Check Dependencies
+
 ```bash
 # Show build dependencies
 nix-store -q --references $(nix-build -A package)
@@ -310,6 +329,7 @@ nix-store --query --roots $(nix-build -A package)
 ```
 
 ### Missing Dependencies
+
 ```bash
 # Check what's needed
 ldd result/bin/program
@@ -322,6 +342,7 @@ nativeBuildInputs = [ autoPatchelfHook ];
 ```
 
 ### Wrong Version Built
+
 ```bash
 # Check what will be built
 nix-build '<nixpkgs>' -A package --dry-run
@@ -336,6 +357,7 @@ nix build nixpkgs/nixos-23.11#package
 ## Debugging NixOS Configurations
 
 ### Configuration Evaluation
+
 ```bash
 # Build configuration
 nixos-rebuild build --flake .#hostname --show-trace
@@ -348,6 +370,7 @@ nix eval .#nixosConfigurations.hostname.config.system.stateVersion
 ```
 
 ### Module Conflicts
+
 ```
 error: The option `services.foo.enable' is defined multiple times
 ```
@@ -362,6 +385,7 @@ nix eval .#nixosConfigurations.hostname.options._module.args --apply "x: builtin
 ```
 
 ### Service Failures
+
 ```bash
 # Check service status after deployment
 systemctl status servicename
@@ -379,6 +403,7 @@ cat /etc/systemd/system/servicename.service
 ## Debugging Flakes
 
 ### Flake Evaluation
+
 ```bash
 # Check flake
 nix flake check
@@ -394,6 +419,7 @@ nix flake lock --update-input nixpkgs
 ```
 
 ### Input Problems
+
 ```bash
 # Check inputs
 nix flake metadata | grep -A 10 Inputs
@@ -406,6 +432,7 @@ nix flake metadata --json | jq .locks
 ```
 
 ### Pure Evaluation Errors
+
 ```
 error: access to absolute path '/home/...' is forbidden in pure eval mode
 ```
@@ -426,6 +453,7 @@ nix build --impure
 ## Advanced Debugging
 
 ### Debug with nix repl
+
 ```bash
 # Start repl
 nix repl
@@ -448,6 +476,7 @@ outputs.nixosConf[TAB]
 ```
 
 ### Profile Evaluation
+
 ```bash
 # Time evaluation
 time nix eval .#package
@@ -460,6 +489,7 @@ nix build .#package --profile /tmp/profile
 ```
 
 ### Debug with breakpoints
+
 ```nix
 # In your expression
 value = builtins.break (someExpression);
@@ -470,11 +500,13 @@ value = builtins.break (someExpression);
 # :quit - Abort evaluation
 # :env - Show environment
 # :value - Show current value
+
 ```
 
 ## Common Debug Patterns
 
 ### Print and Return
+
 ```nix
 # Debug helper
 debug = msg: val: builtins.trace msg val;
@@ -484,6 +516,7 @@ result = debug "Processing ${name}" (processValue value);
 ```
 
 ### Conditional Debugging
+
 ```nix
 # Only debug when flag is set
 let
@@ -497,6 +530,7 @@ in
 ```
 
 ### Assert Debugging
+
 ```nix
 # Use assertions to catch errors early
 { ... }:
@@ -514,6 +548,7 @@ lib.assertMsg someCondition "Error: condition not met"
 ## Debugging Tools
 
 ### nix-tree
+
 ```bash
 # Install
 nix-shell -p nix-tree
@@ -523,12 +558,14 @@ nix-tree $(nix-build -A package)
 ```
 
 ### nix-diff
+
 ```bash
 # Compare two derivations
 nix-diff $(nix-build -A package1) $(nix-build -A package2)
 ```
 
 ### nix-du
+
 ```bash
 # Analyze disk usage
 nix-du -s=500MB
@@ -551,6 +588,7 @@ nix-du | head -20
 ## Emergency Debugging
 
 ### System Won't Boot
+
 ```bash
 # Boot to previous generation (at boot menu)
 # Or from rescue system:
@@ -570,6 +608,7 @@ nix-env --list-generations --profile /nix/var/nix/profiles/system
 ```
 
 ### Out of Disk Space
+
 ```bash
 # Clean old generations, keeping the last 30 days of rollback targets
 nix-collect-garbage --delete-older-than 30d

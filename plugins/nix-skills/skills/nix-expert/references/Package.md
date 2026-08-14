@@ -12,6 +12,7 @@ Create, maintain, and debug Nix packages.
 ## Quick Commands
 
 ### Building Packages
+
 ```bash
 # Build package
 nix build .#package-name
@@ -27,6 +28,7 @@ nix profile install .#package-name
 ```
 
 ### Testing Packages
+
 ```bash
 # Build and test
 nix build .#package-name --rebuild
@@ -41,6 +43,7 @@ nix eval .#package-name.outputs
 ## Package Structure
 
 ### Basic Package Template
+
 ```nix
 # pkgs/mypackage/default.nix
 { lib
@@ -70,6 +73,7 @@ stdenv.mkDerivation rec {
 ```
 
 ### Using callPackage
+
 ```nix
 # pkgs/default.nix
 { pkgs }:
@@ -82,6 +86,7 @@ stdenv.mkDerivation rec {
 ## Language-Specific Packaging
 
 ### Go Packages
+
 ```nix
 { lib
 , buildGoModule
@@ -123,6 +128,7 @@ buildGoModule rec {
 ```
 
 #### Getting vendorHash
+
 ```bash
 # Method 1: Use fake hash
 # Set: vendorHash = lib.fakeSha256;
@@ -138,6 +144,7 @@ nix build .#mygoapp 2>&1 | grep "got:"
 ```
 
 ### Rust Packages
+
 ```nix
 { lib
 , rustPlatform
@@ -172,6 +179,7 @@ rustPlatform.buildRustPackage rec {
 ```
 
 ### Python Packages
+
 ```nix
 { lib
 , python3Packages
@@ -208,6 +216,7 @@ python3Packages.buildPythonPackage rec {
 ```
 
 ### Node.js Packages
+
 ```nix
 { lib
 , buildNpmPackage
@@ -242,6 +251,7 @@ buildNpmPackage rec {
 ## Source Fetchers
 
 ### fetchFromGitHub
+
 ```nix
 src = fetchFromGitHub {
   owner = "owner";
@@ -255,6 +265,7 @@ nix-prefetch-github owner repo --rev v1.0.0
 ```
 
 ### fetchurl
+
 ```nix
 src = fetchurl {
   url = "https://example.com/file-${version}.tar.gz";
@@ -266,6 +277,7 @@ nix-prefetch-url https://example.com/file.tar.gz
 ```
 
 ### fetchgit
+
 ```nix
 src = fetchgit {
   url = "https://git.example.com/repo.git";
@@ -275,6 +287,7 @@ src = fetchgit {
 ```
 
 ### fetchzip
+
 ```nix
 src = fetchzip {
   url = "https://example.com/archive.zip";
@@ -286,6 +299,7 @@ src = fetchzip {
 ## Build Phases
 
 ### Standard Phases
+
 ```nix
 stdenv.mkDerivation {
   # ...
@@ -312,6 +326,7 @@ stdenv.mkDerivation {
 ```
 
 ### Custom Phases
+
 ```nix
 stdenv.mkDerivation {
   # ...
@@ -330,6 +345,7 @@ stdenv.mkDerivation {
 ```
 
 ### Skip Phases
+
 ```nix
 stdenv.mkDerivation {
   # ...
@@ -348,6 +364,7 @@ stdenv.mkDerivation {
 ## Dependencies
 
 ### Types of Dependencies
+
 ```nix
 stdenv.mkDerivation {
   # Build-time dependencies (native to build platform)
@@ -376,6 +393,7 @@ stdenv.mkDerivation {
 ```
 
 ### Finding Dependencies
+
 ```bash
 # Search for package
 nix search nixpkgs openssl
@@ -390,6 +408,7 @@ nix-locate --top-level lib/libssl.so
 ## Multiple Outputs
 
 ### Define Outputs
+
 ```nix
 stdenv.mkDerivation {
   pname = "myapp";
@@ -414,6 +433,7 @@ stdenv.mkDerivation {
 ```
 
 ### Use Specific Output
+
 ```bash
 # Build specific output
 nix build .#package.dev
@@ -425,6 +445,7 @@ nix profile install .#package.doc
 ## Overriding Packages
 
 ### Override Attributes
+
 ```nix
 # Override specific attributes
 mypackage = pkgs.mypackage.overrideAttrs (old: {
@@ -436,6 +457,7 @@ mypackage = pkgs.mypackage.overrideAttrs (old: {
 ```
 
 ### Override Arguments
+
 ```nix
 # Override function arguments
 mypackage = pkgs.mypackage.override {
@@ -444,6 +466,7 @@ mypackage = pkgs.mypackage.override {
 ```
 
 ### Add Patches
+
 ```nix
 mypackage = pkgs.mypackage.overrideAttrs (old: {
   patches = (old.patches or []) ++ [
@@ -455,6 +478,7 @@ mypackage = pkgs.mypackage.overrideAttrs (old: {
 ## Meta Attributes
 
 ### Complete Meta Example
+
 ```nix
 meta = with lib; {
   description = "Short one-line description";
@@ -478,6 +502,7 @@ meta = with lib; {
 ```
 
 ### Common Licenses
+
 ```nix
 licenses.mit
 licenses.gpl3
@@ -492,6 +517,7 @@ licenses.unfree
 ## Testing Packages
 
 ### Build and Test
+
 ```bash
 # Build package
 nix build .#mypackage -L
@@ -504,6 +530,7 @@ nix build .#mypackage.tests.sometest
 ```
 
 ### Test Installation
+
 ```bash
 # Install to temporary profile
 nix profile install .#mypackage --profile /tmp/test-profile
@@ -516,6 +543,7 @@ rm -rf /tmp/test-profile
 ```
 
 ### Check Dependencies
+
 ```bash
 # List runtime dependencies
 nix-store -q --references $(nix build .#mypackage --no-link --print-out-paths)
@@ -530,6 +558,7 @@ nix-store -q --tree result | grep unwanted
 ## Debugging Packages
 
 ### Build Failures
+
 ```bash
 # Keep build directory on failure
 nix build .#mypackage --keep-failed
@@ -541,6 +570,7 @@ cat build.log
 ```
 
 ### Enter Build Environment
+
 ```bash
 # Enter environment
 nix develop .#mypackage
@@ -553,6 +583,7 @@ buildPhase
 ```
 
 ### Check Build Script
+
 ```bash
 # Show derivation
 nix show-derivation .#mypackage
@@ -580,6 +611,7 @@ nix show-derivation .#mypackage | jq '.[].args'
 ## Common Patterns
 
 ### Wrapper Script
+
 ```nix
 { lib, stdenv, makeWrapper, myapp, dependency }:
 
@@ -597,6 +629,7 @@ stdenv.mkDerivation {
 ```
 
 ### Conditional Features
+
 ```nix
 { lib
 , stdenv
@@ -616,6 +649,7 @@ stdenv.mkDerivation {
 ```
 
 ### Platform-Specific
+
 ```nix
 { lib, stdenv, darwin }:
 

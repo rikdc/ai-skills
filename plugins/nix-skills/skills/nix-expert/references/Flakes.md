@@ -12,6 +12,7 @@ Work with Nix flakes: create, update, manage inputs and outputs.
 ## Quick Commands
 
 ### Basic Flake Commands
+
 ```bash
 # Initialize new flake
 nix flake init
@@ -36,6 +37,7 @@ nix flake update nixpkgs
 ```
 
 ### Lock File Management
+
 ```bash
 # Lock dependencies
 nix flake lock
@@ -53,6 +55,7 @@ nix flake metadata --json | jq .locks
 ## Flake Structure
 
 ### Basic Flake Template
+
 ```nix
 {
   description = "A very basic flake";
@@ -68,6 +71,7 @@ nix flake metadata --json | jq .locks
 ```
 
 ### Complete Flake Template
+
 ```nix
 {
   description = "Complete flake example";
@@ -117,6 +121,7 @@ nix flake metadata --json | jq .locks
 ## Flake Inputs
 
 ### Input Formats
+
 ```nix
 inputs = {
   # GitHub repository (latest)
@@ -146,6 +151,7 @@ inputs = {
 ```
 
 ### Following Inputs
+
 ```nix
 inputs = {
   nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
@@ -170,6 +176,7 @@ inputs = {
 ## Flake Outputs
 
 ### Output Types
+
 ```nix
 outputs = { self, nixpkgs }: {
   # Packages
@@ -210,6 +217,7 @@ outputs = { self, nixpkgs }: {
 ```
 
 ### Per-System Outputs
+
 ```nix
 {
   outputs = { self, nixpkgs }: let
@@ -237,6 +245,7 @@ outputs = { self, nixpkgs }: {
 ```
 
 ### Using flake-utils
+
 ```nix
 {
   inputs = {
@@ -259,6 +268,7 @@ outputs = { self, nixpkgs }: {
 ## Managing Lock Files
 
 ### Lock File Structure
+
 ```json
 {
   "nodes": {
@@ -283,6 +293,7 @@ outputs = { self, nixpkgs }: {
 ```
 
 ### Lock File Operations
+
 ```bash
 # Create or update lock file
 nix flake lock
@@ -300,6 +311,7 @@ git commit -m "chore: update flake inputs"
 ```
 
 ### Pin Specific Revision
+
 ```nix
 inputs = {
   # Pin to specific commit
@@ -319,6 +331,7 @@ nix build --override-input nixpkgs github:nixos/nixpkgs/main
 ## Flake Templates
 
 ### Create Template
+
 ```nix
 # templates/go/flake.nix
 {
@@ -342,6 +355,7 @@ nix build --override-input nixpkgs github:nixos/nixpkgs/main
 ```
 
 ### Use Template
+
 ```bash
 # List available templates
 nix flake show templates
@@ -354,6 +368,7 @@ nix flake init -t github:user/repo#template-name
 ```
 
 ### Provide Templates
+
 ```nix
 # In your flake
 {
@@ -377,6 +392,7 @@ nix flake init -t github:user/repo#template-name
 ## Flake Registries
 
 ### Add Registry Entry
+
 ```bash
 # Add flake to registry
 nix registry add myflake github:user/repo
@@ -386,6 +402,7 @@ nix build myflake#package
 ```
 
 ### Pin Registry Entry
+
 ```bash
 # Pin to specific revision
 nix registry pin nixpkgs
@@ -395,6 +412,7 @@ nix registry remove nixpkgs
 ```
 
 ### Custom Registry
+
 ```nix
 # ~/.config/nix/registry.json
 {
@@ -418,6 +436,7 @@ nix registry remove nixpkgs
 ## Flake Development Workflows
 
 ### Local Development
+
 ```bash
 # Test changes without committing
 nix build .
@@ -430,6 +449,7 @@ nix build github:user/repo/commit-hash
 ```
 
 ### Override Inputs
+
 ```bash
 # Override input temporarily
 nix build --override-input nixpkgs path:/local/nixpkgs
@@ -439,6 +459,7 @@ nix build --override-input mylib path:/home/user/mylib
 ```
 
 ### Flake References
+
 ```bash
 # Current directory
 nix build .
@@ -464,6 +485,7 @@ nix build git+https://example.com/repo.git
 ## Flake Compatibility
 
 ### For Non-Flake Users
+
 ```nix
 # default.nix
 (import (
@@ -477,6 +499,7 @@ nix build git+https://example.com/repo.git
 ```
 
 ### Shell.nix for Legacy
+
 ```nix
 # shell.nix
 (import (
@@ -505,6 +528,7 @@ nix build git+https://example.com/repo.git
 ## Common Patterns
 
 ### Multi-System Support
+
 ```nix
 {
   outputs = { self, nixpkgs }: let
@@ -519,6 +543,7 @@ nix build git+https://example.com/repo.git
 ```
 
 ### Overlay Pattern
+
 ```nix
 {
   outputs = { self, nixpkgs }: {
@@ -539,6 +564,7 @@ nix build git+https://example.com/repo.git
 ```
 
 ### Module Pattern
+
 ```nix
 {
   outputs = { self, nixpkgs }: {
@@ -569,6 +595,7 @@ nix build git+https://example.com/repo.git
 ## Troubleshooting
 
 ### Dirty Tree Errors
+
 ```
 error: Git tree is dirty
 ```
@@ -583,6 +610,7 @@ nix build --impure
 ```
 
 ### Input Not Found
+
 ```
 error: input 'nixpkgs' not found
 ```
@@ -596,6 +624,7 @@ nix flake lock
 ```
 
 ### Lock File Conflicts
+
 ```bash
 # After merge conflict in flake.lock
 nix flake lock
