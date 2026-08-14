@@ -1,0 +1,11 @@
+{
+  "name": "nix-skills",
+  "description": "Expert guidance on Nix, NixOS, and home-manager — expressions, flakes, packaging, secrets, and hardening",
+  "version": "1.0.0",
+  "author": {
+    "name": "Richard Claydon"
+  },
+  "license": "MPL-2.0",
+  "keywords": ["skills", "nix", "nixos", "home-manager", "flakes", "homelab"],
+  "skills": ["./skills/"]
+}

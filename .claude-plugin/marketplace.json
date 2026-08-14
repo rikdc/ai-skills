@@ -33,6 +33,14 @@
       "category": "skills"
     },
     {
+      "name": "nix-skills",
+      "source": "./plugins/nix-skills",
+      "description": "Expert guidance on Nix, NixOS, and home-manager — expressions, flakes, packaging, secrets, and hardening",
+      "version": "1.0.0",
+      "keywords": ["skills", "nix", "nixos", "home-manager", "flakes", "homelab"],
+      "category": "skills"
+    },
+    {
       "name": "git-workflow",
       "source": "./plugins/git-workflow",
       "description": "Git workflow automation skills for commits, PRs, and changelog management",

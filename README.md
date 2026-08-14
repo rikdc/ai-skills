@@ -1,6 +1,6 @@
 # AI Skills
 
-A Claude Code marketplace of seven plugins. Two are security hooks: one scans
+A Claude Code marketplace of eight plugins. Two are security hooks: one scans
 MCP traffic for secrets, the other stops you editing protected branches
 directly. The rest are skills and commands for Go work, git workflow, code
 review, project management, and prompt engineering.
@@ -21,6 +21,7 @@ claude plugin install pm-tools@ai-skills
 claude plugin install code-quality@ai-skills
 claude plugin install prompt-tools@ai-skills
 claude plugin install pr-review-triage@ai-skills
+claude plugin install nix-skills@ai-skills
 ```
 
 The `/plugin` command does the same thing from inside a session.
@@ -47,6 +48,7 @@ make test
 | [code-quality](plugins/code-quality/) | Development | Code quality analysis, review, and comment cleanup |
 | [prompt-tools](plugins/prompt-tools/) | AI | Prompt generation and review |
 | [pr-review-triage](plugins/pr-review-triage/) | Workflow | Triage of PR review comments and follow-up tracking |
+| [nix-skills](plugins/nix-skills/) | Development | Expert guidance on Nix, NixOS, and home-manager |
 
 ## Security hooks
 
