@@ -1,4 +1,4 @@
-# Claude Code Template - Git Ignore Rules
+# AI Skills - Git Ignore Rules
 
 # Security scan logs (sensitive data may be logged)
 *.log
@@ -9,6 +9,9 @@ security-scan.log
 tests/output/
 tests/**/test-results.log
 lint-report.txt
+
+# claudelint cache
+.claudelint-cache/
 
 # Temporary files
 *.tmp

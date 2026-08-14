@@ -29,7 +29,7 @@ claude code plugins install security-hooks
 Or install from this repository:
 
 ```bash
-claude code plugins install github:rikdc/claude_code_template/security-hooks
+claude code plugins install github:rikdc/ai-skills/security-hooks
 ```
 
 ## Configuration

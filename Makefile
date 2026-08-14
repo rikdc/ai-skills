@@ -1,4 +1,4 @@
-# Makefile for Claude Code Template
+# Makefile for AI Skills
 # Provides a simple interface for common operations
 
 # Configuration
@@ -20,7 +20,13 @@ PROTECT_BRANCH_SCRIPT := $(HOOKS_DIR)/protect-main-branch.sh
 MANIFEST_FILE := $(PLUGIN_DIR)/.claude-plugin/plugin.json
 TEST_SCRIPT := $(TESTS_DIR)/test-scanner.sh
 TEST_PROTECT_BRANCH_SCRIPT := $(TESTS_DIR)/test-protect-main-branch.sh
+TEST_MARKETPLACE_SCRIPT := $(TESTS_DIR)/test-marketplace.sh
+TEST_CODEX_SKILLS_SCRIPT := $(TESTS_DIR)/test-codex-skills.sh
 VALIDATE_SCRIPT := $(SCRIPTS_DIR)/validate-config.sh
+SYNC_CODEX_SKILLS_SCRIPT := $(SCRIPTS_DIR)/sync-codex-skills.sh
+
+# Pinned tool versions
+CLAUDELINT_VERSION := 0.7.1
 
 # Colors for output
 BLUE := \033[0;34m
@@ -41,6 +47,12 @@ test: ## Run complete test suite
 	@echo
 	@echo -e "$(BLUE)🧪 Running protected branch hook tests...$(NC)"
 	@$(TEST_PROTECT_BRANCH_SCRIPT)
+	@echo
+	@echo -e "$(BLUE)🧪 Running marketplace consistency tests...$(NC)"
+	@$(TEST_MARKETPLACE_SCRIPT)
+	@echo
+	@echo -e "$(BLUE)🧪 Running Codex skill symlink tests...$(NC)"
+	@$(TEST_CODEX_SKILLS_SCRIPT)
 
 .PHONY: validate
 validate: ## Validate plugin manifest, hook scripts, and dependencies
@@ -67,6 +79,18 @@ lint: ## Run ShellCheck on shell scripts and markdownlint on Markdown files
 	else \
 		echo -e "  $(YELLOW)⚠️  markdownlint not installed - skipping Markdown linting$(NC)"; \
 	fi
+	@echo
+	@$(MAKE) --no-print-directory lint-claude
+
+.PHONY: lint-claude
+lint-claude: ## Run claudelint on Claude Code configuration
+	@echo "Claude configuration:"
+	@if command -v npx >/dev/null 2>&1; then \
+		npx --yes claude-code-lint@$(CLAUDELINT_VERSION) check-all && \
+		echo -e "  $(GREEN)✅ claudelint passed$(NC)"; \
+	else \
+		echo -e "  $(YELLOW)⚠️  npx not installed - skipping Claude configuration linting$(NC)"; \
+	fi
 
 ##@ Installation and Setup
 
@@ -86,6 +110,10 @@ clean: ## Remove test artifacts and logs
 	@find "$(PLUGIN_DIR)" -name "*.log" -type f -delete 2>/dev/null || true
 	@find "$(TESTS_DIR)" -name "*.log" -type f -delete 2>/dev/null || true
 	@echo -e "$(GREEN)✅ Cleanup complete$(NC)"
+
+.PHONY: sync-codex-skills
+sync-codex-skills: ## Sync .codex/skills symlinks with plugins/*/skills
+	@$(SYNC_CODEX_SKILLS_SCRIPT)
 
 ##@ Development
 
@@ -124,7 +152,7 @@ check-tools: ## Check for required and optional tools
 
 .PHONY: status
 status: ## Show current status and configuration
-	@echo -e "$(BLUE)📊 Claude Code Template Status$(NC)"
+	@echo -e "$(BLUE)📊 AI Skills Status$(NC)"
 	@echo
 	@echo "Configuration:"
 	@echo "  Project root: $(PROJECT_ROOT)"
@@ -139,7 +167,7 @@ status: ## Show current status and configuration
 
 .PHONY: help
 help: ## Display this help
-	@echo -e "$(BLUE)Claude Code Template - Make Targets$(NC)"
+	@echo -e "$(BLUE)AI Skills - Make Targets$(NC)"
 	@echo
 	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) }' $(MAKEFILE_LIST)
 	@echo
@@ -148,6 +176,7 @@ help: ## Display this help
 	@echo "  make validate          # Validate plugin configuration"
 	@echo "  make lint              # Run code quality checks"
 	@echo "  make install           # Make hook scripts executable"
+	@echo "  make sync-codex-skills # Sync .codex/skills symlinks with plugins/*/skills"
 	@echo "  make clean             # Clean up artifacts"
 	@echo
 

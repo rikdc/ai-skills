@@ -1,11 +1,11 @@
 {
   "name": "dev-skills",
-  "description": "Expert development skills for Go, documentation, architecture, and project management",
+  "description": "Expert development skills for Go, documentation, architecture, shell scripting, and project management",
   "version": "1.0.0",
   "author": {
     "name": "Richard Claydon"
   },
   "license": "MPL-2.0",
-  "keywords": ["skills", "go", "documentation", "architecture", "mentorship"],
+  "keywords": ["skills", "go", "documentation", "architecture", "mentorship", "shell", "bash"],
   "skills": ["./skills/"]
 }

@@ -48,7 +48,7 @@ claude code plugins install git-workflow
 Or install from this repository:
 
 ```bash
-claude code plugins install github:rikdc/claude_code_template/git-workflow
+claude code plugins install github:rikdc/ai-skills/git-workflow
 ```
 
 ## Usage Examples

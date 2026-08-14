@@ -1,67 +1,65 @@
-# Activity Monitor Testing
+# Tests
 
-This directory contains comprehensive tests for the activity monitor security improvements.
+Test suites for the hooks and marketplace configuration in this repository.
+
+Run everything through the Makefile:
+
+```bash
+make test
+```
+
+That runs the three suites below in order. Each is a standalone script, so an
+individual suite can also be run directly.
 
 ## Test Files
 
-### `test-activity-monitor.py`
+### `test-scanner.sh`
 
-Comprehensive Python test suite that validates:
-
-- **Security Validation Functions**: Path traversal protection, data sanitization, input validation
-- **Database Context Manager**: Proper connection handling and cleanup
-- **Input Limits**: JSON size limits and execution duration caps
-- **Integration**: End-to-end testing with mock hook data
-
-### `test-hook-input.sh`
-
-Shell script that tests the hook with realistic JSON input:
-
-- Normal hook events (UserPromptSubmit, PreToolUse)
-- Sensitive data sanitization
-- Malicious input handling
-- Oversized input rejection
-
-## Running Tests
-
-### Security Test Suite
+Functional tests for the MCP security scanner hook. Covers detection of
+sensitive data in MCP request payloads, and confirms non-MCP tool calls pass
+through untouched.
 
 ```bash
-python3 tests/test-activity-monitor.py
+./tests/test-scanner.sh
 ```
 
-### Hook Input Tests
+### `test-protect-main-branch.sh`
+
+Tests for the protected branch hook. The suite is organised around the
+distinction the hook has to get right — blocking writes to a protected branch
+without blocking harmless commands:
+
+- Read-only and non-git Bash on `main` is allowed
+- Read-only git commands and lookalike strings are allowed
+- Genuine writes to a protected branch are blocked
+- Writes hidden behind wrappers, pipelines, and `.git/` paths are blocked
+- Feature branches are unaffected regardless of command
+- Creating a feature branch is allowed, since it is the suggested remedy
 
 ```bash
-./tests/test-hook-input.sh
+./tests/test-protect-main-branch.sh
 ```
 
-### Manual Testing
+### `test-marketplace.sh`
 
-You can manually test the hook by piping JSON to it:
+Consistency checks between each plugin and the marketplace manifest. Every
+plugin's own `.claude-plugin/plugin.json` is treated as the source of truth;
+`marketplace.json` and the docs are derivative, so drift is always reported
+against the plugin manifest.
+
+This suite deliberately does not use `set -e`, so a single run reports every
+failure rather than stopping at the first.
 
 ```bash
-echo '{"hook_event_name": "UserPromptSubmit", "prompt": "test"}' | \
-  python3 .claude/hooks/activity-monitor.py
+./tests/test-marketplace.sh
 ```
 
-## Security Improvements Tested
+## Related Checks
 
-✅ **SQL Injection Prevention**: Parameterized queries prevent injection attacks  
-✅ **Path Traversal Protection**: File paths are validated and sanitized  
-✅ **Data Sanitization**: Sensitive information is masked in logs and database  
-✅ **Input Validation**: All user inputs are validated and sanitized  
-✅ **Size Limits**: JSON input is limited to 1MB to prevent DoS attacks  
-✅ **Context Management**: Database connections use proper cleanup patterns  
+`make test` covers the suites above. Two other checks run separately, and in
+CI:
 
-## Expected Results
-
-All tests should pass with output showing:
-
-- Path traversal attempts are blocked
-- Sensitive data (API keys, passwords, emails) is sanitized
-- Malicious inputs are handled safely
-- Database operations work correctly
-- Integration tests complete successfully
-
-The activity database (`.claude/activity_metrics.db`) should contain sanitized entries with no exposed sensitive information.
+```bash
+make lint          # ShellCheck, markdownlint, and claudelint
+make validate      # Plugin manifest, hook scripts, and dependencies
+```

@@ -1,155 +1,170 @@
-# Claude Code Template
+# AI Skills
 
-Production-ready Claude Code project template with security hooks, workflow automation, and specialized agents for software development.
+A Claude Code marketplace of seven plugins. Two are security hooks: one scans
+MCP traffic for secrets, the other stops you editing protected branches
+directly. The rest are skills and commands for Go work, git workflow, code
+review, project management, and prompt engineering.
 
-## Features
-
-- **Security Hooks**: Prevent sensitive data leaks and enforce branch protection
-- **Slash Commands**: Workflow automation for code quality, documentation, and project management
-- **Specialized Agents**: Expert agents for Go development, code review, and documentation
-- **Testing Infrastructure**: Comprehensive test suite with ~2000 lines of test coverage
-- **Marketplace Plugins**: Modular plugin architecture with 6 installable plugins
+Install only the plugins you want, or clone the repository and work on them.
 
 ## Installation
 
-### Install Individual Plugins
-
-The repository is organized as a marketplace with 6 independent plugins:
+Add the marketplace, then install plugins from it:
 
 ```bash
-# Install specific plugins
-claude code plugins install security-hooks
-claude code plugins install dev-skills
-claude code plugins install git-workflow
-claude code plugins install pm-tools
-claude code plugins install code-quality
-claude code plugins install prompt-tools
+claude plugin marketplace add rikdc/ai-skills
 
-# Or install from GitHub
-claude code plugins install github:rikdc/claude_code_template/security-hooks
+claude plugin install security-hooks@ai-skills
+claude plugin install dev-skills@ai-skills
+claude plugin install git-workflow@ai-skills
+claude plugin install pm-tools@ai-skills
+claude plugin install code-quality@ai-skills
+claude plugin install prompt-tools@ai-skills
+claude plugin install pr-review-triage@ai-skills
 ```
 
-### Clone for Local Development
+The `/plugin` command does the same thing from inside a session.
 
-Clone the entire repository for local development with all components:
+Hooks only take effect after a Claude Code restart.
+
+### Clone for local development
 
 ```bash
-git clone https://github.com/rikdc/claude_code_template.git
-cd claude_code_template
+git clone https://github.com/rikdc/ai-skills.git
+cd ai-skills
 make install
 make test
 ```
 
-## Available Plugins
+## Available plugins
 
 | Plugin | Category | Description |
 |--------|----------|-------------|
 | [security-hooks](plugins/security-hooks/) | Security | MCP security scanner and protected branch hooks |
-| [dev-skills](plugins/dev-skills/) | Development | Expert skills for Go, documentation, and architecture |
-| [git-workflow](plugins/git-workflow/) | Productivity | Git automation for commits, PRs, and changelog |
-| [pm-tools](plugins/pm-tools/) | Productivity | Project management commands for PRDs and tasks |
-| [code-quality](plugins/code-quality/) | Development | Code quality analysis, review, and cleanup |
-| [prompt-tools](plugins/prompt-tools/) | AI | AI prompt generation and review tools |
+| [dev-skills](plugins/dev-skills/) | Development | Skills for Go, documentation, specs, and architecture |
+| [git-workflow](plugins/git-workflow/) | Productivity | Commits, pull requests, and changelog maintenance |
+| [pm-tools](plugins/pm-tools/) | Productivity | PRDs, task generation, and task tracking |
+| [code-quality](plugins/code-quality/) | Development | Code quality analysis, review, and comment cleanup |
+| [prompt-tools](plugins/prompt-tools/) | AI | Prompt generation and review |
+| [pr-review-triage](plugins/pr-review-triage/) | Workflow | Triage of PR review comments and follow-up tracking |
 
-## Security Hooks
+## Security hooks
 
-| Hook | Description |
-|------|-------------|
-| [MCP Security Scanner](docs/mcp-security-scanner.md) | Scans MCP requests for API keys, tokens, database URLs, and PII |
-| [Protected Branch Hook](docs/protect-main-branch-hook.md) | Enforces PR-based workflow by blocking direct edits to protected branches |
+Both hooks run on `PreToolUse` and are configured by the plugin manifest, so
+there is nothing to wire up by hand.
 
-## Slash Commands
+| Hook | Trigger | Behaviour |
+|------|---------|-----------|
+| [MCP security scanner](docs/mcp-security-scanner.md) | Any `mcp__*` tool call | Scans requests for API keys, tokens, database URLs, and PII, then logs what it finds |
+| [Protected branch hook](docs/protect-main-branch-hook.md) | `Edit`, `Write`, `Bash`, `Task` | Blocks writes on `main`, `master`, `production`, and `release`, and tells you to branch first |
 
-### Development
+Detection patterns live in `.claude/security-patterns.conf`. Copy
+`.claude/security-patterns.conf.example` to start from, then add your own.
 
-- `/dev:check` - Comprehensive code quality analysis with parallel auto-fixing
-- `/dev:review` - Performs detailed code review on latest commit
-- `/clean` - Removes redundant comments from codebase
+## Skills
 
-### GitHub Workflow
+`dev-skills`:
 
-- `/git-workflow:commit` - Creates brief conventional commits
-- `/git-workflow:pr` - Creates draft GitHub pull requests from the branch
+- `/dev-skills:golang-expert`: Go advice across concurrency, errors, project structure, performance, and testing
+- `/dev-skills:go-implementor`: writes production Go with tests and observability
+- `/dev-skills:go-review`: Go review for correctness, security, and performance
+- `/dev-skills:document`: API docs, ADRs, architecture docs, and runbooks
+- `/dev-skills:mentor`: senior-engineer perspective on design and technical strategy
+- `/dev-skills:manager`: coordinates work that spans several specialists
+- `/dev-skills:specify`: turns designs into implementable specifications
+- `/dev-skills:taskify`: breaks specifications into atomic tasks
 
-### Project Management
+`git-workflow`:
 
-- `/pm:create-prd` - Interactive PRD creation with clarifying questions
-- `/pm:generate-tasks` - Generates task lists from PRDs with phased approach
-- `/pm:process-tasks` - Task management protocols and workflows
+- `/git-workflow:commit`: conventional commit messages, with a nudge to split when the diff mixes concerns
+- `/git-workflow:pr`: opens a draft pull request describing the branch
+- `/git-workflow:changelog`: maintains `CHANGELOG.md` in Keep a Changelog format
 
-### Documentation
+`pr-review-triage`:
 
-- `/git-workflow:changelog` - Maintains CHANGELOG.md following Keep a Changelog format
-- `/promptify` - Generates high-quality AI prompts with best practices
-- `/prompt-reviewer` - Reviews and improves AI prompts
+- `/pr-review-triage:triage-reviews`: classifies review feedback, applies what holds up, and explains what does not
 
-## Specialized Agents
+## Commands
 
-- **Manager Agent**: Orchestrates multi-agent workflows and task delegation
-- **Go Implementor**: Test-driven Go development with eevee framework patterns
-- **Go Reviewer**: Expert Go code review focusing on idiomatic patterns
-- **Document Agent**: Technical documentation and API specification generation
-- **Staff Eyes**: Senior-level architectural review and design feedback
-- **Specify Agent**: Requirements analysis and technical specification creation
-- **Taskify Agent**: Breaks down epics into actionable development tasks
+`code-quality`:
 
-## Quick Start
+- `/code-quality:check`: quality analysis and auto-fix, run as parallel sub-tasks
+- `/code-quality:review`: full review of the repository
+- `/code-quality:clean`: strips redundant comments
+
+`pm-tools`:
+
+- `/pm-tools:create-prd`: PRD creation, with clarifying questions up front
+- `/pm-tools:generate-tasks`: phased task lists from a PRD
+- `/pm-tools:process-tasks`: one sub-task at a time, with checkpoints
+
+`prompt-tools`:
+
+- `/prompt-tools:promptify`: generates prompts for LLMs and agents
+- `/prompt-tools:prompt-reviewer`: reviews prompts for clarity and effectiveness
+
+`pr-review-triage`:
+
+- `/pr-review-triage:triage`: triages unresolved review comments on a PR
+
+## Working on the repository
 
 ```bash
-make install        # Install hooks and make scripts executable
-make test           # Run complete test suite
-make lint           # Run ShellCheck and markdownlint
-make check-tools    # Verify required and optional tools
+make install        # Make the hook scripts executable
+make test           # Scanner, branch protection, and marketplace consistency tests
+make validate       # Check the plugin manifest, hook scripts, and dependencies
+make lint           # ShellCheck and markdownlint
+make check-tools    # Report required and optional tools
 make status         # Show configuration and tool status
+make help           # List every target
 ```
 
-## Project Structure
+`jq`, `grep`, `awk`, and `mktemp` are required. `trufflehog`, `gitleaks`, and
+`git-secrets` are optional, and improve secret detection when present.
+
+## Project structure
 
 ```text
-plugins/                          # Marketplace plugin distribution
-├── security-hooks/              # MCP security and branch protection
-├── dev-skills/                  # Development skills (Go, docs, etc.)
-├── git-workflow/                # Git automation skills
-├── pm-tools/                    # Project management commands
-├── code-quality/                # Code review and cleanup
-└── prompt-tools/                # AI prompt generation
+plugins/                        # Everything the marketplace ships
+├── security-hooks/             # MCP scanner and branch protection hooks
+├── dev-skills/                 # Go, docs, specs, architecture
+├── git-workflow/               # Commit, PR, changelog
+├── pm-tools/                   # PRDs and task management
+├── code-quality/               # Review and cleanup
+├── prompt-tools/               # Prompt generation and review
+└── pr-review-triage/           # PR comment triage
 
-.claude/                         # Local development structure
-├── skills/                      # Specialized skills
-├── commands/                    # Slash command implementations
-│   ├── dev/                    # Development workflow commands
-│   ├── gh/                     # GitHub automation commands
-│   └── pm/                     # Project management commands
-├── hooks/                       # Security and workflow hooks
-└── settings.json                # Hook configuration
-
-docs/                            # Documentation
-tests/                           # Test suite
-Makefile                         # Command interface
+.claude-plugin/marketplace.json # Marketplace manifest
+.claude/                        # Local config: security patterns, logs
+docs/                           # Hook and marketplace documentation
+scripts/                        # Validation tooling
+tests/                          # Test suite
+Makefile                        # Everything above, in one place
 ```
 
-**Note**: The `plugins/` directory is the canonical location for all plugin content.
+Plugin content lives under `plugins/` and nowhere else. Each plugin owns its
+manifest in `.claude-plugin/plugin.json`, which is also where hook wiring is
+declared.
 
 ## Attribution
 
-This project includes work from the following sources:
+### Product management commands
 
-### Product Management Commands
-
-The PM command suite (`/pm:create-prd`, `/pm:generate-tasks`, `/pm:process-tasks`) is based on patterns and workflows from:
+The PM command suite (`/pm-tools:create-prd`, `/pm-tools:generate-tasks`,
+`/pm-tools:process-tasks`) is based on patterns and workflows from:
 
 - **Source**: [AI Dev Tasks](https://github.com/snarktank/ai-dev-tasks/tree/main)
-- **License**: Apache License 2.0 — full text at [LICENSES/Apache-2.0.txt](LICENSES/Apache-2.0.txt)
+- **License**: Apache License 2.0. Full text at [LICENSES/Apache-2.0.txt](LICENSES/Apache-2.0.txt)
 - **Usage**: Adapted and extended for Claude Code project management workflows
 
 **Statement of changes** (Apache-2.0 §4(b)): the upstream `create-prd.md` and
 `generate-tasks.md` have been modified. Changes include restructuring them as
-Claude Code slash commands under the `/pm:` namespace, adding frontmatter,
-adjusting the task-list format, and extending the workflow with
-`/pm:process-tasks`. The files in `plugins/pm-tools/commands/` are not
-byte-identical to their upstream originals.
+Claude Code slash commands, adding frontmatter, adjusting the task-list format,
+and extending the workflow with `process-tasks`. The files in
+`plugins/pm-tools/commands/` are not byte-identical to their upstream
+originals.
 
-Special thanks to the AI Dev Tasks project for providing the foundational patterns for structured AI-assisted development workflows.
+Thanks to the AI Dev Tasks project for the underlying patterns.
 
 ## License
 
@@ -161,11 +176,11 @@ the full text, or obtain a copy at <https://mozilla.org/MPL/2.0/>.
 MPL-2.0 is a per-file weak copyleft licence. In practice:
 
 - **Use it freely**, including commercially, with no obligation to open your own code
-- **Credit is required** — retain the copyright and licence notices
+- **Credit is required**: retain the copyright and licence notices
 - **Modifications to these files must stay open** under MPL-2.0, with source made available
-- **Larger works may be proprietary** — you can combine this with closed code
+- **Larger works may be proprietary**, so you can combine this with closed code
 
 The PM command suite retains its upstream Apache-2.0 licence, as noted under
 [Attribution](#attribution). Apache-2.0 material may be included in an MPL-2.0
 project provided its licence copy, attribution, and statement of changes are
-preserved — see [LICENSES/Apache-2.0.txt](LICENSES/Apache-2.0.txt).
+preserved. See [LICENSES/Apache-2.0.txt](LICENSES/Apache-2.0.txt).

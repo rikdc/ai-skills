@@ -52,6 +52,12 @@ Task decomposition expert for breaking technical specifications into atomic, imp
 
 **Use when**: Converting specs into actionable task lists for development teams.
 
+### `/shell-script-reviewer`
+
+Reviews Bash, Zsh, and Fish shell scripts for bugs, security vulnerabilities, portability issues, and style violations, grounded in the Google Shell Style Guide, ShellCheck, BashPitfalls, and shell-specific idiom references.
+
+**Use when**: Reviewing, auditing, linting, or improving a `.sh`/`.bash`/`.zsh`/`.fish` file.
+
 ## Installation
 
 Install via Claude Code marketplace:
@@ -63,7 +69,7 @@ claude code plugins install dev-skills
 Or install from this repository:
 
 ```bash
-claude code plugins install github:rikdc/claude_code_template/dev-skills
+claude code plugins install github:rikdc/ai-skills/dev-skills
 ```
 
 ## Usage Examples
@@ -95,6 +101,9 @@ claude code plugins install github:rikdc/claude_code_template/dev-skills
 
 # Debug a Go concurrency issue
 /golang-expert Why is my worker pool leaking goroutines?
+
+# Review a shell script
+/shell-script-reviewer Review scripts/deploy.sh for security issues
 ```
 
 ## License

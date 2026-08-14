@@ -1,10 +1,10 @@
-# Claude Code Template Marketplace
+# AI Skills Marketplace
 
-This document explains the marketplace structure and plugin distribution system for the Claude Code Template repository.
+This document explains the marketplace structure and plugin distribution system for the AI Skills repository.
 
 ## Overview
 
-The repository is organized as a **Claude Code marketplace** with 6 independent, installable plugins. This allows users to install only the components they need rather than getting everything at once.
+The repository is organized as a **Claude Code marketplace** with 7 independent, installable plugins. This allows users to install only the components they need rather than getting everything at once.
 
 ## Architecture
 
@@ -65,10 +65,11 @@ claude code plugins install security-hooks
 - `/manager` - Project orchestration
 - `/specify` - Technical specifications
 - `/taskify` - Task decomposition
+- `/shell-script-reviewer` - Bash/Zsh/Fish script review
 
 **Features**:
 
-- 7 specialized development skills
+- 8 specialized development skills
 - Expert knowledge in Go, documentation, and architecture
 - Project management and task coordination
 
@@ -192,6 +193,31 @@ claude code plugins install prompt-tools
 
 ---
 
+### 7. pr-review-triage
+
+**Category**: Workflow
+**Source**: `./plugins/pr-review-triage`
+
+**Components**:
+
+- `/triage-reviews` - PR review comment triage skill
+- `/triage` - Legacy triage command
+
+**Features**:
+
+- Classifies review comments and accepts or rejects each with a reason
+- Creates tracked follow-up tasks for deferred feedback
+- Resolves handled threads on the pull request
+- Supports `--dry-run` and per-category auto-approval
+
+**Installation**:
+
+```bash
+claude code plugins install pr-review-triage
+```
+
+---
+
 ## Plugin Structure
 
 Each plugin follows this structure:
@@ -238,7 +264,7 @@ The top-level `.claude-plugin/marketplace.json` registers all plugins:
 
 ```json
 {
-  "name": "claude-code-template",
+  "name": "ai-skills",
   "owner": {
     "name": "Richard Claydon"
   },
@@ -280,8 +306,8 @@ claude code plugins install dev-skills
 #### Option 2: Clone entire repository
 
 ```bash
-git clone https://github.com/rikdc/claude_code_template.git
-cd claude_code_template
+git clone https://github.com/rikdc/ai-skills.git
+cd ai-skills
 make install
 ```
 
@@ -296,7 +322,7 @@ claude code plugins install <plugin-name>
 ### From GitHub Repository
 
 ```bash
-claude code plugins install github:rikdc/claude_code_template/<plugin-name>
+claude code plugins install github:rikdc/ai-skills/<plugin-name>
 ```
 
 ### From Local Directory

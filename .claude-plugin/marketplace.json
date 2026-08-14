@@ -1,12 +1,11 @@
 {
-  "name": "claude-code-template",
+  "name": "ai-skills",
   "owner": {
     "name": "Richard Claydon"
   },
   "metadata": {
     "description": "Security hooks, branch protection, and development skills for Claude Code projects",
-    "version": "1.0.0",
-    "pluginRoot": "./plugins"
+    "version": "1.0.0"
   },
   "plugins": [
     {
@@ -28,9 +27,9 @@
     {
       "name": "dev-skills",
       "source": "./plugins/dev-skills",
-      "description": "Expert development skills for Go, documentation, architecture, and project management",
+      "description": "Expert development skills for Go, documentation, architecture, shell scripting, and project management",
       "version": "1.0.0",
-      "keywords": ["skills", "go", "documentation", "architecture", "mentorship"],
+      "keywords": ["skills", "go", "documentation", "architecture", "mentorship", "shell", "bash"],
       "category": "skills"
     },
     {
@@ -40,6 +39,38 @@
       "version": "1.0.0",
       "keywords": ["skills", "nix", "nixos", "home-manager", "flakes", "homelab"],
       "category": "skills"
+    },
+    {
+      "name": "git-workflow",
+      "source": "./plugins/git-workflow",
+      "description": "Git workflow automation skills for commits, PRs, and changelog management",
+      "version": "2.0.0",
+      "keywords": ["git", "github", "workflow", "changelog"],
+      "category": "productivity"
+    },
+    {
+      "name": "pm-tools",
+      "source": "./plugins/pm-tools",
+      "description": "Project management commands for PRDs, task generation, and task tracking",
+      "version": "1.0.0",
+      "keywords": ["project-management", "prd", "tasks", "planning"],
+      "category": "productivity"
+    },
+    {
+      "name": "code-quality",
+      "source": "./plugins/code-quality",
+      "description": "Code quality analysis, review, and cleanup commands",
+      "version": "1.0.0",
+      "keywords": ["code-quality", "review", "linting", "cleanup"],
+      "category": "development"
+    },
+    {
+      "name": "prompt-tools",
+      "source": "./plugins/prompt-tools",
+      "description": "AI prompt generation and review tools for LLM development",
+      "version": "1.0.0",
+      "keywords": ["prompts", "ai", "llm", "prompt-engineering"],
+      "category": "ai"
     }
   ]
 }

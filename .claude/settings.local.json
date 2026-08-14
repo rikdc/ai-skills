@@ -8,70 +8,17 @@
       "Bash(git checkout:*)",
       "WebSearch",
       "mcp__sequential-thinking__sequentialthinking",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(rtk ls *)",
+      "Bash(rtk read *)",
+      "Bash(gh api *)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(rtk curl *)",
+      "Bash(awk -F/ '{print $1}')",
+      "Bash(xargs -0 cat)",
+      "Bash(grep -v '^$')",
+      "Bash(rtk grep *)"
     ],
     "deny": []
-  },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/rdchome/repositories/claude_code_template_wip/.claude/hooks/activity-monitor.py"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/rdchome/repositories/claude_code_template_wip/.claude/hooks/activity-monitor.py"
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/rdchome/repositories/claude_code_template_wip/.claude/hooks/activity-monitor.py"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/rdchome/repositories/claude_code_template_wip/.claude/hooks/activity-monitor.py"
-          }
-        ]
-      }
-    ],
-    "Notification": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/rdchome/repositories/claude_code_template_wip/.claude/hooks/activity-monitor.py"
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/rdchome/repositories/claude_code_template_wip/.claude/hooks/activity-monitor.py"
-          }
-        ]
-      }
-    ]
   }
 }

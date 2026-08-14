@@ -50,7 +50,7 @@ claude code plugins install code-quality
 Or install from this repository:
 
 ```bash
-claude code plugins install github:rikdc/claude_code_template/code-quality
+claude code plugins install github:rikdc/ai-skills/code-quality
 ```
 
 ## Usage Examples
