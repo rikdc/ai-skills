@@ -4,7 +4,7 @@ This document explains the marketplace structure and plugin distribution system 
 
 ## Overview
 
-The repository is organized as a **Claude Code marketplace** with 7 independent, installable plugins. This allows users to install only the components they need rather than getting everything at once.
+The repository is organized as a **Claude Code marketplace** with 8 independent, installable plugins. This allows users to install only the components they need rather than getting everything at once.
 
 ## Architecture
 
@@ -215,6 +215,32 @@ claude code plugins install prompt-tools
 ```bash
 claude code plugins install pr-review-triage
 ```
+
+---
+
+### 8. nix-skills
+
+**Category**: Development
+**Source**: `./plugins/nix-skills`
+
+**Components**:
+
+- `/nix-expert` - Expert guidance on Nix, NixOS, and home-manager
+
+**Features**:
+
+- Advisory guidance on Nix expressions, modules, derivations, and overlays
+- Flake management and home-manager patterns
+- Secrets handling with agenix and sops-nix
+- NixOS hardening and the rebuild safety ladder
+
+**Installation**:
+
+```bash
+claude code plugins install nix-skills
+```
+
+**Documentation**: [plugins/nix-skills/README.md](../plugins/nix-skills/README.md)
 
 ---
 

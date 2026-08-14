@@ -12,6 +12,7 @@ Build Nix packages, NixOS configurations, and understand the build process.
 ## Quick Commands
 
 ### Building Packages
+
 ```bash
 # Build package from flake
 nix build .#package-name
@@ -31,6 +32,7 @@ nix build .#package-name --print-build-logs
 ```
 
 ### Building NixOS Configurations
+
 ```bash
 # Build NixOS configuration
 nixos-rebuild build --flake .#hostname
@@ -46,6 +48,7 @@ nixos-rebuild build --flake .#hostname --show-trace
 ```
 
 ### Building for Different Systems
+
 ```bash
 # Build for different architecture
 nix build .#package-name --system x86_64-linux
@@ -58,6 +61,7 @@ nix build .#package-name.pkgsCross.aarch64-multiplatform
 ## Understanding Build Process
 
 ### Build Phases
+
 ```
 Nix build phases (for stdenv.mkDerivation):
 1. unpackPhase    - Extract source
@@ -70,6 +74,7 @@ Nix build phases (for stdenv.mkDerivation):
 ```
 
 ### Viewing Build Steps
+
 ```bash
 # Show derivation
 nix show-derivation .#package-name
@@ -81,9 +86,10 @@ nix develop .#package-name --command cat $(type -p genericBuild)
 nix build .#package-name --debug
 ```
 
-## Building Packages
+## Package Build Sources
 
 ### From Flake
+
 ```bash
 # Build package
 nix build .#mypackage
@@ -96,6 +102,7 @@ nix build .#packages.x86_64-linux.mypackage
 ```
 
 ### From nixpkgs
+
 ```bash
 # Build package from nixpkgs
 nix build nixpkgs#firefox
@@ -105,6 +112,7 @@ nix build github:nixos/nixpkgs/nixos-23.11#firefox
 ```
 
 ### Build Local Package
+
 ```bash
 # Build package in current directory
 nix build
@@ -119,6 +127,7 @@ nix build -f . mypackage
 ## Building NixOS Systems
 
 ### Local System
+
 ```bash
 # Build current system configuration
 sudo nixos-rebuild build --flake .
@@ -131,6 +140,7 @@ nixos-rebuild dry-build --flake .#hostname
 ```
 
 ### Remote System
+
 ```bash
 # Build for remote host
 nixos-rebuild build --flake .#remote-host \
@@ -142,6 +152,7 @@ nix build .#nixosConfigurations.remote-host.config.system.build.toplevel
 ```
 
 ### Build VM
+
 ```bash
 # Build VM from configuration
 nixos-rebuild build-vm --flake .#hostname
@@ -153,6 +164,7 @@ nixos-rebuild build-vm --flake .#hostname
 ## Build Options
 
 ### Parallel Builds
+
 ```bash
 # Build with more cores
 nix build .#package --cores 8
@@ -162,6 +174,7 @@ nix build .#package --max-jobs 4
 ```
 
 ### Offline Mode
+
 ```bash
 # Build without network access
 nix build .#package --offline
@@ -171,6 +184,7 @@ nix build .#package --no-net
 ```
 
 ### Rebuild Everything
+
 ```bash
 # Force rebuild (ignore cache)
 nix build .#package --rebuild
@@ -182,6 +196,7 @@ nix build .#package --no-substitute
 ## Build Outputs
 
 ### Multiple Outputs
+
 ```bash
 # Packages can have multiple outputs
 # Common: out, dev, doc, lib
@@ -196,6 +211,7 @@ nix show-derivation .#package | jq '.[] | .outputs'
 ```
 
 ### Inspect Build Result
+
 ```bash
 # After building, result symlink created
 ls -l result/
@@ -214,6 +230,7 @@ nix-store -q --requisites result
 ## Build Caching
 
 ### Using Binary Caches
+
 ```bash
 # Add binary cache
 nix build .#package \
@@ -226,6 +243,7 @@ nix build .#package
 ```
 
 ### Push to Cache
+
 ```bash
 # Push to cachix
 nix build .#package
@@ -238,6 +256,7 @@ nix copy --to https://cache.example.com result
 ## Build for Development
 
 ### Enter Build Environment
+
 ```bash
 # Enter environment for building
 nix develop .#package
@@ -250,6 +269,7 @@ buildPhase
 ```
 
 ### Iterative Building
+
 ```bash
 # Build and keep build directory
 nix build .#package --keep-failed
@@ -264,6 +284,7 @@ cd /tmp/nix-build-*
 ## Repository-Specific Builds
 
 ### Home Repository
+
 ```bash
 # Build current system
 make switch
@@ -279,6 +300,7 @@ nix build .#packages.x86_64-linux --all
 ```
 
 ### Build Custom Package
+
 ```bash
 # Package in pkgs/mypackage/
 nix build .#mypackage
@@ -293,6 +315,7 @@ nix profile install .#mypackage
 ## Debugging Builds
 
 ### Verbose Output
+
 ```bash
 # Show all build output
 nix build .#package -L
@@ -305,6 +328,7 @@ nix build .#package -vvv --show-trace
 ```
 
 ### Build Failures
+
 ```bash
 # Keep failed build directory
 nix build .#package --keep-failed
@@ -319,6 +343,7 @@ cat build.log
 ```
 
 ### Interactive Debugging
+
 ```bash
 # Enter build environment
 nix develop .#package
@@ -335,6 +360,7 @@ buildPhase
 ## Build Performance
 
 ### Speed Up Builds
+
 ```bash
 # Use more cores
 nix build .#package --cores $(nproc)
@@ -347,6 +373,7 @@ nix build .#package --max-jobs auto
 ```
 
 ### Monitor Build Progress
+
 ```bash
 # Real-time build logs
 nix build .#package -L
@@ -361,6 +388,7 @@ nix build .#package --print-build-logs | ts
 ## Cross-Compilation
 
 ### Build for ARM
+
 ```bash
 # ARM 64-bit
 nix build .#package --system aarch64-linux
@@ -373,6 +401,7 @@ nix build .#package.pkgsCross.aarch64-multiplatform
 ```
 
 ### Build for Different Platform
+
 ```bash
 # Build for Raspberry Pi
 nix build .#nixosConfigurations.rpi4-host.config.system.build.sdImage
@@ -384,6 +413,7 @@ nix build github:nixos/nixpkgs/nixos-23.11#package
 ## Advanced Build Techniques
 
 ### Override Package Attributes
+
 ```bash
 # Override during build
 nix build --impure --expr '
@@ -394,6 +424,7 @@ nix build --impure --expr '
 ```
 
 ### Build from Git
+
 ```bash
 # Build from specific commit
 nix build github:owner/repo/commit-hash#package
@@ -406,6 +437,7 @@ nix build git+file:///path/to/repo#package
 ```
 
 ### Conditional Builds
+
 ```bash
 # Build only if changed
 nix build .#package --rebuild
@@ -417,6 +449,7 @@ nix build .#package --arg enableFeature true
 ## Build Artifacts
 
 ### Store Paths
+
 ```bash
 # Show store path without building
 nix eval .#package
@@ -432,6 +465,7 @@ nix-store --query --roots result
 ```
 
 ### Build Logs
+
 ```bash
 # View previous build log
 nix log .#package
@@ -457,6 +491,7 @@ nix build .#package -L 2>&1 | tee build.log
 ## Common Build Patterns
 
 ### Build and Test
+
 ```bash
 # Build package
 nix build .#mypackage -L
@@ -469,6 +504,7 @@ nix run .#mypackage
 ```
 
 ### Build Multiple Outputs
+
 ```bash
 # Build all outputs
 nix build .#package.all
@@ -478,6 +514,7 @@ nix build .#package.out .#package.dev
 ```
 
 ### Build with Local Changes
+
 ```bash
 # Build with local modifications
 nix build .#package --override-input nixpkgs path:/local/nixpkgs
@@ -489,6 +526,7 @@ nix build path:/local/repo#package
 ## Troubleshooting Builds
 
 ### Hash Mismatches
+
 ```bash
 # Update hash
 # 1. Set hash to lib.fakeSha256 or empty string
@@ -500,6 +538,7 @@ nix-prefetch-github owner repo --rev commit-hash
 ```
 
 ### Disk Space Issues
+
 ```bash
 # Clean old build artifacts, keeping the last 30 days of rollback targets
 nix-collect-garbage --delete-older-than 30d
@@ -512,6 +551,7 @@ nix-store --delete /nix/store/...-package
 ```
 
 ### Permission Errors
+
 ```bash
 # Build as root
 sudo nix build .#package

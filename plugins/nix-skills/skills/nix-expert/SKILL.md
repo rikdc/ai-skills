@@ -493,8 +493,8 @@ sandboxing.
 
 ## Resources
 
-- NixOS Manual: https://nixos.org/manual/nixos/stable/
-- Nixpkgs Manual: https://nixos.org/manual/nixpkgs/stable/
-- Home-Manager Manual: https://nix-community.github.io/home-manager/
-- Nix Pills: https://nixos.org/guides/nix-pills/
-- Option search: https://search.nixos.org/options
+- NixOS Manual: <https://nixos.org/manual/nixos/stable/>
+- Nixpkgs Manual: <https://nixos.org/manual/nixpkgs/stable/>
+- Home-Manager Manual: <https://nix-community.github.io/home-manager/>
+- Nix Pills: <https://nixos.org/guides/nix-pills/>
+- Option search: <https://search.nixos.org/options>

@@ -14,6 +14,7 @@ Common Nix issues, error messages, and solutions.
 ### Hash Mismatch
 
 **Error:**
+
 ```
 error: hash mismatch in fixed-output derivation
   specified: sha256-AAAA...
@@ -21,6 +22,7 @@ error: hash mismatch in fixed-output derivation
 ```
 
 **Solution:**
+
 ```nix
 # Copy the "got" hash
 src = fetchFromGitHub {
@@ -32,6 +34,7 @@ src = fetchFromGitHub {
 ```
 
 **Get Hash Correctly:**
+
 ```bash
 # For GitHub
 nix-prefetch-github owner repo --rev v1.0.0
@@ -46,11 +49,13 @@ nix-prefetch-git https://git.example.com/repo.git --rev commit-hash
 ### Infinite Recursion
 
 **Error:**
+
 ```
 error: infinite recursion encountered
 ```
 
 **Common Causes:**
+
 ```nix
 # 1. Self-referencing attribute
 {
@@ -72,6 +77,7 @@ final: prev: {
 ```
 
 **Solutions:**
+
 ```nix
 # Use lib.mkDefault or lib.mkForce
 { lib, ... }:
@@ -98,12 +104,14 @@ rec {
 ### Attribute Not Found
 
 **Error:**
+
 ```
 error: attribute 'foo' missing
 error: undefined variable 'bar'
 ```
 
 **Debug:**
+
 ```bash
 # Check what attributes exist
 nix eval .#nixosConfigurations.hostname --apply builtins.attrNames
@@ -116,6 +124,7 @@ nix eval .#value --show-trace
 ```
 
 **Common Fixes:**
+
 ```nix
 # Check spelling
 services.nginx.enable = true;  # Not nginX or nginx
@@ -130,12 +139,14 @@ nix search nixpkgs package-name
 ### File Not Found
 
 **Error:**
+
 ```
 error: getting status of '/nix/store/.../file': No such file or directory
 error: path '/path/to/file' does not exist
 ```
 
 **Solutions:**
+
 ```nix
 # Use relative paths in flakes
 src = ./path/to/file;  # Not /absolute/path
@@ -151,6 +162,7 @@ src = ./path/to/file;  # Not /absolute/path
 ### Import from Derivation (IFD)
 
 **Error:**
+
 ```
 error: cannot build '/nix/store/...' during evaluation
 ```
@@ -159,6 +171,7 @@ error: cannot build '/nix/store/...' during evaluation
 Import from Derivation - importing result of a build
 
 **Workarounds:**
+
 ```nix
 # Avoid when possible
 # Bad:
@@ -179,12 +192,14 @@ in
 ### Restricted Mode / Pure Eval
 
 **Error:**
+
 ```
 error: access to absolute path '/home/...' is forbidden in pure eval mode
 error: cannot look up '<nixpkgs>' in pure evaluation mode
 ```
 
 **Solutions:**
+
 ```nix
 # Use relative paths
 path = ./file.nix;  # Not /absolute/path
@@ -202,6 +217,7 @@ nix build --impure
 ### Compilation Errors
 
 **Check Build Log:**
+
 ```bash
 # View last build log
 nix log .#package
@@ -216,6 +232,7 @@ ls -la
 ```
 
 **Common Issues:**
+
 ```bash
 # Missing dependencies
 # Add to buildInputs or nativeBuildInputs
@@ -233,6 +250,7 @@ ls -la
 ### Test Failures
 
 **Skip Tests Temporarily:**
+
 ```nix
 stdenv.mkDerivation {
   # ...
@@ -241,6 +259,7 @@ stdenv.mkDerivation {
 ```
 
 **Debug Tests:**
+
 ```bash
 # Run tests manually
 nix develop .#package
@@ -254,6 +273,7 @@ checkPhase  # Run tests with full output
 ### Missing Files in Output
 
 **Check Output:**
+
 ```bash
 # What's in the output?
 nix build .#package
@@ -267,6 +287,7 @@ find . -name "expected-file"
 ```
 
 **Fix Install Phase:**
+
 ```nix
 installPhase = ''
   runHook preInstall
@@ -287,11 +308,13 @@ installPhase = ''
 ### Executable Not Found
 
 **Error:**
+
 ```
 bash: command not found
 ```
 
 **Check:**
+
 ```bash
 # Is package installed?
 which command-name
@@ -310,11 +333,13 @@ nix profile install .#package
 ### Library Not Found
 
 **Error:**
+
 ```
 error while loading shared libraries: libfoo.so.1: cannot open shared object file
 ```
 
 **Solutions:**
+
 ```bash
 # Use autoPatchelfHook
 nativeBuildInputs = [ autoPatchelfHook ];
@@ -332,6 +357,7 @@ patchelf --set-rpath ${lib.makeLibraryPath [ libfoo ]} $out/bin/program
 ### Permission Denied
 
 **Check Permissions:**
+
 ```bash
 # File permissions in store
 ls -l result/
@@ -341,6 +367,7 @@ ls -l result/
 ```
 
 **Fix:**
+
 ```nix
 postInstall = ''
   chmod +x $out/bin/myapp
@@ -352,6 +379,7 @@ postInstall = ''
 ### Out of Disk Space
 
 **Check Space:**
+
 ```bash
 # Check /nix/store size
 du -sh /nix/store
@@ -364,6 +392,7 @@ nix path-info --closure-size .#package | sort -h
 ```
 
 **Clean Up:**
+
 ```bash
 # Delete generations older than 30 days, keeping recent rollback targets
 nix-collect-garbage --delete-older-than 30d
@@ -378,11 +407,13 @@ nix-store --delete /nix/store/...-package
 ### Garbage Collection Issues
 
 **Error:**
+
 ```
 error: cannot delete path '...' because it is in use by '...'
 ```
 
 **Solutions:**
+
 ```bash
 # Find what's using the path
 nix-store --query --roots /nix/store/...-package
@@ -400,12 +431,14 @@ nix-collect-garbage
 ### Download Failures
 
 **Error:**
+
 ```
 error: unable to download 'https://...'
 error: curl error: Connection timeout
 ```
 
 **Solutions:**
+
 ```bash
 # Check network
 ping example.com
@@ -423,12 +456,14 @@ nix build --no-substitute
 ### Binary Cache Issues
 
 **Error:**
+
 ```
 error: cannot add path '...' to the store
 warning: ignoring substitute for '...'
 ```
 
 **Solutions:**
+
 ```bash
 # Add cache manually
 nix build --substituters https://cache.nixos.org \
@@ -446,12 +481,14 @@ cachix use cachename
 ### Syntax Errors
 
 **Error:**
+
 ```
 error: syntax error, unexpected IF
 error: undefined variable 'if'
 ```
 
 **Common Mistakes:**
+
 ```nix
 # 1. Missing semicolon
 {
@@ -475,11 +512,13 @@ let x = 1; in x + 1  # Correct
 ### Module Conflicts
 
 **Error:**
+
 ```
 error: The option `services.foo.enable' is defined multiple times
 ```
 
 **Solutions:**
+
 ```nix
 # Use lib.mkForce to override
 services.foo.enable = lib.mkForce true;
@@ -497,12 +536,14 @@ services.foo.extraConfig = lib.mkMerge [
 ### Type Mismatches
 
 **Error:**
+
 ```
 error: value is a set while a string was expected
 error: value is a string while a list was expected
 ```
 
 **Solutions:**
+
 ```nix
 # Check types
 builtins.typeOf value
@@ -521,6 +562,7 @@ lib.splitString "," "a,b,c"  # [ "a" "b" "c" ]
 ### System Won't Boot
 
 **Recovery:**
+
 ```bash
 # 1. Boot to previous generation
 # Select older generation in bootloader menu
@@ -540,6 +582,7 @@ nixos-rebuild switch --rollback
 ### Service Failures
 
 **Debug:**
+
 ```bash
 # Check service status
 systemctl status service-name
@@ -555,6 +598,7 @@ cat /etc/systemd/system/service-name.service
 ```
 
 **Common Issues:**
+
 ```nix
 # Wrong user
 systemd.services.myservice.serviceConfig.User = "correct-user";
@@ -570,11 +614,13 @@ ExecStart = "${pkgs.myapp}/bin/myapp";
 ### Home-Manager Issues
 
 **Error:**
+
 ```
 error: collision between files
 ```
 
 **Solutions:**
+
 ```nix
 # Let home-manager manage conflicts
 home.file."conflict".source = ./file;
@@ -594,6 +640,7 @@ home.packages = lib.filter (p: p != pkgs.conflicting) config.home.packages;
 ### Slow Evaluation
 
 **Profile:**
+
 ```bash
 # Time evaluation
 time nix eval .#nixosConfigurations.hostname.config.system.build.toplevel
@@ -603,6 +650,7 @@ nix eval --show-stats .#value
 ```
 
 **Optimize:**
+
 ```nix
 # Avoid expensive operations in hot paths
 # Use builtins when possible
@@ -613,6 +661,7 @@ nix eval --show-stats .#value
 ### Slow Builds
 
 **Speed Up:**
+
 ```bash
 # Use more cores
 nix build --cores $(nproc)
@@ -632,6 +681,7 @@ nix build --offline
 ### Corrupted Nix Store
 
 **Check:**
+
 ```bash
 # Verify store
 nix-store --verify --check-contents
@@ -643,11 +693,13 @@ nix-store --verify --repair
 ### Locked Nix Database
 
 **Error:**
+
 ```
 error: cannot open Nix database: database is locked
 ```
 
 **Fix:**
+
 ```bash
 # Stop nix-daemon
 systemctl stop nix-daemon
@@ -662,6 +714,7 @@ systemctl start nix-daemon
 ### Full Disk
 
 **Emergency Clean:**
+
 ```bash
 # Keep the 5 most recent generations, drop the rest
 sudo nix-env --delete-generations +5
