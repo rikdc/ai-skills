@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added forgejo-review plugin with the forgejo-advisory-review workflow skill (advisory COMMENT review on a Forgejo PR: clone at head, diff, review, one Reviews-API post with inline comments, 422 recovery, verify)
 - Added changelog command with security controls
 - Added code quality check command with parallel sub-task strategy
 - Added clean command for removing redundant comments
