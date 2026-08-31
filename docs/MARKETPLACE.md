@@ -4,7 +4,7 @@ This document explains the marketplace structure and plugin distribution system 
 
 ## Overview
 
-The repository is organized as a **Claude Code marketplace** with 8 independent, installable plugins. This allows users to install only the components they need rather than getting everything at once.
+The repository is organized as a **Claude Code marketplace** with 9 independent, installable plugins. This allows users to install only the components they need rather than getting everything at once.
 
 ## Architecture
 
@@ -241,6 +241,33 @@ claude code plugins install nix-skills
 ```
 
 **Documentation**: [plugins/nix-skills/README.md](../plugins/nix-skills/README.md)
+
+---
+
+### 9. forgejo-review
+
+**Category**: Workflow
+**Source**: `./plugins/forgejo-review`
+
+**Components**:
+
+- `forgejo-advisory-review` - Procedure for one advisory `COMMENT` review on a Forgejo PR
+
+**Features**:
+
+- Clones the repo at the PR head sha (`refs/pull/<n>/head`, fork-safe) and reads whole files
+- Applies language-agnostic criteria plus any language-specific reviewer skills named on the task
+- Posts a single review with every line-specific finding as an inline comment
+- Recovers from Forgejo's 422 by recomputing `new_position` or moving only that finding to the body
+- Advisory and read-only: never approves, merges, posts a status, or runs the project toolchain
+
+**Installation**:
+
+```bash
+claude code plugins install forgejo-review
+```
+
+**Documentation**: [plugins/forgejo-review/README.md](../plugins/forgejo-review/README.md)
 
 ---
 

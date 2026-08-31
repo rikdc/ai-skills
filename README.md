@@ -48,6 +48,7 @@ make test
 | [code-quality](plugins/code-quality/) | Development | Code quality analysis, review, and comment cleanup |
 | [prompt-tools](plugins/prompt-tools/) | AI | Prompt generation and review |
 | [pr-review-triage](plugins/pr-review-triage/) | Workflow | Triage of PR review comments and follow-up tracking |
+| [forgejo-review](plugins/forgejo-review/) | Workflow | Advisory Forgejo pull-request review — one COMMENT review with inline comments |
 | [nix-skills](plugins/nix-skills/) | Development | Expert guidance on Nix, NixOS, and home-manager |
 
 ## Security hooks

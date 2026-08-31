@@ -1,0 +1,11 @@
+{
+  "name": "forgejo-review",
+  "description": "Advisory Forgejo pull-request review workflow — clone at head, fetch the diff, review, post one COMMENT review with inline comments",
+  "version": "1.0.0",
+  "author": {
+    "name": "Richard Claydon"
+  },
+  "license": "MPL-2.0",
+  "keywords": ["pr-review", "code-review", "forgejo", "workflow", "advisory"],
+  "skills": ["./skills/"]
+}
