@@ -190,8 +190,10 @@ the rails forbid a second attempt outside this helper.
 ## 6. Close the card
 
 1. `kanban_comment` the review's `html_url` (printed by the helper).
-2. `kanban_complete` with metadata `{changed_files, findings_count,
-   review_url}`.
+2. `kanban_complete` with a one-line `summary` (what you reviewed and how
+   many findings) **and** metadata `{changed_files, findings_count,
+   review_url}`. `kanban_complete` rejects the call if `summary` is
+   missing.
 
 The card is terminal. Do not `request-review`, do not merge, do not post a
 commit status.
