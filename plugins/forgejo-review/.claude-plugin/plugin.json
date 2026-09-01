@@ -1,7 +1,7 @@
 {
   "name": "forgejo-review",
   "description": "Advisory Forgejo pull-request review workflow — clone at head, fetch the diff, review, post one COMMENT review with inline comments",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": {
     "name": "Richard Claydon"
   },

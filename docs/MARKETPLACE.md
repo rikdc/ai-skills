@@ -258,7 +258,7 @@ claude code plugins install nix-skills
 - Clones the repo at the PR head sha (`refs/pull/<n>/head`, fork-safe) and reads whole files
 - Applies language-agnostic criteria plus any language-specific reviewer skills named on the task
 - Posts a single review with every line-specific finding as an inline comment
-- Recovers from Forgejo's 422 by recomputing `new_position` or moving only that finding to the body
+- Delegates the Reviews-API call to a bundled `submit-review.py`: it maps findings to inline `new_position` comments, folds out-of-diff findings into the body, and retries past Forgejo's all-or-nothing 422
 - Advisory and read-only: never approves, merges, posts a status, or runs the project toolchain
 
 **Installation**:

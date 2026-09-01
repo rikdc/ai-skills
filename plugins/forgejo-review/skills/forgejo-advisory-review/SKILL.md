@@ -1,6 +1,6 @@
 ---
 name: forgejo-advisory-review
-description: Step-by-step procedure for producing ONE advisory COMMENT review on a Forgejo pull request — clone at the head sha, fetch the diff, apply general and language review criteria, post a single Reviews-API review with inline comments, recover from 422s, then verify and close the kanban card. Use when a kanban card assigns an advisory PR review on git.home.claydon.co.
+description: Step-by-step procedure for producing ONE advisory COMMENT review on a Forgejo pull request — clone at the head sha, fetch the diff, apply general and language review criteria, then hand a summary and a flat findings list to submit-review.py, which maps findings to inline comments, folds the rest into the body, recovers from 422s, and verifies. Use when a kanban card assigns an advisory PR review on git.home.claydon.co.
 user-invocable: false
 allowed-tools: Read, Glob, Grep, Bash
 ---
@@ -15,6 +15,12 @@ you how to carry it out.
 
 The whole job is: **one Forgejo review of type `COMMENT`, then a completed
 kanban card.** Nothing else touches the PR.
+
+You describe the findings. A bundled helper,
+`scripts/submit-review.py`, owns every fiddly part of getting them onto the
+PR: parsing the diff, deciding which finding can be an inline comment,
+folding the rest into the review body, the single Reviews-API call, 422
+recovery, and the post-check. You do not hand-write the `curl`.
 
 ## 0. Read the card body
 
@@ -57,9 +63,13 @@ If the clone or the checkout fails, `kanban_block` with the reason and stop.
 
 ## 2. Fetch the PR's unified diff
 
+Save it to `pr.diff` next to your `repo` checkout — step 5 passes this same
+file to the helper, so it is fetched once:
+
 ```sh
 curl -fsS -H "Authorization: token $FORGEJO_TOKEN" \
-  "https://git.home.claydon.co/api/v1/repos/<owner>/<name>/pulls/<n>.diff"
+  "https://git.home.claydon.co/api/v1/repos/<owner>/<name>/pulls/<n>.diff" \
+  > pr.diff
 ```
 
 The diff tells you which files and which lines changed. If the diff fetch
@@ -106,114 +116,80 @@ have the toolchain and a failing command here tells you nothing. If a
 finding would normally need a command to confirm, state it as "likely" and
 move on.
 
-## 5. Post exactly ONE review (Reviews API)
+## 5. Write the two inputs and run the helper
 
-```text
-POST /api/v1/repos/<owner>/<name>/pulls/<n>/reviews
-{
-  "event": "COMMENT",
-  "commit_id": "<head sha>",
-  "body": "<summary + only findings with no single changed line>",
-  "comments": [
-    {"path": "<file>", "new_position": <line in NEW file>, "body": "<finding>"}
-  ]
-}
-```
+Produce two files:
 
-```sh
-curl -fsS -X POST \
-  -H "Authorization: token $FORGEJO_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d @- \
-  "https://git.home.claydon.co/api/v1/repos/<owner>/<name>/pulls/<n>/reviews"
-```
+**`summary.md`** — the overall read: what the PR does, your assessment, and
+any finding that has no single changed line (cross-cutting issues, something
+missing, a concern spanning several files). Plain Markdown, no front matter.
 
-Rules:
-
-- `event` is **always** `"COMMENT"`. The API also accepts `APPROVED`,
-  `PENDING`, `REQUEST_CHANGES` — never send any of them.
-- `commit_id` is the card's `head` sha.
-- **Every finding about a specific line MUST be an inline entry in
-  `comments`** — `path` plus `new_position`, the line number in the NEW
-  version of the file (the `+` side of the diff). Do not summarise
-  line-specific findings in `body`. A review that had line findings but put
-  them only in `body` is a failure — redo it.
-- `body` is for the overall read (what the PR does, your assessment) and for
-  findings that genuinely have no single changed line: cross-cutting issues,
-  something missing, a concern spanning several files.
-- Always post a review, even with an empty `comments` array and a `body`
-  that says nothing blocking was found. There is always a visible artifact
-  on the PR.
-
-### Worked example
-
-PR adds a helper to `scripts/backup.sh`; the new hunk is:
-
-```diff
-@@ -10,6 +10,11 @@ set -eu
- main() {
-+  dest=$1
-+  cd $dest
-+  rm -rf ./cache/*
-+  echo "cleaned $dest"
-+}
-```
-
-`cd $dest` is line 13 in the new file, `rm -rf ./cache/*` is line 14. A
-correct multi-comment body:
+**`findings.json`** — a flat JSON array, one object per line-specific
+finding:
 
 ```json
-{
-  "event": "COMMENT",
-  "commit_id": "9f3a1c2e5b7d0a4f6c8e1b2d3a5f7c9e0b1d2f3a",
-  "body": "Adds a cache-cleaning helper to scripts/backup.sh. The logic is small and readable; two robustness issues on the new lines, noted inline. No security or correctness blockers beyond those.",
-  "comments": [
-    {"path": "scripts/backup.sh", "new_position": 13,
-     "body": "`cd $dest` is unquoted and its exit status is unchecked. If `$dest` is empty or has spaces the `cd` fails and, because `set -e` does not trigger on a failed command in this position, the following `rm -rf ./cache/*` then runs against the wrong directory. Use `cd \"$dest\" || exit 1`."},
-    {"path": "scripts/backup.sh", "new_position": 14,
-     "body": "`rm -rf ./cache/*` relies on the `cd` above having succeeded; combined with the unchecked `cd` this can delete `cache/` under whatever directory the script was invoked from. Guard the `cd` (see previous comment)."}
-  ]
-}
+[
+  {"path": "scripts/backup.sh", "line": 13,
+   "body": "`cd $dest` is unquoted and its exit status is unchecked. If `$dest` is empty or has spaces the `cd` fails and, because `set -e` does not trigger here, the following `rm -rf ./cache/*` runs against the wrong directory. Use `cd \"$dest\" || exit 1`."},
+  {"path": "scripts/backup.sh", "line": 14,
+   "body": "`rm -rf ./cache/*` relies on the `cd` above having succeeded; with the unchecked `cd` this can delete `cache/` under whatever directory the script ran from. Guard the `cd` (see previous comment)."}
+]
 ```
 
-Note both line findings are inline; `body` only carries the overall read.
+- `path` is the repo-relative path as it appears in the diff.
+- `line` is the line number in the **NEW** version of the file (the `+`
+  side). Count from the hunk's `@@ -a,b +c,d @@` header if unsure; the
+  helper re-checks every number and will not post a bad one.
+- `body` is the finding text. Backticks and fenced snippets are fine.
+- Put a finding here whenever it points at a specific changed line. Do not
+  pre-filter for "is this line in the diff" — the helper does that, and a
+  finding whose line turns out to be outside the diff is moved into the
+  review body automatically, not dropped.
 
-## 6. 422 recovery
-
-`new_position` / `old_position` are **file line numbers**, not diff offsets.
-Forgejo rejects the **whole call** with `422 Unprocessable Entity` if any
-comment points at a line outside the diff hunks.
-
-On a 422:
-
-1. Recompute the offending `new_position` by counting `+` and context lines
-   in the hunk from its `@@ -a,b +c,d @@` header — do not guess.
-2. Re-POST with the corrected number.
-3. If a specific finding genuinely has no in-diff line, move **only that
-   finding** into `body` and keep every other finding inline.
-4. Retry up to 3 times.
-
-Never collapse the whole `comments` array to empty just to get a 2xx.
-
-## 7. Verify the review landed
+Then run the helper from your workspace. It needs the Forgejo API base;
+derive it from the scheme+host of the card's `url` and add `/api/v1`
+(for `https://forge.example/rikdc/x/pulls/4` that is
+`https://forge.example/api/v1`):
 
 ```sh
-curl -fsS -H "Authorization: token $FORGEJO_TOKEN" \
-  "https://git.home.claydon.co/api/v1/repos/<owner>/<name>/pulls/<n>/reviews"
+api_base="$(printf '%s' '<url>' | sed -E 's#(https?://[^/]+)/.*#\1/api/v1#')"
+python3 "$HERMES_HOME/skills/forgejo-advisory-review/scripts/submit-review.py" \
+  --repo <owner>/<name> --pr <n> --commit <head sha> \
+  --api-base "$api_base" \
+  --summary-file summary.md --comments-file findings.json \
+  --diff-file pr.diff
 ```
 
-Confirm the response contains the review you just posted: its `commit_id`
-matches the card's `head` sha and its `user` is your own bot login.
+On success it prints the review's `html_url` on stdout and a one-line
+summary (`N inline comment(s), M finding(s) in the body`) on stderr. Capture
+the URL for step 6.
 
-**You MUST NOT call `kanban_complete` unless this check passes.** If it does
-not — including any case where your only successful output went somewhere
-other than `git.home.claydon.co` — `kanban_comment` the failure and
-`kanban_block`. Never complete a card over a review that never reached the
-Forgejo PR.
+Always run the helper, even with an empty `findings.json` (`[]`) and a
+`summary.md` that says nothing blocking was found — there is always a
+visible review on the PR.
 
-## 8. Close the card
+### What the helper does for you
 
-1. `kanban_comment` the review's `html_url`.
+- Parses `pr.diff` into the set of valid NEW-file line numbers per file.
+- Each finding whose `line` is in that set becomes an inline
+  `comments[]` entry (`path` + `new_position`); every other finding is
+  appended to the review body under **Findings outside the diff**, prefixed
+  with `` `path:line` `` so nothing is lost.
+- POSTs exactly one review with `event: "COMMENT"` and `commit_id` set to
+  `<head sha>`. It never sends `APPROVED`, `PENDING`, or `REQUEST_CHANGES`.
+- On Forgejo's all-or-nothing `422` it moves one more inline comment into
+  the body and retries, up to 3 times, without ever emptying the array just
+  to get a 2xx.
+- Verifies the review is listed on the PR before exiting 0.
+
+If the helper exits non-zero, it could not post or could not verify the
+review. `kanban_comment` its stderr and `kanban_block` — do **not**
+`kanban_complete`. Never hand-write a fallback `curl` to the Reviews API;
+the rails forbid a second attempt outside this helper.
+
+## 6. Close the card
+
+1. `kanban_comment` the review's `html_url` (printed by the helper).
 2. `kanban_complete` with metadata `{changed_files, findings_count,
    review_url}`.
 
@@ -222,7 +198,6 @@ commit status.
 
 ## If you run low on turns
 
-Before your turn budget runs out, stop analysing and post the review you
-have (step 5) — still with each line-specific finding inline, anything
-unresolved in `body` — then run steps 7–8. A posted advisory review beats a
-card stuck in progress.
+Before your turn budget runs out, stop analysing, write `summary.md` and
+whatever `findings.json` you have, and run the helper (step 5) — then do
+step 6. A posted advisory review beats a card stuck in progress.

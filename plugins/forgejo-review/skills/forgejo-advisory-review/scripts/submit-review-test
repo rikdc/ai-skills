@@ -1,0 +1,234 @@
+#!/usr/bin/env bash
+# Verification for submit-review.py: given a summary, a findings list, and a
+# unified diff, which findings become inline review comments and which get
+# folded into the review body, plus 422 recovery and the post-verify check.
+# No real network: a local http.server subclass records the POST body and can
+# be told to reject the first POST with 422 or to hide the review on GET.
+set -uo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+script="${1:-$here/submit-review.py}"
+tmp="$(mktemp -d)"
+srv_pid=""
+trap '[ -n "$srv_pid" ] && kill "$srv_pid" 2>/dev/null; rm -rf "$tmp"' EXIT
+
+# --- fixture diff: scripts/backup.sh gains three lines; README.md untouched ---
+cat > "$tmp/t.diff" <<'EOF'
+diff --git a/scripts/backup.sh b/scripts/backup.sh
+index 1111111..2222222 100755
+--- a/scripts/backup.sh
++++ b/scripts/backup.sh
+@@ -10,4 +10,7 @@ set -eu
+ main() {
+   local src=$1
+   local dest=$2
++  cd $dest
++  rm -rf ./cache/*
++  echo "cleaned $dest"
+ }
+EOF
+# New-file lines inside the hunk: 10,11,12 context; 13,14,15 added; 16 context.
+# So valid new_position values for scripts/backup.sh are 10..16.
+
+# --- fake Forgejo API ---------------------------------------------------------
+cat > "$tmp/fake_forgejo.py" <<'EOF'
+import json, os, sys
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+STATE = os.environ["FAKE_STATE"]
+REVIEWS_PATH = "/repos/o/r/pulls/7/reviews"
+
+
+def flag(name):
+    return os.path.exists(os.path.join(STATE, name))
+
+
+class H(BaseHTTPRequestHandler):
+    def log_message(self, *a):
+        pass
+
+    def _send(self, code, obj):
+        body = json.dumps(obj).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self):
+        if self.path.split("?")[0].endswith("/pulls/7.diff"):
+            with open(os.path.join(STATE, "diff")) as fh:
+                data = fh.read().encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
+        if self.path.split("?")[0] == REVIEWS_PATH:
+            if flag("hide_review"):
+                self._send(200, [])
+            else:
+                self._send(200, [{"id": 99, "commit_id": "HEADSHA",
+                                  "user": {"login": "hermes"},
+                                  "html_url": "https://forge/o/r/pulls/7#review-99"}])
+            return
+        self._send(404, {"message": "not found"})
+
+    def do_POST(self):
+        n = int(self.headers.get("Content-Length", 0))
+        raw = self.rfile.read(n)
+        with open(os.path.join(STATE, "posts"), "a") as fh:
+            fh.write(raw.decode() + "\n")
+        count_file = os.path.join(STATE, "post_count")
+        seen = int(open(count_file).read()) if os.path.exists(count_file) else 0
+        seen += 1
+        open(count_file, "w").write(str(seen))
+        if flag("fail_first_post") and seen == 1:
+            self._send(422, {"message": "a comment refers to a line outside the diff hunks"})
+            return
+        self._send(200, {"id": 99,
+                         "html_url": "https://forge/o/r/pulls/7#review-99"})
+
+
+HTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
+EOF
+
+state="$tmp/state"
+mkdir -p "$state"
+cp "$tmp/t.diff" "$state/diff"
+export FAKE_STATE="$state"
+
+port="$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1]);s.close()')"
+python3 "$tmp/fake_forgejo.py" "$port" &
+srv_pid=$!
+for _ in $(seq 1 50); do
+  curl -fsS "http://127.0.0.1:$port/repos/o/r/pulls/7.diff" >/dev/null 2>&1 && break
+  sleep 0.1
+done
+
+export FORGEJO_API_BASE="http://127.0.0.1:$port"
+export FORGEJO_TOKEN="test-token"
+
+echo "summary text" > "$tmp/summary.md"
+
+fails=0
+reset_state() {
+  rm -f "$state/posts" "$state/post_count" "$state/fail_first_post" "$state/hide_review"
+}
+run() {
+  reset_state
+  printf '%s' "$1" > "$tmp/findings.json"
+  out="$(python3 "$script" \
+    --repo o/r --pr 7 --commit HEADSHA \
+    --summary-file "$tmp/summary.md" \
+    --comments-file "$tmp/findings.json" \
+    --diff-file "$state/diff" 2>"$tmp/err")"
+  rc=$?
+}
+last_post() { tail -n1 "$state/posts" 2>/dev/null; }
+pass() { echo "PASS: $1"; }
+fail() { echo "FAIL: $1"; echo "  rc=$rc out=$out"; echo "  err: $(cat "$tmp/err")"; fails=$((fails + 1)); }
+jqp() { printf '%s' "$1" | python3 -c "import json,sys;d=json.load(sys.stdin);print($2)"; }
+
+# 1. two findings on changed lines -> two inline comments, right positions
+run '[{"path":"scripts/backup.sh","line":13,"body":"unquoted cd"},{"path":"scripts/backup.sh","line":14,"body":"rm after unchecked cd"}]'
+p="$(last_post)"
+if [ "$rc" -eq 0 ] \
+  && [ "$(jqp "$p" 'len(d["comments"])')" = "2" ] \
+  && [ "$(jqp "$p" 'd["comments"][0]["new_position"]')" = "13" ] \
+  && [ "$(jqp "$p" 'd["comments"][1]["new_position"]')" = "14" ] \
+  && [ "$(jqp "$p" 'd["event"]')" = "COMMENT" ] \
+  && [ "$(jqp "$p" 'd["commit_id"]')" = "HEADSHA" ] \
+  && [ "$out" = "https://forge/o/r/pulls/7#review-99" ]; then
+  pass "in-hunk findings become inline comments"
+else fail "in-hunk findings become inline comments"; fi
+
+# 2. finding on a line outside every hunk -> folded into body, not inline
+run '[{"path":"scripts/backup.sh","line":999,"body":"way past the hunk"}]'
+p="$(last_post)"
+if [ "$rc" -eq 0 ] \
+  && [ "$(jqp "$p" 'len(d["comments"])')" = "0" ] \
+  && printf '%s' "$(jqp "$p" 'd["body"]')" | grep -q 'scripts/backup.sh:999' \
+  && printf '%s' "$(jqp "$p" 'd["body"]')" | grep -q 'way past the hunk'; then
+  pass "out-of-hunk finding folded into body"
+else fail "out-of-hunk finding folded into body"; fi
+
+# 3. finding on a file absent from the diff -> folded into body
+run '[{"path":"README.md","line":1,"body":"no diff for this file"}]'
+p="$(last_post)"
+if [ "$rc" -eq 0 ] \
+  && [ "$(jqp "$p" 'len(d["comments"])')" = "0" ] \
+  && printf '%s' "$(jqp "$p" 'd["body"]')" | grep -q 'README.md:1'; then
+  pass "finding on undiffed file folded into body"
+else fail "finding on undiffed file folded into body"; fi
+
+# 4. first POST 422s -> retry with the offending comment demoted, then succeed
+reset_state
+touch "$state/fail_first_post"
+printf '%s' '[{"path":"scripts/backup.sh","line":13,"body":"keep me"},{"path":"scripts/backup.sh","line":14,"body":"demote me"}]' > "$tmp/findings.json"
+out="$(python3 "$script" --repo o/r --pr 7 --commit HEADSHA \
+  --summary-file "$tmp/summary.md" --comments-file "$tmp/findings.json" \
+  --diff-file "$state/diff" 2>"$tmp/err")"
+rc=$?
+posts="$(wc -l < "$state/posts" | tr -d ' ')"
+p="$(last_post)"
+if [ "$rc" -eq 0 ] && [ "$posts" = "2" ] \
+  && [ "$(jqp "$p" 'len(d["comments"])')" = "1" ] \
+  && [ "$(jqp "$p" 'd["comments"][0]["new_position"]')" = "13" ] \
+  && printf '%s' "$(jqp "$p" 'd["body"]')" | grep -q 'demote me' \
+  && [ "$out" = "https://forge/o/r/pulls/7#review-99" ]; then
+  pass "422 triggers a demote-and-retry"
+else fail "422 triggers a demote-and-retry"; fi
+
+# 5. review not visible on the verify GET -> non-zero exit
+reset_state
+touch "$state/hide_review"
+printf '%s' '[]' > "$tmp/findings.json"
+out="$(python3 "$script" --repo o/r --pr 7 --commit HEADSHA \
+  --summary-file "$tmp/summary.md" --comments-file "$tmp/findings.json" \
+  --diff-file "$state/diff" 2>"$tmp/err")"
+rc=$?
+if [ "$rc" -ne 0 ] && grep -qi 'verif\|not found\|did not' "$tmp/err"; then
+  pass "verify failure exits non-zero"
+else fail "verify failure exits non-zero"; fi
+
+# 7. no --diff-file -> the helper fetches the diff from the API itself
+reset_state
+printf '%s' '[{"path":"scripts/backup.sh","line":15,"body":"echo of a var"}]' > "$tmp/findings.json"
+out="$(python3 "$script" --repo o/r --pr 7 --commit HEADSHA \
+  --summary-file "$tmp/summary.md" --comments-file "$tmp/findings.json" 2>"$tmp/err")"
+rc=$?
+p="$(last_post)"
+if [ "$rc" -eq 0 ] \
+  && [ "$(jqp "$p" 'len(d["comments"])')" = "1" ] \
+  && [ "$(jqp "$p" 'd["comments"][0]["new_position"]')" = "15" ]; then
+  pass "diff fetched from API when --diff-file omitted"
+else fail "diff fetched from API when --diff-file omitted"; fi
+
+# 6. missing FORGEJO_TOKEN -> usage error, no POST
+reset_state
+( unset FORGEJO_TOKEN
+  printf '%s' '[]' > "$tmp/findings.json"
+  python3 "$script" --repo o/r --pr 7 --commit HEADSHA \
+    --summary-file "$tmp/summary.md" --comments-file "$tmp/findings.json" \
+    --diff-file "$state/diff" >/dev/null 2>"$tmp/err" )
+rc=$?
+if [ "$rc" -ne 0 ] && [ ! -f "$state/posts" ] && grep -qi 'token' "$tmp/err"; then
+  pass "missing token fails before any POST"
+else fail "missing token fails before any POST"; fi
+
+# 8. no --api-base and no FORGEJO_API_BASE -> usage error, no POST
+reset_state
+( unset FORGEJO_API_BASE
+  printf '%s' '[]' > "$tmp/findings.json"
+  python3 "$script" --repo o/r --pr 7 --commit HEADSHA \
+    --summary-file "$tmp/summary.md" --comments-file "$tmp/findings.json" \
+    --diff-file "$state/diff" >/dev/null 2>"$tmp/err" )
+rc=$?
+if [ "$rc" -ne 0 ] && [ ! -f "$state/posts" ] && grep -qi 'api-base\|api_base\|FORGEJO_API_BASE' "$tmp/err"; then
+  pass "missing api base fails before any POST"
+else fail "missing api base fails before any POST"; fi
+
+echo
+if [ "$fails" -eq 0 ]; then echo "ALL PASS"; else echo "$fails FAILURE(S)"; exit 1; fi
