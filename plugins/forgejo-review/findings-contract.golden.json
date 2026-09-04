@@ -14,13 +14,15 @@
       "severity": "medium",
       "file": "cmd/worker/main.go",
       "line": 88,
-      "title": "Ignored error from db.Close()"
+      "title": "Ignored error from db.Close()",
+      "detail": "The error returned from closing the database connection is not handled. This may mask connection cleanup failures."
     },
     {
       "severity": "low",
       "file": "cmd/worker/main.go",
       "line": null,
-      "title": "No test file added for this new package"
+      "title": "No test file added for this new package",
+      "detail": "New packages should include test coverage. Consider adding a cmd/worker/*_test.go file."
     }
   ]
 }

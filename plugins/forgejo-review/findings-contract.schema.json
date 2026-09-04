@@ -11,7 +11,7 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["severity", "file", "line", "title"],
+        "required": ["severity", "file", "line", "title", "detail"],
         "additionalProperties": false,
         "properties": {
           "severity": {"enum": ["critical", "high", "medium", "low"]},
