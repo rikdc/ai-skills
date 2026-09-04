@@ -212,3 +212,46 @@ security checklist) so feedback is actionable and verifiable, not a matter
 of taste — and to be explicit about the difference between "ShellCheck
 confirmed this" and "this needs a human/runtime check" for the dialects
 and constructs static analysis can't fully cover.
+
+## Fan-out specialist mode (invoked by forgejo-review-orchestrator)
+
+When your goal explicitly says "Write the findings JSON contract to
+`<path>`", you are running as one specialist in a parallel Forgejo PR
+review fan-out, not in the interactive review mode described above. In
+this mode:
+
+- Apply ONLY the review criteria above (dialect detection, the relevant
+  reference file(s), the security checklist unconditionally) to the file
+  subset your goal lists. Do not review files outside that subset, and
+  ignore the `--security` / `--fix` flags — this mode has none of those.
+- You have read-only file access to a checkout at the PR's head SHA. You
+  do NOT have `kanban`, `hermes-cli`, or network tools in this mode.
+- Do not run `shellcheck`, `shfmt`, or any other command — this mode never
+  has the project's toolchain available. State an unconfirmed finding as
+  "likely" in its `detail` and keep going.
+- Write your findings to the exact path in your goal, and nothing else to
+  stdout. The file must match this shape exactly (see
+  `plugins/forgejo-review/findings-contract.schema.json` in this repo for
+  the authoritative schema):
+
+  ```json
+  {
+    "specialist": "shell-script-reviewer",
+    "summary": "<one line, always present, even when findings is empty>",
+    "findings": [
+      {
+        "severity": "critical | high | medium | low",
+        "file": "<repo-relative path, matching the diff's +++ path>",
+        "line": 42,
+        "title": "<short title>",
+        "detail": "<the finding, plain prose>",
+        "suggestion": "<optional: a literal code fix>"
+      }
+    ]
+  }
+  ```
+
+- `line` is a post-image (NEW-file) line number, or `null` if the finding
+  is not anchored to one changed line.
+- Finding nothing is a valid, completed pass: still write the file, with
+  `findings: []` and a one-line `summary` saying so.
