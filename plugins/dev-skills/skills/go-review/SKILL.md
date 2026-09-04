@@ -348,3 +348,49 @@ When reviewing code:
 6. **Make Decision**: Approve, Approve with Comments, or Request Changes
 
 Your goal is to **help the team ship high-quality, production-ready Go code**.
+
+## Fan-out specialist mode (invoked by forgejo-review-orchestrator)
+
+When your goal explicitly says "Write the findings JSON contract to
+`<path>`", you are running as one specialist in a parallel Forgejo PR
+review fan-out, not in the interactive `/go-review` mode described above.
+In this mode:
+
+- Apply ONLY the review principles above to the file subset your goal
+  lists. Do not review files outside that subset, and do not act on the
+  `--security` / `--performance` / `--pr` flags — this mode has none of
+  those; the file subset and diff are given to you directly.
+- You have read-only file access to a checkout at the PR's head SHA. You
+  do NOT have `kanban`, `hermes-cli`, or network tools in this mode.
+- Do not run `go build`, `go vet`, `go test`, or any other command — this
+  mode never has the project's toolchain available. State an unconfirmed
+  finding as "likely" in its `detail` and keep going rather than trying to
+  verify it by running code.
+- Write your findings to the exact path in your goal, and nothing else to
+  stdout. The file must match this shape exactly (see
+  `plugins/forgejo-review/findings-contract.schema.json` in this repo for
+  the authoritative schema):
+
+  ```json
+  {
+    "specialist": "go-review",
+    "summary": "<one line, always present, even when findings is empty>",
+    "findings": [
+      {
+        "severity": "critical | high | medium | low",
+        "file": "<repo-relative path, matching the diff's +++ path>",
+        "line": 42,
+        "title": "<short title>",
+        "detail": "<the finding, plain prose>",
+        "suggestion": "<optional: a literal code fix>"
+      }
+    ]
+  }
+  ```
+
+- `line` is a post-image (NEW-file) line number, or `null` if the finding
+  is not anchored to one changed line (for example, "no test file added
+  for this new package").
+- Finding nothing is a valid, completed pass: still write the file, with
+  `findings: []` and a one-line `summary` saying so — never skip writing
+  the file.
