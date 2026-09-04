@@ -43,6 +43,37 @@ diff (`--diff-file` or fetched from the API), it posts exactly one
 (required — no default). `scripts/submit-review-test` is a
 standalone harness (no network; a fake Forgejo records the POST body).
 
+## Fan-out specialist skills
+
+In addition to the advisory-review procedure above, this plugin (plus two
+skills in `dev-skills`) provides eight specialist review skills for a
+Hermes-driven Forgejo PR-review fan-out. Each specialist is dispatched
+against a subset of the PR's changed files, reviews only through its own
+lens, and writes findings as JSON matching
+[`findings-contract.schema.json`](./findings-contract.schema.json) — the
+authoritative output shape every specialist emits (see
+[`findings-contract.golden.json`](./findings-contract.golden.json) for a
+worked example). They are not user-invocable; an orchestrator dispatches
+them by goal.
+
+### Language reviewers
+
+| Skill | Description | Dispatch trigger |
+| --- | --- | --- |
+| `go-review` (`dev-skills`) | Go-specific correctness, security, performance, and maintainability review | `.go` file suffix |
+| `shell-script-reviewer` (`dev-skills`) | Bash/Zsh/shell script review against ShellCheck, BashPitfalls, and style conventions | `.sh` / `.bash` file suffix |
+
+### Topic reviewers
+
+| Skill | Description | Dispatch trigger |
+| --- | --- | --- |
+| `general-code-review` | Language-agnostic PR review criteria — correctness, security, error handling, repo conventions | always (every PR) |
+| `security-review` | Focused security review for changes touching auth, crypto, secrets, tokens, or access control | path matches `(auth\|crypto\|secret\|login\|token\|password\|acl\|firewall)` |
+| `test-coverage-review` | Flags source changes with no corresponding test signal in the same diff | a source file changed with no matching test file touched |
+| `schema-migration-review` | Reviews database schema migrations for backward compatibility, destructive operations, and rollout safety | path matches `(migrations?/\|\.sql$\|schema\.)` |
+| `docs-review` | Reviews Markdown/docs changes for accuracy against the accompanying code change, broken references, staleness | path matches `(\.md$\|docs/)` |
+| `api-surface-review` | Flags breaking changes to exported/public function signatures, types, and API contracts with no migration path | a public/exported signature may have changed |
+
 ## Installation
 
 Install via Claude Code marketplace:
