@@ -40,3 +40,6 @@ Thumbs.db
 
 # Keep test library
 !tests/lib/
+
+# Git worktrees (superpowers:using-git-worktrees)
+.worktrees/
