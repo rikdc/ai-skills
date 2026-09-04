@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Forgejo review specialist findings contract",
+  "type": "object",
+  "required": ["specialist", "summary", "findings"],
+  "additionalProperties": false,
+  "properties": {
+    "specialist": {"type": "string", "minLength": 1},
+    "summary": {"type": "string", "minLength": 1},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["severity", "file", "line", "title"],
+        "additionalProperties": false,
+        "properties": {
+          "severity": {"enum": ["critical", "high", "medium", "low"]},
+          "file": {"type": "string", "minLength": 1},
+          "line": {"type": ["integer", "null"]},
+          "title": {"type": "string", "minLength": 1},
+          "detail": {"type": "string", "minLength": 1},
+          "suggestion": {"type": "string"}
+        }
+      }
+    }
+  }
+}

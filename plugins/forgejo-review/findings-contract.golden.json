@@ -1,0 +1,26 @@
+{
+  "specialist": "go-review",
+  "summary": "Two issues: one high-severity unquoted-path bug, one missing error check.",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "homelab/scripts/deploy.sh",
+      "line": 42,
+      "title": "Unquoted path in cd target",
+      "detail": "If $target contains spaces the cd fails silently and the rsync runs against $PWD.",
+      "suggestion": "cd \"$target\" || exit 1"
+    },
+    {
+      "severity": "medium",
+      "file": "cmd/worker/main.go",
+      "line": 88,
+      "title": "Ignored error from db.Close()"
+    },
+    {
+      "severity": "low",
+      "file": "cmd/worker/main.go",
+      "line": null,
+      "title": "No test file added for this new package"
+    }
+  ]
+}

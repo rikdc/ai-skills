@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Verifies findings-contract.golden.json validates against
+# findings-contract.schema.json, and that a findings array violating each
+# constraint is correctly rejected. No network, no LLM.
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+schema="$here/findings-contract.schema.json"
+golden="$here/findings-contract.golden.json"
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "SKIP: python3 not found"
+  exit 0
+fi
+if ! python3 -c "import jsonschema" 2>/dev/null; then
+  echo "SKIP: python3 jsonschema module not installed"
+  exit 0
+fi
+
+python3 - "$schema" "$golden" <<'PYEOF'
+import json, sys
+from jsonschema import validate, ValidationError
+
+schema_path, golden_path = sys.argv[1], sys.argv[2]
+schema = json.load(open(schema_path))
+golden = json.load(open(golden_path))
+
+# 1. The golden fixture must validate cleanly.
+validate(instance=golden, schema=schema)
+
+# 2. A bad severity value must be rejected.
+bad_severity = json.loads(json.dumps(golden))
+bad_severity["findings"][0]["severity"] = "urgent"
+try:
+    validate(instance=bad_severity, schema=schema)
+    print("FAIL: bad severity value was accepted", file=sys.stderr)
+    sys.exit(1)
+except ValidationError:
+    pass
+
+# 3. A finding missing "file" must be rejected.
+missing_file = json.loads(json.dumps(golden))
+del missing_file["findings"][0]["file"]
+try:
+    validate(instance=missing_file, schema=schema)
+    print("FAIL: finding missing 'file' was accepted", file=sys.stderr)
+    sys.exit(1)
+except ValidationError:
+    pass
+
+# 4. An empty findings array with a summary must still validate (the
+#    "specialist found nothing" case every skill must be able to produce).
+empty = {"specialist": "go-review", "summary": "No issues found.", "findings": []}
+validate(instance=empty, schema=schema)
+
+print("PASS: findings-contract-test")
+PYEOF
