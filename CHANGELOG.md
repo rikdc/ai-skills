@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed protect-main-branch denying writes in linked worktrees: the branch is
+  now read where the write lands (Edit/Write target path, Bash `cd` and
+  `git -C`), not in the hook's own working directory
 - Fixed markdown linting issues (line length violations)
 - Fixed general linter issues across project files
 - Removed superfluous comments from codebase
