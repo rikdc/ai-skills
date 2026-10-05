@@ -1,7 +1,7 @@
 {
   "name": "security-hooks",
   "description": "MCP security scanner and protected branch hooks for Claude Code",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "author": {
     "name": "Richard Claydon"
   },

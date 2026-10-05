@@ -252,6 +252,80 @@ else
 fi
 
 echo ""
+echo "--- Real repositories: the branch is read where the write lands ---"
+
+# A main checkout plus a linked worktree on a feature branch. No
+# TEST_BRANCH_NAME here: the hook must resolve branches itself. It runs from /
+# so that only the payload (.cwd, file_path, cd, git -C) can point it anywhere.
+FIXTURE="$(cd "$(mktemp -d)" && pwd -P)"
+trap 'rm -rf "$FIXTURE"' EXIT
+git_quiet() { git -c user.name=test -c user.email=test@example.com -c commit.gpgsign=false -c init.defaultBranch=main "$@" >/dev/null 2>&1; }
+git_quiet init "$FIXTURE/repo"
+git_quiet -C "$FIXTURE/repo" commit --allow-empty -m init
+git_quiet -C "$FIXTURE/repo" worktree add -b feature/wt "$FIXTURE/wt"
+mkdir -p "$FIXTURE/plain"
+MAIN_REPO="$FIXTURE/repo"
+WT="$FIXTURE/wt"
+
+check_real() {
+    local test_name="$1" payload="$2" should_block="$3"
+    local output decision
+    if ! output=$(echo "$payload" | (cd / && env -u TEST_BRANCH_NAME \
+        CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT") 2>&1); then
+        test_failed "$test_name (hook exited non-zero)"
+        return
+    fi
+    decision=$(echo "$output" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null || echo "")
+    if [[ "$should_block" == "true" && "$decision" == "deny" ]] ||
+        [[ "$should_block" == "false" && -z "$decision" ]]; then
+        test_passed "$test_name"
+    else
+        test_failed "$test_name (expected block=$should_block, got '${decision:-allow}')"
+    fi
+}
+
+run_file_test() {
+    local test_name="$1" cwd="$2" tool="$3" path="$4" should_block="$5"
+    check_real "$test_name" "$(jq -n --arg t "$tool" --arg c "$cwd" --arg p "$path" \
+        '{tool_name:$t, cwd:$c, tool_input:{file_path:$p}}')" "$should_block"
+}
+
+run_cmd_test() {
+    local test_name="$1" cwd="$2" command="$3" should_block="$4"
+    check_real "$test_name" "$(jq -n --arg c "$cwd" --arg cmd "$command" \
+        '{tool_name:"Bash", cwd:$c, tool_input:{command:$cmd}}')" "$should_block"
+}
+
+# Edit / Write / Task
+run_file_test "Allow Edit in worktree from a session on main" "$MAIN_REPO" Edit "$WT/a.txt" "false"
+run_file_test "Allow Write creating new dirs in worktree" "$MAIN_REPO" Write "$WT/new/dir/b.txt" "false"
+run_file_test "Allow relative Write into worktree" "$MAIN_REPO" Write "../wt/c.txt" "false"
+run_file_test "Block Edit in main checkout from a worktree session" "$WT" Edit "$MAIN_REPO/a.txt" "true"
+run_file_test "Block Write in main checkout from its own session" "$MAIN_REPO" Write "$MAIN_REPO/a.txt" "true"
+run_file_test "Allow Write outside any repository" "$MAIN_REPO" Write "$FIXTURE/plain/d.txt" "false"
+check_real "Block Task from a session on main" \
+    "$(jq -n --arg c "$MAIN_REPO" '{tool_name:"Task", cwd:$c, tool_input:{}}')" "true"
+check_real "Allow Task from a worktree session" \
+    "$(jq -n --arg c "$WT" '{tool_name:"Task", cwd:$c, tool_input:{}}')" "false"
+
+# Bash: cd and git -C move the directory a write is judged in
+run_cmd_test "Allow cd worktree && git commit from main session" "$MAIN_REPO" "cd $WT && git commit -m x" "false"
+run_cmd_test "Allow relative cd into worktree" "$MAIN_REPO" "cd ../wt && git commit -m x" "false"
+run_cmd_test "Allow git -C worktree commit from main session" "$MAIN_REPO" "git -C $WT commit -m x" "false"
+run_cmd_test "Allow sh -c cd worktree && git push" "$MAIN_REPO" "sh -c 'cd $WT && git push'" "false"
+run_cmd_test "Allow git commit in a worktree session" "$WT" "git commit -m x" "false"
+run_cmd_test "Block git commit in a main session" "$MAIN_REPO" "git commit -m x" "true"
+run_cmd_test "Block cd main && git push from worktree session" "$WT" "cd $MAIN_REPO && git push" "true"
+run_cmd_test "Block git -C main commit from worktree session" "$WT" "git -C $MAIN_REPO commit -m x" "true"
+run_cmd_test "Block second cd back to main" "$MAIN_REPO" "cd $WT && git commit -m x; cd $MAIN_REPO && git push" "true"
+run_cmd_test "Block rm under main .git from worktree session" "$WT" "cd $MAIN_REPO && rm -f .git/refs/heads/main" "true"
+# Unresolvable targets keep the previous directory rather than failing open.
+# shellcheck disable=SC2016 # the literal $SOMEWHERE is the point
+run_cmd_test "Block cd to a variable then commit on main" "$MAIN_REPO" 'cd "$SOMEWHERE" && git commit -m x' "true"
+run_cmd_test "Block cd to a missing dir then commit on main" "$MAIN_REPO" "cd $FIXTURE/nope && git commit -m x" "true"
+run_cmd_test "Allow git commit outside any repository" "$FIXTURE/plain" "git commit -m x" "false"
+
+echo ""
 echo "========================================"
 echo "Tests passed: $TESTS_PASSED"
 echo "Tests failed: $TESTS_FAILED"

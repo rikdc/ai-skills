@@ -33,8 +33,12 @@ The hook runs on `PreToolUse` for tools that can modify code or execute commands
 
 When triggered on a protected branch, the hook:
 
-1. Detects the current branch using `git branch --show-current`
-2. Checks if the branch matches the protected pattern
+1. Works out where the write lands and reads the branch checked out there:
+   - `Edit` / `Write`: the work tree containing `tool_input.file_path`
+   - `Bash`: the session directory (`cwd` in the hook payload), moved by any
+     `cd <dir>` segment and by `git -C <dir>`, judged per write segment
+   - `Task`: the session directory
+2. Checks if that branch matches the protected pattern
 3. Blocks the operation and provides guidance if protected
 4. Allows the operation to proceed if not protected
 
@@ -56,6 +60,16 @@ To proceed:
 3. Push and create a Pull Request:
    git push -u origin your-name/feature-description
 ```
+
+### Worktrees
+
+Because the branch is read where the write lands, a session started in a
+repository's main checkout can edit files in a linked worktree that is on a
+feature branch, and `cd <worktree> && git commit` is allowed. The reverse is
+still blocked: a session in a worktree cannot `cd` into the main checkout and
+push. A `cd` or `git -C` target the hook cannot resolve statically (a
+variable, command substitution, a missing path) leaves the directory
+unchanged, so it errs toward blocking.
 
 ### Creating a Feature Branch
 
