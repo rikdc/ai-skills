@@ -4,11 +4,11 @@ Expert development skills for Go, documentation, architecture, and project manag
 
 ## Skills Included
 
-### `/go-implementor`
+### `/go-backend-implementor`
 
 Expert Go software engineer for implementing production-grade backend services with idiomatic Go patterns, testing, and observability.
 
-**Use when**: Implementing Go code following best practices.
+**Use when**: Implementing Go backend code following best practices.
 
 ### `/go-review`
 
@@ -76,7 +76,7 @@ claude code plugins install github:rikdc/ai-skills/dev-skills
 
 ```bash
 # Implement a new Go service
-/go-implementor Implement a user authentication service
+/go-backend-implementor Implement a user authentication service
 
 # Review Go code
 /go-review Review the authentication middleware for security issues

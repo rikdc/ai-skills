@@ -69,7 +69,7 @@ Detection patterns live in `.claude/security-patterns.conf`. Copy
 `dev-skills`:
 
 - `/dev-skills:golang-expert`: Go advice across concurrency, errors, project structure, performance, and testing
-- `/dev-skills:go-implementor`: writes production Go with tests and observability
+- `/dev-skills:go-backend-implementor`: writes production Go backend services with tests and observability
 - `/dev-skills:go-review`: Go review for correctness, security, and performance
 - `/dev-skills:document`: API docs, ADRs, architecture docs, and runbooks
 - `/dev-skills:mentor`: senior-engineer perspective on design and technical strategy
