@@ -58,7 +58,7 @@ claude code plugins install security-hooks
 
 **Components**:
 
-- `/go-implementor` - Expert Go implementation
+- `/go-backend-implementor` - Expert Go backend implementation
 - `/go-review` - Go code review
 - `/document` - Technical documentation
 - `/mentor` - Senior engineer mentorship

@@ -51,7 +51,7 @@ Skills are the recommended approach for reusable Claude Code behaviors:
 
 - `/mentor` - Senior Staff Engineer mentor for architecture, design decisions, and career guidance
 - `/document` - Technical documentation expert for API docs, ADRs, runbooks, and guides
-- `/go-implementor` - Expert Go engineer for production-grade service implementation
+- `/go-backend-implementor` - Expert Go engineer for production-grade backend service implementation
 - `/go-review` - Senior Go code reviewer for quality, security, and best practices
 - `/manager` - Engineering project orchestrator for coordinating complex initiatives
 - `/specify` - Software specification expert for detailed technical specs
@@ -64,7 +64,7 @@ Previous agent definitions have been migrated to skills:
 | Old Agent | New Skill |
 |-----------|-----------|
 | `document-agent.md` | `/document` |
-| `go-implementor-agent.md` | `/go-implementor` |
+| `go-implementor-agent.md` | `/go-backend-implementor` |
 | `go-review-agent.md` | `/go-review` |
 | `manager-agent.md` | `/manager` |
 | `specify-agent.md` | `/specify` |
