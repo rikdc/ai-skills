@@ -50,7 +50,7 @@ project/
 
 House conventions that are not idiomatic-Go defaults:
 
-- Constructors return interfaces (`NewUserService(...) IUserService`)
+- Constructors return interfaces (`NewUserService(...) UserService`)
 - Table-driven tests using testify (`require`/`assert`) with subtests
 
 Standard idiomatic-Go conventions to follow:

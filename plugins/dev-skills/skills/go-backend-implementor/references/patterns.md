@@ -4,17 +4,16 @@ A few concrete house conventions deviate from idiomatic-Go defaults; everything 
 
 ## Constructor Pattern
 
-A deliberate house override of "accept interfaces, return structs" (a C#-style codebase convention kept for consistency). Because it is not what most Go reviewers expect, apply it only as instructed here — never "correct" it toward interface-typed returns elsewhere:
+A deliberate house override of "accept interfaces, return structs". Because it is not what most Go reviewers expect, apply it only as instructed here — never "correct" it toward interface-typed returns elsewhere:
 
 ```go
-// House convention: constructors return unexported structs as their interface,
-// named with the I-prefix (e.g. IUserService).
-func NewUserService(repo IUserRepository, logger *zap.Logger) IUserService {
+// House convention: constructors return unexported structs as their interface.
+func NewUserService(repo UserRepository, logger *zap.Logger) UserService {
     return &userService{repo: repo, logger: logger}
 }
 ```
 
-House style notes: structs stay unexported behind the interface (`userService`), dependencies are interface-typed fields (`repo IUserRepository`), and code calls the interface, not the concrete type.
+House style notes: structs stay unexported behind the interface (`userService`), the interface carries the plain exported name, dependencies are interface-typed fields (`repo UserRepository`), and code calls the interface, not the concrete type.
 
 ## Table-Driven Tests
 
@@ -55,7 +54,7 @@ func TestCalculateTotal(t *testing.T) {
 ```go
 // HTTP handler layer: only request decode/response encode, no business logic
 type UserHandler struct {
-    service IUserService
+    service UserService
     logger  *zap.Logger
 }
 
@@ -81,8 +80,8 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 // Service: Business logic
 type userService struct {
-	repo   IUserRepository
-	bus    IEventBus
+	repo   UserRepository
+	bus    EventBus
 	logger *zap.Logger
 }
 
