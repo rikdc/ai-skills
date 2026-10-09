@@ -80,9 +80,9 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 // Service: Business logic
 type userService struct {
-	repo   UserRepository
-	bus    EventBus
-	logger *zap.Logger
+    repo   UserRepository
+    bus    EventBus
+    logger *zap.Logger
 }
 
 func (s *userService) CreateUser(ctx context.Context, req CreateUserRequest) (*User, error) {
