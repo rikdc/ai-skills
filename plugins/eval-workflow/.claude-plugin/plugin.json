@@ -1,0 +1,11 @@
+{
+  "name": "eval-workflow",
+  "description": "Generates and verifies tessl eval scenarios for repository plugins",
+  "version": "0.1.0",
+  "author": {
+    "name": "Richard Claydon"
+  },
+  "license": "MPL-2.0",
+  "keywords": ["evals", "tessl", "scenarios", "testing"],
+  "skills": ["./skills/"]
+}

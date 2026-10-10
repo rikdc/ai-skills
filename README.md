@@ -22,6 +22,7 @@ claude plugin install code-quality@ai-skills
 claude plugin install prompt-tools@ai-skills
 claude plugin install pr-review-triage@ai-skills
 claude plugin install nix-skills@ai-skills
+claude plugin install eval-workflow@ai-skills
 ```
 
 The `/plugin` command does the same thing from inside a session.
@@ -50,6 +51,7 @@ make test
 | [pr-review-triage](plugins/pr-review-triage/) | Workflow | Triage of PR review comments and follow-up tracking |
 | [forgejo-review](plugins/forgejo-review/) | Workflow | Advisory Forgejo pull-request review — one COMMENT review with inline comments |
 | [nix-skills](plugins/nix-skills/) | Development | Expert guidance on Nix, NixOS, and home-manager |
+| [eval-workflow](plugins/eval-workflow/) | Development | Generation and offline verification of tessl eval scenarios |
 
 ## Security hooks
 
