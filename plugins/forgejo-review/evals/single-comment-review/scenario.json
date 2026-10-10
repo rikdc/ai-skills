@@ -1,0 +1,1 @@
+{"description": "Advisory Forgejo review happy path: clone at the card's head sha, fetch the diff, apply the general criteria, post exactly ONE COMMENT review with inline comments, verify it landed, and close the kanban card.", "include": ["./inputs"]}

@@ -1,0 +1,56 @@
+{
+  "context": "The agent runs the forgejo-advisory-review skill against a simulated Forgejo API for infra/logsrv PR 42 (a shell script change adding a prune() helper to scripts/rotate.sh). Grading reads forgejo-record.json (diff fetch, review attempts, posted reviews, verification), kanban-record.json (card calls), the clone's HEAD, and the served diff at forgejo-sim/pull-42.diff. The simulation registers one POST review as attempt 1; grading checks that the one accepted review follows every rule the skill documents for posting, verifying, and closing.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Exactly one review posted",
+      "description": "forgejo-record.json's reviews array has exactly one entry (the simulation records every accepted POST .../pulls/42/reviews; re-submissions after a failed attempt or duplicate posts make this fail).",
+      "max_score": 10
+    },
+    {
+      "name": "Event is COMMENT",
+      "description": "The recorded posted review has event == 'COMMENT', not APPROVED, PENDING, or REQUEST_CHANGES.",
+      "max_score": 15
+    },
+    {
+      "name": "commit_id is the card's head sha",
+      "description": "The recorded posted review's commit_id equals the head sha on card.txt (also served as forgejo-sim/head_sha), i.e. the review is anchored to the PR's actual head, not to a base sha or an invented value.",
+      "max_score": 10
+    },
+    {
+      "name": "Repository checked out at the head sha",
+      "description": "The clone under repo/ has HEAD evaluated to the card's head sha (git rev-parse HEAD), i.e. the agent reviewed the PR's actual content, not the base branch or a different commit.",
+      "max_score": 8
+    },
+    {
+      "name": "rm -rf finding reported inline",
+      "description": "The posted review contains an inline comment on scripts/rotate.sh at new_position 7 (the added 'rm -rf ./old/*' line) explaining the safely-anchorable rm risk; the finding is in comments, not summarised only in body.",
+      "max_score": 15
+    },
+    {
+      "name": "Unchecked-cd finding reported inline",
+      "description": "The posted review contains an inline comment on scripts/rotate.sh at new_position 8 (the added 'cd \"$dest\" || true' line) noting that a failed cd is swallowed and later commands (tar, echo) run in the wrong directory; reported at the file line, not only in body.",
+      "max_score": 10
+    },
+    {
+      "name": "Body is an overall read, not a line dump",
+      "description": "The posted review's body is non-empty, describes the PR's overall content and assessment (mentions the backup-pruning purpose / prune helper), and does not carry the two line-specific findings verbatim instead of the inline comments.",
+      "max_score": 8
+    },
+    {
+      "name": "No non-advisory event in any attempt",
+      "description": "Across every entry of review_attempts and reviews in forgejo-record.json, no POST was made with event APPROVED, PENDING, or REQUEST_CHANGES.",
+      "max_score": 8
+    },
+    {
+      "name": "Review verified before the card closed",
+      "description": "After posting, the agent called GET .../pulls/42/reviews (forgejo-record.json reviews_list_fetched is true and verified is true) and only then completed the card: kanban-record.json shows completed == true and at least one kanban_comment call carrying the review URL.",
+      "max_score": 10
+    },
+    {
+      "name": "Diff fetched before reviewing",
+      "description": "forgejo-record.json shows diff_fetched == true, i.e. the agent pulled the PR's unified diff from the API instead of reviewing from the clone alone.",
+      "max_score": 6
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "context": "The agent runs the forgejo-advisory-review skill against a simulated Forgejo API for infra/logsrv PR 42 with the simulation set to always reject the first POST to the reviews endpoint with 422 (see task.md; the agent is told this up front). Grading reads forgejo-record.json (review_attempts, reviews, diff_fetched, reviews_list_fetched, verified), kanban-record.json, the clone's HEAD under repo/, and the served diff at forgejo-sim/pull-42.diff. Grading focuses on 422 recovery: an honest recomputed retry that keeps every finding inline, capped retries, and the same posting/verify/close rules as the happy path.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "First POST attempt got rejected and retried",
+      "description": "forgejo-record.json review_attempts has at least two entries: the first with status 422 (reject_reason non-null) and a later attempt submitted afterwards — i.e. the agent did not treat the 422 as a terminal failure and did not give up without posting.",
+      "max_score": 12
+    },
+    {
+      "name": "Accepted review obtained within the retry cap",
+      "description": "A POST attempt ended with status 200 (the reviews array is non-empty), and the number of POST attempts to the reviews endpoint is at most 4 (the forced 422 plus up to 3 retries), i.e. the agent respected the retry ceiling instead of looping forever.",
+      "max_score": 12
+    },
+    {
+      "name": "Accepted review event is COMMENT",
+      "description": "The accepted review in forgejo-record.json reviews has event == 'COMMENT'.",
+      "max_score": 8
+    },
+    {
+      "name": "commit_id is the card's head sha",
+      "description": "The accepted review's commit_id equals the head sha on card.txt / forgejo-sim/head_sha.",
+      "max_score": 8
+    },
+    {
+      "name": "Repository checked out at the head sha",
+      "description": "git rev-parse HEAD inside repo/ equals the card's head sha — the agent reviewed the PR's content, not the base branch.",
+      "max_score": 10
+    },
+    {
+      "name": "rm -rf finding kept inline through recovery",
+      "description": "The accepted review has an inline comment on scripts/rotate.sh at new_position 7 (the added 'rm -rf ./old/*' line) describing the anchored-path deletion risk.",
+      "max_score": 12
+    },
+    {
+      "name": "Unchecked-cd finding kept inline through recovery",
+      "description": "The accepted review has an inline comment on scripts/rotate.sh at new_position 8 (the added 'cd \"$dest\" || true' line) describing the swallowed-cd / wrong-directory risk.",
+      "max_score": 12
+    },
+    {
+      "name": "Comments array not collapsed by the recovery",
+      "description": "In the accepted review the comments array still contains both inline findings with integer new_position values — the agent did not 'fix' the 422 by emptying comments or by demoting line findings into body.",
+      "max_score": 10
+    },
+    {
+      "name": "Exactly one accepted review",
+      "description": "forgejo-record.json reviews has exactly one entry while review_attempts shows at least two attempts (one rejected, then the accepted re-POST).",
+      "max_score": 8
+    },
+    {
+      "name": "Verified and card closed",
+      "description": "After the accepted POST the agent fetched GET .../pulls/42/reviews (reviews_list_fetched and verified true in forgejo-record.json) and kanban-record.json shows completed == true with a kanban_comment call passing the review URL.",
+      "max_score": 8
+    }
+  ]
+}
