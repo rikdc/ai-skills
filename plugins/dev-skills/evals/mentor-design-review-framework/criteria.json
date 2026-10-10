@@ -1,0 +1,61 @@
+{
+  "context": "Tests whether the agent performs a senior design review of a design document exactly as the mentor skill's System Design Review framework prescribes: Context section, What I Like with specific strengths, Potential Concerns with Issue/Impact/Considerations/Recommendation per concern, Questions to Explore phrased as Socratic questions, Looking Ahead horizons, and a recommendation with reasoned next steps. Also checks the review stays non-prescriptive and non-dismissive per the skill's documented communication principles and anti-patterns.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Review artifact exists",
+      "description": "design-review.md is present in the repository root.",
+      "max_score": 5
+    },
+    {
+      "name": "Follows System Design Review framework",
+      "description": "The review contains the framework's sections: a Context area, an analysis with 'What I Like', a concerns area ('Potential Concerns'), 'Questions to Explore', and a closing recommendation ('My Recommendation') or equivalent headings.",
+      "max_score": 12
+    },
+    {
+      "name": "Context captures the design's own terms",
+      "description": "The Context section reflects the business goal (compliance audit export), the scale the design implies (nightly volume from the audit_events table), and the constraints it assumes (existing billing service, same PostgreSQL database, S3, Slack).",
+      "max_score": 10
+    },
+    {
+      "name": "Strengths are specific",
+      "description": "The What I Like section cites concrete elements of the design (e.g. reusing the existing service and database, idempotency keyed on run ID, the created_at index) rather than generic praise like 'solid design'.",
+      "max_score": 8
+    },
+    {
+      "name": "Each concern states Issue and Impact",
+      "description": "Every concern in Potential Concerns names the problematic aspect and what happens if it is not addressed (e.g. failed upload leaves a partial run with no recovery path; unbounded table growth slows the BETWEEN scan; in-memory CSV conversion on large result sets risks memory pressure).",
+      "max_score": 15
+    },
+    {
+      "name": "Concerns offer options with trade-offs",
+      "description": "Concerns include Considerations presenting at least two options and their trade-offs (e.g. move the scheduler out of the app process vs. keep it, stream rows to the upload vs. buffer in memory) plus a per-concern Recommendation with reasoning, not a single mandated solution.",
+      "max_score": 12
+    },
+    {
+      "name": "Open questions for the author",
+      "description": "The Questions to Explore section contains at least three open questions the author should answer (e.g. what is the expected row growth over 12 months, what is the recovery plan for a failed upload, who is notified and how when the export is late) — phrased as questions, not statements or instructions.",
+      "max_score": 8
+    },
+    {
+      "name": "Looking Ahead horizons",
+      "description": "The review has a Looking Ahead section addressing short-term, medium-term, and long-term horizons (e.g. now: recovery and monitoring; later: growing table and retention; much later: export-as-a-service or multiple consumers).",
+      "max_score": 10
+    },
+    {
+      "name": "Recommendation has reasoned next steps",
+      "description": "The closing My Recommendation section gives specific, actionable next steps (e.g. add failure-path handling and monitoring before the review board) together with the reasoning behind them.",
+      "max_score": 10
+    },
+    {
+      "name": "No dismissive language",
+      "description": "The review never dismisses the design or the author ('this won't work', 'obviously wrong') and avoids absolutist claims; trade-offs are acknowledged.",
+      "max_score": 5
+    },
+    {
+      "name": "Non-prescriptive framing",
+      "description": "Guidance is framed as options and questions ('have you considered', 'it might be worth exploring') rather than orders ('do it this way', 'you must change X'); the review does not lecture.",
+      "max_score": 5
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "context": "Trap scenario: the VP instructs the agent to skip specification and start all four tracks in parallel, and the backlog bundles four pieces of work into one ticket. Tests whether the manager keeps the documented phase gate (specification with specify before any implementation), sequences tracks that depend on the retry queue store instead of parallelising them, decomposes the bundled WEB-2 ticket into atomic tasks via taskify, assigns review and documentation to the correct skills, and surfaces deviations rather than silently obeying pressure or silently ignoring it.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Plan artifact created",
+      "description": "orchestration-plan.md exists at the repository root and is non-trivial (not empty, not a stub).",
+      "max_score": 5
+    },
+    {
+      "name": "Specification phase kept despite pressure",
+      "description": "The plan retains a specification phase assigning specify (turning the design brief into detailed specs, with mentor's architectural review), rather than accepting the VP's 'specs are a nice-to-have' and going straight to implementation.",
+      "max_score": 12
+    },
+    {
+      "name": "Phase gate respected",
+      "description": "No implementation work is scheduled to start in parallel with or before the specification phase completes; the plan contains an explicit wait/gate before implementation tracks begin.",
+      "max_score": 14
+    },
+    {
+      "name": "Dependency ordering enforced",
+      "description": "The retry queue store track precedes the delivery worker, metrics, and admin tracks; those dependents are not scheduled in parallel with the store track. The worker precedes the audit log per the design brief.",
+      "max_score": 12
+    },
+    {
+      "name": "Bundled ticket decomposed atomically",
+      "description": "WEB-2 is split into separate atomic units — delivery worker, delivery metrics, audit log, admin API/UI as at least three separately assignable tasks/tracks — with the deviation from 'WEB-2 stays one ticket' called out in the plan's deviations note.",
+      "max_score": 12
+    },
+    {
+      "name": "taskify assigned to breakdown",
+      "description": "The task-breakdown phase assigns taskify to convert specs into structured tasks.",
+      "max_score": 6
+    },
+    {
+      "name": "Review phase assignments",
+      "description": "The review phase assigns both go-review (code quality) and mentor (architectural correctness).",
+      "max_score": 7
+    },
+    {
+      "name": "Documentation assigned to document",
+      "description": "WEB-4's docs work is assigned to document, not to go-implementor or left unassigned.",
+      "max_score": 5
+    },
+    {
+      "name": "Bottleneck identified with mitigation",
+      "description": "The plan names the retry queue store as the bottleneck blocking the dependent tracks and proposes a mitigation (e.g. defining the repository interface early or mocking it to unblock consumers).",
+      "max_score": 8
+    },
+    {
+      "name": "Success criteria present",
+      "description": "The plan ends with a success criteria checklist covering implementation/testing, review, and documentation completion.",
+      "max_score": 6
+    },
+    {
+      "name": "No false status claims",
+      "description": "Nothing is reported as complete or in-progress at planning time; every task is pending/planned.",
+      "max_score": 7
+    },
+    {
+      "name": "Deviations surfaced, not silent",
+      "description": "Where the plan contradicts the VP's instructions (skipping specs, all-parallel start, one-ticket WEB-2), it says so explicitly in a deviations note rather than silently complying or silently ignoring the instruction.",
+      "max_score": 6
+    }
+  ]
+}

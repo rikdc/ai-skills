@@ -1,0 +1,61 @@
+{
+  "context": "Tests whether the agent implements a missing service layer and HTTP handler following the go-backend-implementor house conventions: constructors return unexported structs behind their exported interface, dependencies are interface-typed fields, context.Context is propagated from handler to repository, validation failures and repository failures are wrapped with %w, the handler stays decode/encode only with structured logging, and tests are table-driven with testify and named subtests. Also checks that the agent does not claim test runs it could not perform (no Go toolchain in the sandbox).",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "House constructor pattern",
+      "description": "internal/service/product.go defines an unexported productService struct and a NewProductService constructor whose return type is the ProductService interface (not the concrete struct), returning &productService{...}; both carry godoc comments.",
+      "max_score": 12
+    },
+    {
+      "name": "Dependency fields are interface-typed",
+      "description": "productService stores its dependencies as typed fields (repo repository.ProductRepository, logger *zap.Logger) injected via the constructor, not constructed inside CreateProduct or stored as concrete types.",
+      "max_score": 8
+    },
+    {
+      "name": "Context propagated to repository",
+      "description": "CreateProduct takes context.Context as its first parameter and passes the context through to ProductRepository.Create rather than context.Background()/TODO() or dropping it.",
+      "max_score": 10
+    },
+    {
+      "name": "Validation wraps sentinel with %w",
+      "description": "Request validation (empty SKU, non-positive price) happens in the service before the repository call and failures wrap a sentinel error (service.ErrInvalidSKU / service.ErrInvalidPrice) using %w, not bare sentinel returns, %v, or string-only errors.",
+      "max_score": 10
+    },
+    {
+      "name": "Repository failure wrapped with context",
+      "description": "A failing ProductRepository.Create is returned as fmt.Errorf with added context and %w (e.g. 'failed to create product: %w'), never returned bare, formatted with %v, or silently discarded.",
+      "max_score": 12
+    },
+    {
+      "name": "Handler is decode/encode only",
+      "description": "ProductHandler.Create contains no business logic: no repository access, no uuid generation, no validation of domain rules — it decodes the request, delegates to the service, and encodes the response.",
+      "max_score": 10
+    },
+    {
+      "name": "Decode failure answered 400 with logged error",
+      "description": "A JSON decode error is logged with the structured logger (h.logger, zap fields) and answered with http.StatusBadRequest via writeError before returning; the handler does not fall through to the service on a decode failure.",
+      "max_score": 10
+    },
+    {
+      "name": "Request context passed to service",
+      "description": "The handler calls the service with r.Context() (not context.Background(), TODO, or a fresh context).",
+      "max_score": 6
+    },
+    {
+      "name": "Success writes 201 with encoded product",
+      "description": "On success the handler writes http.StatusCreated via writeJSON with the created *model.Product as the body.",
+      "max_score": 6
+    },
+    {
+      "name": "Structured logging on handler error paths",
+      "description": "Handler/service error paths log through the injected *zap.Logger with zap fields (e.g. zap.Error(err)); no fmt.Println, log.Println, or unstructured printing in the new code.",
+      "max_score": 8
+    },
+    {
+      "name": "Table-driven testify test with subtests",
+      "description": "internal/service/product_test.go defines a table of cases with a name field and runs them via t.Run subtests using require (or assert); it covers at least one validation failure, the duplicate-SKU (repository) failure, and a success case using the in-memory repository, and does not claim a coverage percentage it cannot know.",
+      "max_score": 8
+    }
+  ]
+}

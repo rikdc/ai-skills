@@ -1,0 +1,56 @@
+{
+  "context": "Tests whether the agent fixes transaction and error-handling code to match the go-backend-implementor documented rules: BeginTx/Commit errors wrapped with context and %w, an unconditional deferred rollback placed right after BeginTx whose post-commit sql.ErrTxDone is guarded with errors.Is and never surfaced as a failure (unexpected rollback errors only logged), %w (never %v) wrapping so errors.Is works, sentinel checks via errors.Is rather than ==, and wrapped repository failures in the service. The trap: a correctly-styled house constructor (returns interface) must not be 'corrected' to return the struct. No Go toolchain is available, so grading reads the code content; the agent must not claim verifications it could not run.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "BeginTx failure wrapped with context",
+      "description": "In Transfer, a failing r.db.BeginTx is returned as fmt.Errorf with added context (e.g. 'failed to begin transaction: %w'), not returned bare.",
+      "max_score": 10
+    },
+    {
+      "name": "Commit failure wrapped with context",
+      "description": "A failing tx.Commit is returned as fmt.Errorf with added context (e.g. 'failed to commit transaction: %w'), not returned bare.",
+      "max_score": 8
+    },
+    {
+      "name": "Unconditional deferred rollback after BeginTx",
+      "description": "Transfer defers tx.Rollback() immediately after a successful BeginTx and before the first fallible call (defer runs unconditionally, covering both debit and credit failures); the rollback is not moved after Commit or made conditional on an error.",
+      "max_score": 12
+    },
+    {
+      "name": "Post-commit rollback error never surfaced",
+      "description": "The deferred rollback does not write into Transfer's named return value or otherwise overwrite a successful commit: rollback errors are not returned/propagated from Transfer, and sql.ErrTxDone (the expected post-commit rollback result) is explicitly guarded with errors.Is and treated as expected cleanup noise.",
+      "max_score": 16
+    },
+    {
+      "name": "Unexpected rollback errors only logged",
+      "description": "Rollback errors other than sql.ErrTxDone are logged via the repository's structured logger (e.g. r.log.Warn('rollback failed', zap.Error(err))), not returned to the caller.",
+      "max_score": 6
+    },
+    {
+      "name": "debit/credit wrap with %w preserving sentinels",
+      "description": "debit and credit wrap their failures with fmt.Errorf using %w (not %v), so repository.ErrInsufficientFunds / repository.ErrAccountNotFound remain matchable with errors.Is up the stack; sentinel errors are not stringified or converted to new sentinel values.",
+      "max_score": 14
+    },
+    {
+      "name": "Sentinel mapped with errors.Is",
+      "description": "paymentService.Transfer checks the repository failure with errors.Is(err, repository.ErrInsufficientFunds) (not == comparison), which works through %w-wrapped chains.",
+      "max_score": 12
+    },
+    {
+      "name": "Other repository failures wrapped in service",
+      "description": "Repository failures that are not the rejected-payment sentinel are wrapped with added context and %w in the service (e.g. fmt.Errorf('transfer ...: %w', err)) rather than returned bare or swallowed.",
+      "max_score": 6
+    },
+    {
+      "name": "House constructor left untouched",
+      "description": "internal/repository/repository.go still has NewLedgerRepository returning the LedgerRepository interface over the unexported postgresRepository struct — the agent did not restyle it to 'accept interfaces, return structs' or otherwise rewrite it.",
+      "max_score": 8
+    },
+    {
+      "name": "review-notes.md enumerates the real violations",
+      "description": "review-notes.md exists and lists the fixed violations (at minimum: the rollback/ErrTxDone overwrite, %v instead of %w wrapping, the == sentinel comparison, and the bare BeginTx/Commit returns) with the rule each violated; its Verification section lists the would-run commands and does not claim any were executed or passed.",
+      "max_score": 8
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+{"description":"Trap scenario: a staged change framed by its author as purely cosmetic actually introduces a guaranteed index-out-of-range panic; graded on a correctness-first review with Request Changes verdict and cosmetic notes confined to Minor","include":["./inputs"]}

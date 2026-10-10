@@ -1,0 +1,51 @@
+{
+  "context": "Tests whether the agent applies the shell-script-reviewer skill's error-handling stance to a script wearing the 'unofficial strict mode' header: flagging the presence of set -e/set -u as an anti-pattern (Style, at most Medium) while explicitly keeping -o pipefail, refusing to recommend adding strict mode, and STILL reporting unchecked critical commands (a cd inside a function called from an && guard chain) as Correctness findings because -e cannot be trusted — plus refusing the classic wrong one-line fix of double-quoting $(ls ...) output.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "set -e / set -u flagged for removal",
+      "description": "The review flags the presence of `set -e` (and `-u`) in the strict-mode header as a finding and recommends REMOVING them while keeping what is safe — it does not merely note the header as good practice or leave it unmentioned.",
+      "max_score": 14
+    },
+    {
+      "name": "Anti-pattern finding correctly classified",
+      "description": "The -e/-u finding is Category Style and severity no higher than Medium (Low or Medium), per the skill's stance that it is a maintainability finding, not a safety one — it is neither silenced as best practice nor inflated to High/Critical.",
+      "max_score": 8
+    },
+    {
+      "name": "Never recommends adding strict mode",
+      "description": "Nowhere in the report does the agent recommend adding `set -e`, `set -u`, or `set -euo pipefail` (or expanding strict mode), and the report does not list the absence of a strict-mode header anywhere as a gap; critiques of the script come from the documented explicit-checks stance instead.",
+      "max_score": 15
+    },
+    {
+      "name": "pipefail and IFS narrowing explicitly kept",
+      "description": "The recommended replacement for the header keeps `set -o pipefail` (and may keep the IFS narrowing / call them unambiguously safe defense-in-depth) instead of discarding the whole header wholesale.",
+      "max_score": 10
+    },
+    {
+      "name": "Unchecked cd reported regardless of set -e",
+      "description": "The review reports the unchecked `cd \"$SNAPSHOT_ROOT\"` in snapshot() as a Correctness finding with an explicit `cd ... || exit` (or `|| return`) check, even though `set -e` is present — and explicitly does not treat -e as validating it; the fix is explicit per-command checks.",
+      "max_score": 14
+    },
+    {
+      "name": "Guard-chain failure swallowing explained",
+      "description": "The review recognises that `snapshot && prune_old \"$1\"` inside main() suppresses errexit for the whole chain (including any critical command inside the functions it calls, since failures land on commands that are part of an &&/|| list) so a failed snapshot silently continues to list and print 'snapshot complete' — and proposes explicit checks rather than leaning on -e.",
+      "max_score": 12
+    },
+    {
+      "name": "ls-loop fixed per authority, not by quoting",
+      "description": "The `for f in $(ls \"$SNAPSHOT_ROOT\")` finding is marked True Correctness (one of the few defects ShellCheck catches) but the review does NOT propose the tempting one-line fix of double-quoting the $(ls ...) substitution; with static-analysis coverage confirmed the proposed fix is a glob or `find ... -print0 | while IFS= read -r -d ''`, citing SC2045 / BashPitfalls.",
+      "max_score": 12
+    },
+    {
+      "name": "Report follows the output skeleton",
+      "description": "review-report.md states the dialect (bash) and uses the skill's skeleton: findings grouped by severity with locations as file:line (Severity and Category named per finding), concrete Current/Fix snippets, and a summary count table by severity and by category.",
+      "max_score": 8
+    },
+    {
+      "name": "No invented severity and no false safety claims",
+      "description": "The review neither invents Critical-severity findings the fixture does not support (no untrusted-input eval, no temp-file race here) nor asserts the script is safe because the strict header is present; findings drive the graded output paths, not the header.",
+      "max_score": 7
+    }
+  ]
+}
