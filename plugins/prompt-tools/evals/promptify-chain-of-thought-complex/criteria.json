@@ -1,0 +1,51 @@
+{
+  "context": "Tests whether the agent matches prompt pattern to task complexity: a multi-step bug-triage request leads to a reasoning pattern prompt with numbered thinking steps, a separated final output, an edge-case path, and a recorded analysis whose pattern choice is consistent with the complexity argument.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Analysis file records all fields",
+      "description": "analysis.md records Purpose, Input, Output, Domain, Complexity, and Best Pattern.",
+      "max_score": 12
+    },
+    {
+      "name": "Complexity assessed honestly",
+      "description": "analysis.md marks the task complex (or otherwise argues the multi-step reasoning) rather than calling it simple.",
+      "max_score": 10
+    },
+    {
+      "name": "Chosen pattern fits multi-step reasoning",
+      "description": "The chosen pattern is one suitable for step-by-step reasoning (Chain-of-Thought) or an equivalent step-structured pattern, and the justification connects it to the multi-step classification work.",
+      "max_score": 14
+    },
+    {
+      "name": "Prompt present and usable",
+      "description": "generated-prompt.md contains the finished prompt itself.",
+      "max_score": 8
+    },
+    {
+      "name": "Numbered thinking steps",
+      "description": "The prompt instructs the AI through an explicit sequence of numbered steps (e.g. analyse symptoms, determine category, choose severity, justify).",
+      "max_score": 15
+    },
+    {
+      "name": "Final output separated",
+      "description": "The prompt has a clearly separated final output specification (category + severity + justification, in a named format) after the reasoning steps.",
+      "max_score": 13
+    },
+    {
+      "name": "Edge case handled",
+      "description": "The prompt addresses the unclear-category edge case (report that fits none or several classes) and states how to handle it.",
+      "max_score": 13
+    },
+    {
+      "name": "No vague unqualified terms",
+      "description": "The prompt does not instruct with unqualified vague words like 'good' or 'properly' without definition.",
+      "max_score": 7
+    },
+    {
+      "name": "Evidence files only",
+      "description": "The working directory contains analysis.md and generated-prompt.md as the deliverables (setup fixture aside).",
+      "max_score": 8
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+{"description":"Promptify trap case: a vague request must not produce a vague prompt; missing requirements are surfaced as assumptions and the prompt uses concrete, checkable requirements.","include":["./inputs"]}

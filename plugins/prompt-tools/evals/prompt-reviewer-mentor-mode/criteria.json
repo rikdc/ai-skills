@@ -1,0 +1,46 @@
+{
+  "context": "Tests whether the agent honours the --mentor flag of the prompt-reviewer command: the recorded review is Socratic (guiding questions organised by evaluation dimension, thought experiments, exploratory next steps) and contains no prescribed fixes, no rewritten prompt, and no edits to the reviewed file.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Review file present",
+      "description": "mentor-review.md exists in the working directory.",
+      "max_score": 10
+    },
+    {
+      "name": "Initial observations positive",
+      "description": "The review opens with brief observations about what the prompt does well, before questioning anything.",
+      "max_score": 10
+    },
+    {
+      "name": "Questions, not prescriptions",
+      "description": "The dominant body is guiding questions (phrased as questions with '?'), not direct instructions like 'change X to Y'.",
+      "max_score": 16
+    },
+    {
+      "name": "Questions organised by evaluation dimensions",
+      "description": "Questions are grouped under dimension-style headings (clarity, structure/examples, output/validation, or equivalent).",
+      "max_score": 12
+    },
+    {
+      "name": "Thought experiments included",
+      "description": "The review contains at least one thought experiment describing an edge-case or ambiguous situation and asking how the current prompt would handle it.",
+      "max_score": 14
+    },
+    {
+      "name": "No rewritten prompt",
+      "description": "The review does not include a full rewritten version of the author's prompt.",
+      "max_score": 12
+    },
+    {
+      "name": "Questions anchored in the fixture",
+      "description": "The questions target real weaknesses of the fixture prompt (e.g. the unqualified 'good', identity confusion, missing session context), not generic fillers.",
+      "max_score": 16
+    },
+    {
+      "name": "Next steps exploratory",
+      "description": "The next-steps section invites the author to try or consider things, rather than prescribing final changes.",
+      "max_score": 10
+    }
+  ]
+}
