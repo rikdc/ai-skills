@@ -1,0 +1,56 @@
+{
+  "context": "Tests whether the agent honours the /dev:review --all flag: reviews the entire repository instead of just changed files, applies repository-wide findings (the hardcoded placeholder token is High Priority), and still produces the full structured report without inventing issues that are not there.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "review.md exists",
+      "description": "review.md exists in the working directory.",
+      "max_score": 10
+    },
+    {
+      "name": "Full-repo scope declared",
+      "description": "The Change Summary states this is a repository-wide (--all) analysis, not a changes-diff review.",
+      "max_score": 10
+    },
+    {
+      "name": "Placeholder token flagged High",
+      "description": "The hardcoded placeholder service token in src/auth.py appears under High Priority security findings.",
+      "max_score": 16
+    },
+    {
+      "name": "No-validation issue flagged",
+      "description": "The missing input validation/error handling in the validation path of src/api.py (validate_job returning True unconditionally) is flagged.",
+      "max_score": 12
+    },
+    {
+      "name": "All source files covered",
+      "description": "Findings or a coverage note reference every Python file in src/ (auth.py, api.py, format.py) — nothing silently skipped.",
+      "max_score": 10
+    },
+    {
+      "name": "Priority Findings sections",
+      "description": "A 'Priority Findings' section with High, Medium, and Low priority subsections is present.",
+      "max_score": 8
+    },
+    {
+      "name": "Edge Cases & Risks section",
+      "description": "An 'Edge Cases & Risks' section is present with concrete repository-wide risks.",
+      "max_score": 8
+    },
+    {
+      "name": "Recommendations section",
+      "description": "A 'Recommendations' section with actionable repository-wide improvements is present.",
+      "max_score": 8
+    },
+    {
+      "name": "Real code references",
+      "description": "Findings cite actual lines/function names from the reviewed files.",
+      "max_score": 10
+    },
+    {
+      "name": "No invented issues",
+      "description": "No finding is attributed to code that does not exist in the repository; severity claims are gradeable in the fixture state.",
+      "max_score": 8
+    }
+  ]
+}

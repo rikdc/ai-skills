@@ -1,0 +1,46 @@
+{
+  "context": "Tests whether the agent performs the cleanup rules of /clean on uncommitted edits: removes commented-out code, edit-narration, and name-restating comments as redundant, moves an end-of-line comment above the line, keeps the module's behaviour identical, and doesn't strip comments arbitrarily.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Commented-out code removed",
+      "description": "The commented-out first-version total() block (three lines of '# old = ...') and the '# commented out while auditing totals' lead-in are gone.",
+      "max_score": 18
+    },
+    {
+      "name": "Edit-narration comments removed",
+      "description": "'# changed the loop to enumerate()' and '# removed the taxable-min floor after the audit' are gone.",
+      "max_score": 14
+    },
+    {
+      "name": "Obvious comments removed",
+      "description": "'# lists the total' — which merely restates the names subtotal/total — is gone.",
+      "max_score": 12
+    },
+    {
+      "name": "End-of-line comment moved above",
+      "description": "No end-of-line comment remains on the uncommitted lines; the '# restock-only items' note moved above the ink entry on its own line.",
+      "max_score": 14
+    },
+    {
+      "name": "TODO comment preserved verbatim",
+      "description": "'# TODO(auditor): reconcile against ledger-2026-03 ...' still appears in the file.",
+      "max_score": 12
+    },
+    {
+      "name": "Behaviour unchanged",
+      "description": "`python3 src/ledger.py` prints total=272 (15+95+120+42) exactly as the pre-clean demo did; no code semantics altered.",
+      "max_score": 16
+    },
+    {
+      "name": "No comment defaced broadly",
+      "description": "Module docstrings and function docstrings were not mass-deleted; only the redundant comment lines were removed.",
+      "max_score": 6
+    },
+    {
+      "name": "Git hygiene respected",
+      "description": "The agent did not commit, stage, or revert; the change remains uncommitted local work.",
+      "max_score": 8
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "context": "Tests whether the agent applies the /dev:check fix-don't-just-report contract to security findings: removes a hardcoded credential in favour of an environment variable, swaps eval() for the provided safe evaluator, parameterises the SQL query, keeps the gate and provided helper unchanged, verifies the gate exits 0, and records the fixes in fix-report.md.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Quality gate passes",
+      "description": "`python3 tools/quality_check.py` exits 0 when re-run in the working directory with all security checks marked PASS.",
+      "max_score": 20
+    },
+    {
+      "name": "Hardcoded token removed",
+      "description": "The literal 'sk-live-' token no longer appears anywhere under src/.",
+      "max_score": 14
+    },
+    {
+      "name": "Credential read from environment",
+      "description": "src/payments.py no longer stores or returns the hardcoded token; auth() (or its replacement) reads the credential from the PAYGATE_TOKEN environment variable at runtime via os.environ.",
+      "max_score": 14
+    },
+    {
+      "name": "eval() eliminated",
+      "description": "No `eval(` call remains in src/payments.py; the expression is evaluated through src/safe_calc.py's helper.",
+      "max_score": 14
+    },
+    {
+      "name": "SQL parameterised",
+      "description": "The query is executed with a `?` placeholder and a parameter tuple, not f-string/concatenation of the user value.",
+      "max_score": 14
+    },
+    {
+      "name": "Gate and helper unchanged",
+      "description": "tools/quality_check.py and src/safe_calc.py still match their setup content (no weakening, no deletion of checks).",
+      "max_score": 8
+    },
+    {
+      "name": "Functionality preserved",
+      "description": "The health/usage path still works: `PAYGATE_TOKEN=tok python3 src/payments.py` prints a receipt line without raising.",
+      "max_score": 6
+    },
+    {
+      "name": "fix-report.md records each fix",
+      "description": "fix-report.md names all three vulnerabilities and the fix applied for each.",
+      "max_score": 10
+    }
+  ]
+}

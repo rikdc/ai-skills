@@ -1,0 +1,4 @@
+{
+  "description": "Run the --all whole-repository review and produce the structured report covering all files, including the pre-existing security issue",
+  "include": ["./inputs"]
+}

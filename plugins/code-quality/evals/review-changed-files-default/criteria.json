@@ -1,0 +1,61 @@
+{
+  "context": "Tests whether the agent performs the documented /dev:review default behaviour: derives the changed-files scope itself from git, reviews performance/security/maintainability/edge cases of that change, and emits the structured report (Change Summary, Priority Findings, Edge Cases & Risks, Recommendations) with real code references, without reviewing or fabricating issues outside the change.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "review.md exists",
+      "description": "review.md exists in the working directory.",
+      "max_score": 10
+    },
+    {
+      "name": "Change Summary section",
+      "description": "A 'Change Summary' section reports the latest commit's hash (or a four-to-seven char prefix), its message, and the scope of the change (file(s) touched).",
+      "max_score": 10
+    },
+    {
+      "name": "Priority Findings section",
+      "description": "A 'Priority Findings' section with High, Medium, and Low priority subsections is present.",
+      "max_score": 10
+    },
+    {
+      "name": "Bare except flagged",
+      "description": "The bare `except: pass` swallowing errors in src/retry.py is flagged under High Priority (or equivalent top severity).",
+      "max_score": 12
+    },
+    {
+      "name": "Unbounded retry flagged",
+      "description": "The `while True` retry loop with no cap/backoff limit in src/retry.py is flagged as a performance/reliability issue.",
+      "max_score": 10
+    },
+    {
+      "name": "Edge Cases & Risks section",
+      "description": "An 'Edge Cases & Risks' section is present and discusses at least one concrete unhandled scenario in the retry change.",
+      "max_score": 8
+    },
+    {
+      "name": "Recommendations section",
+      "description": "A 'Recommendations' section with actionable advice, including what must change before merge, is present.",
+      "max_score": 8
+    },
+    {
+      "name": "Scope respected",
+      "description": "src/auth.py (unchanged, contains a pre-existing placeholder token) is not reported as a change review finding; no finding claims it was modified recently.",
+      "max_score": 12
+    },
+    {
+      "name": "Real code references",
+      "description": "Findings quote or cite the actual offending lines/function names from src/retry.py, not generic prose.",
+      "max_score": 10
+    },
+    {
+      "name": "No invented change details",
+      "description": "The Change Summary reflects the real commit message and changed-file set; no fabricated author, date, or files listed.",
+      "max_score": 6
+    },
+    {
+      "name": "Professional tone",
+      "description": "The report reads like a formal PR review: no personal attacks, no exclamatory or dismissive language.",
+      "max_score": 4
+    }
+  ]
+}

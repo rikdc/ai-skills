@@ -1,0 +1,4 @@
+{
+  "description": "Run the quality gate, fix all lint violations and the failing unit test in product code, and re-run until the gate passes",
+  "include": ["./inputs"]
+}
