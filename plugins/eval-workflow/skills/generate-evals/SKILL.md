@@ -40,9 +40,13 @@ ones.
    `"private": true`.
 2. Point the manifest at what the plugin ships: `"skills": "./skills/"` (or
    an array of skill dirs) when skills exist, `"commands": "./commands/"`
-   when commands exist, nothing for hooks-only plugins (a manifest with no
-   content fields is valid; these hooks are Claude-native, not tessl hook
-   schema).
+   when commands exist. For hooks-only plugins declare at least one content
+   key - `tessl plugin lint` rejects a manifest with none of skills,
+   commands, rules, `hooks`, or `nativeHooks`. These Claude-native hooks
+   translate to the tessl `hooks` (cross-agent) schema: event names
+   (`PreToolUse`, matcher, command array) with
+   `"${TESSL_PLUGIN_DIR}"/hooks/<script>.sh` as the command; verify with
+   lint.
 3. Remove any **nested** per-skill `skills/*/.tessl-plugin/` manifests - the
    parent manifest supersedes them. Mention the removal in the commit body.
 4. `evals/` belongs at the plugin root, never under `skills/`.
