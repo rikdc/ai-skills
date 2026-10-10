@@ -1,0 +1,7 @@
+{
+  "name": "rikdc/forgejo-review",
+  "description": "Advisory Forgejo pull-request review workflow — clone at head, fetch the diff, review, post one COMMENT review with inline comments",
+  "version": "1.0.0",
+  "private": true,
+  "skills": "./skills/"
+}
