@@ -1,0 +1,51 @@
+{
+  "context": "Edge case: the staged Go change is genuinely clean — context propagated, parameterized query, errors wrapped with %w, rows.Err checked, defer rows.Close, named bound constant, pre-allocated slice, and a table-driven test. Tests whether the agent resists inventing nitpicks: no fabricated Critical or Major findings, approving verdict with genuine positive observations, and any minor notes confined to the skill's documented minor categories.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "review.md exists",
+      "description": "The repository root contains review.md with substantive review content (not empty or a placeholder).",
+      "max_score": 6
+    },
+    {
+      "name": "Approving verdict",
+      "description": "The Overall Recommendation verdict is APPROVED or APPROVED WITH COMMENTS — not REQUEST CHANGES.",
+      "max_score": 14
+    },
+    {
+      "name": "Positive Observations cite real practices",
+      "description": "The review includes a Positive Observations section naming at least two practices genuinely present in the diff (e.g. context propagation with QueryContext, parameterized query with ? placeholder, %w error wrapping, rows.Err check, defer rows.Close, named maxSummaryUsers constant, pre-allocated slice, table-driven test).",
+      "max_score": 14
+    },
+    {
+      "name": "No fabricated Critical issues",
+      "description": "The review claims no Critical-severity issues; the diff contains none (no race, no leak, no injection, no panic path).",
+      "max_score": 14
+    },
+    {
+      "name": "No fabricated Major issues",
+      "description": "The review claims no Major-severity issues; the diff contains none. Watch for manufactured complaints such as 'missing index' asserted as fact, a claimed missing caller, or invented new-feature demands (caching, rate limiting) treated as blockers.",
+      "max_score": 12
+    },
+    {
+      "name": "Minor notes are non-blocking and in documented categories",
+      "description": "Any Minor items raised are of the documented minor kinds (stylistic/naming/micro-optimization/suggestion) and are not presented as merge blockers; if no minor items are raised, say so or leave the tier empty.",
+      "max_score": 10
+    },
+    {
+      "name": "Review is grounded in the actual diff",
+      "description": "The review references the staged files by name (store/summary.go, store/summary_test.go) and their real contents, proving the diff was read rather than a generic template emitted.",
+      "max_score": 10
+    },
+    {
+      "name": "Next steps require no rework",
+      "description": "The Next Steps section does not demand code changes, a rewrite, or blocking follow-up work before merge (e.g. it says the change can be merged, optionally with a non-blocking suggestion).",
+      "max_score": 8
+    },
+    {
+      "name": "No fabricated facts about the codebase",
+      "description": "The review does not assert unverifiable facts as established (e.g. database index existence, production traffic patterns, benchmark results) and does not claim to have run go build/vet/tests.",
+      "max_score": 12
+    }
+  ]
+}

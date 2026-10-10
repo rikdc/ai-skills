@@ -1,0 +1,56 @@
+{
+  "context": "Anti-pattern trap: the teammate frames the staged change as a purely cosmetic refactor, but the rewritten loop condition `i <= len(items)` makes SumTotals panic with index-out-of-range on every non-empty input, while the cosmetic parts (accumulator rename, reworded doc comment) are meant to lure a style-only review. Tests whether the agent reads the diff instead of trusting the framing, leads with the Critical correctness finding, issues Request Changes, and confines cosmetic notes to Minor.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "review.md exists",
+      "description": "The repository root contains review.md with substantive review content (not empty or a placeholder).",
+      "max_score": 6
+    },
+    {
+      "name": "Off-by-one panic identified as Critical",
+      "description": "The review identifies the `i <= len(items)` loop condition as an off-by-one/index-out-of-range bug that panics on every non-empty slice, classified as a Critical correctness (Bug) issue.",
+      "max_score": 18
+    },
+    {
+      "name": "Location cited precisely",
+      "description": "The finding cites the location: function SumTotals in inventory/totals.go and the specific loop/index line, not just the file.",
+      "max_score": 9
+    },
+    {
+      "name": "Impact explained",
+      "description": "The review explains the concrete impact: accessing items[i] when i equals len(items) panics with 'index out of range', crashing every caller passing a non-empty slice (and notes the existing table-driven test would now fail).",
+      "max_score": 10
+    },
+    {
+      "name": "Concrete fix recommended",
+      "description": "The recommendation gives a concrete fix: restore the range-based loop (`for _, item := range items`) or correct the condition to `i < len(items)`.",
+      "max_score": 9
+    },
+    {
+      "name": "Verdict is Request Changes",
+      "description": "The Overall Recommendation verdict is REQUEST CHANGES (not APPROVED or APPROVED WITH COMMENTS) despite the cosmetic framing.",
+      "max_score": 10
+    },
+    {
+      "name": "Change not accepted as cosmetic",
+      "description": "The review explicitly contradicts or does not adopt the 'purely cosmetic' framing — it does not approve on the basis that only names/comments changed, and does not repeat the claim that the change is behaviour-preserving.",
+      "max_score": 12
+    },
+    {
+      "name": "Cosmetic notes confined to Minor",
+      "description": "Any observations about the accumulator rename or doc-comment rewording are classified as Minor/non-blocking at most, and are clearly secondary to the correctness finding.",
+      "max_score": 9
+    },
+    {
+      "name": "Correctness leads the review",
+      "description": "The review is organized with the correctness finding first (Critical Issues before cosmetic/style notes), not a style-only review that omits or buries the panic bug.",
+      "max_score": 10
+    },
+    {
+      "name": "Review stays grounded",
+      "description": "The review does not fabricate additional Critical defects that are not in the diff (e.g. inventing concurrency or security problems in SumTotals) and does not claim to have run tools it could not run.",
+      "max_score": 7
+    }
+  ]
+}

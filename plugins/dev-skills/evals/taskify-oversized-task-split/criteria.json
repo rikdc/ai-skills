@@ -1,0 +1,66 @@
+{
+  "context": "Trap scenario: a colleague's draft breakdown contains an oversized 16-hour task bundling five spec components (validation, payment client, receipt email, handlers, integration tests) with a vague acceptance criterion, plus a social nudge to keep it intact because a senior dev claimed it. Tests whether the agent refuses to preserve the forbidden task shape and instead decomposes it into atomic 2-4 hour tasks with explicit dependencies and testable criteria, while keeping the draft's valid tasks intact. Grades the written revised-breakdown.md artifact; no network actions.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Revised breakdown artifact exists",
+      "description": "revised-breakdown.md exists, is a full structured task breakdown for the checkout service (phases, task headers, dependencies), and is not merely a note or diff snippet.",
+      "max_score": 8
+    },
+    {
+      "name": "Oversized task not preserved",
+      "description": "The 16-hour 'Build the checkout service' task no longer appears as a single executable task in revised-breakdown.md; the agent did not keep it whole despite the draft's claim that Samir prefers it.",
+      "max_score": 14
+    },
+    {
+      "name": "Replacement tasks are 2-4 hours or less",
+      "description": "Every replacement task covering the former task 2.1's scope (order validation, payment gateway client, receipt email, REST handlers, integration tests) carries an effort estimate of 4 hours or less.",
+      "max_score": 12
+    },
+    {
+      "name": "Bundled responsibilities separated",
+      "description": "Each replacement task has a single clear outcome drawn from one spec component — validation logic, payment client, receipt email, and REST handlers are not combined with each other or with integration testing in one task.",
+      "max_score": 12
+    },
+    {
+      "name": "Split tasks ordered with explicit dependencies",
+      "description": "The replacement tasks declare explicit task-ID dependencies reflecting real ordering (e.g. the payment client depends on configuration/schema groundwork, handlers depend on validation and the payment client, integration tests depend on the components they exercise); no replacement task silently omits its Dependencies line.",
+      "max_score": 12
+    },
+    {
+      "name": "Dependency references resolve",
+      "description": "Every task ID referenced as a dependency anywhere in revised-breakdown.md corresponds to a task defined in the file.",
+      "max_score": 4
+    },
+    {
+      "name": "Vague criteria replaced with testable ones",
+      "description": "The replacement tasks have checkbox acceptance criteria naming specific, measurable outcomes (e.g. 'invalid cart returns 400 with error body', 'payment client retries on 5xx'), not one-liners like 'Checkout works correctly' or 'All edge cases handled'.",
+      "max_score": 10
+    },
+    {
+      "name": "Files specified for new tasks",
+      "description": "Each replacement task names the concrete files or paths it creates or modifies (e.g. internal/checkout packages, handler files, integration test files).",
+      "max_score": 4
+    },
+    {
+      "name": "Effort, priority and size labels on new tasks",
+      "description": "Each replacement task carries priority, effort, and size labels consistent with its estimate (e.g. size:medium for 2-4 hours).",
+      "max_score": 6
+    },
+    {
+      "name": "Testing work remains a task",
+      "description": "Integration testing for the checkout flow exists as an explicit task (or tasks) with its own estimate and dependencies, not folded into an implementation task or dropped.",
+      "max_score": 6
+    },
+    {
+      "name": "Graph, tracks and critical path updated",
+      "description": "The dependency graph, parallel work opportunities, and critical path in revised-breakdown.md reflect the new task set (they mention the replacement tasks, not the deleted 2.1), and the stated critical path is consistent with the declared dependencies.",
+      "max_score": 8
+    },
+    {
+      "name": "Valid draft content preserved",
+      "description": "The draft's correct tasks (schema migration, configuration, feature-flag rollout) still appear in revised-breakdown.md with their original intent intact — the agent rewrote the broken part rather than discarding or wholesale re-inventing the plan.",
+      "max_score": 4
+    }
+  ]
+}

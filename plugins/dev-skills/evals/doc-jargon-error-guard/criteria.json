@@ -1,0 +1,61 @@
+{
+  "context": "Tests whether the agent applies the documented clarity and completeness principles when rewriting an existing doc: define jargon at first use, document the error cases the code actually has, include troubleshooting and examples, link related docs, and maintainably mark an obsolete doc clearly as deprecated pointing to its replacement instead of deleting or ignoring it.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "New guide created",
+      "description": "docs/ingest-guide.md exists in the repository.",
+      "max_score": 8
+    },
+    {
+      "name": "Covers all public functions",
+      "description": "The guide documents both public functions of src/ingest.py (ingest_batch and purge) with their parameters and purpose.",
+      "max_score": 12
+    },
+    {
+      "name": "Error cases grounded in code",
+      "description": "The guide documents the failure modes the code actually has: duplicate batch IDs rejected (DuplicateBatchError) and partial purge behaviour on failure.",
+      "max_score": 12
+    },
+    {
+      "name": "Troubleshooting section present",
+      "description": "The guide has a troubleshooting section covering realistic failure modes.",
+      "max_score": 10
+    },
+    {
+      "name": "Jargon from the old doc is defined",
+      "description": "Domain terms carried over from the old doc (idempotent, upsert, backpressure, WAL) are each explained at first use in plain language.",
+      "max_score": 12
+    },
+    {
+      "name": "No undefined new acronyms",
+      "description": "The rewritten guide introduces no new acronyms or jargon that are used without explanation.",
+      "max_score": 5
+    },
+    {
+      "name": "Concrete example included",
+      "description": "At least one code example or runnable command appears in the guide.",
+      "max_score": 8
+    },
+    {
+      "name": "Links to related docs",
+      "description": "The guide links to at least one other document in the repository (e.g. README or the legacy doc's deprecation pointer).",
+      "max_score": 5
+    },
+    {
+      "name": "Legacy doc still present and marked deprecated",
+      "description": "docs/legacy-ingest.md still exists and has a clear deprecation notice at the top (deprecated/obsolete wording, not just a soft hint).",
+      "max_score": 12
+    },
+    {
+      "name": "Legacy doc points to replacement",
+      "description": "The deprecation notice points readers to docs/ingest-guide.md as the current guide.",
+      "max_score": 8
+    },
+    {
+      "name": "Clear structure, no wall of text",
+      "description": "The rewritten guide uses headings and lists to structure content rather than dense unbroken paragraphs.",
+      "max_score": 8
+    }
+  ]
+}

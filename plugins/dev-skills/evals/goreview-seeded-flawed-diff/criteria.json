@@ -1,0 +1,66 @@
+{
+  "context": "Tests whether the agent reviews a staged Go change as the go-review skill prescribes: correctness and security findings first with Critical/Major/Minor severity, specific locations, actionable concrete fixes, positive observations, and a grounded Request Changes verdict — without fabricating defects or claiming tool runs it did not perform. The seeded diff contains five documented defect classes: SQL string interpolation, an unsynchronized concurrent append (race), an unclosed file handle, per-row N+1 queries, and a swallowed error.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "review.md exists",
+      "description": "The repository root contains review.md with substantive review content (not empty or a placeholder).",
+      "max_score": 5
+    },
+    {
+      "name": "SQL injection identified as Critical security issue",
+      "description": "The review flags the fmt.Sprintf string interpolation of userID/email into the SQL query as a SQL injection vulnerability, categorised as Security, with Critical severity.",
+      "max_score": 15
+    },
+    {
+      "name": "Parameterized-query fix recommended",
+      "description": "The SQL finding's recommendation gives a concrete parameterized form, e.g. a query with ? placeholders passed to db.Query as separate arguments.",
+      "max_score": 6
+    },
+    {
+      "name": "Race condition identified as Critical",
+      "description": "The review flags the unsynchronized `records = append(records, ...)` executed inside the spawned goroutines as a data race, categorised as a Bug/Concurrency issue with Critical severity.",
+      "max_score": 13
+    },
+    {
+      "name": "Race fix recommended",
+      "description": "The race finding recommends a concrete synchronization fix such as a mutex around the append, collecting results via a channel, or using errgroup with a locked/collected slice.",
+      "max_score": 6
+    },
+    {
+      "name": "File resource leak identified",
+      "description": "The review flags that the file opened with os.Create is never closed (no defer f.Close()) before/after the csv writer is used — a resource leak.",
+      "max_score": 11
+    },
+    {
+      "name": "N+1 query pattern identified",
+      "description": "The review flags lookupLabel issuing one query per order row (per-row database round trips) as a performance problem.",
+      "max_score": 9
+    },
+    {
+      "name": "Swallowed error identified",
+      "description": "The review flags that the error returned by the Scan call inside lookupLabel is ignored, so a failed label lookup silently produces an empty label (error handling gap).",
+      "max_score": 8
+    },
+    {
+      "name": "Severity taxonomy applied",
+      "description": "Findings are labelled with the skill's three tiers (Critical/Major/Minor), with the injection, race, and leak treated as the blocking tier rather than buried as minor style notes.",
+      "max_score": 6
+    },
+    {
+      "name": "Locations cited",
+      "description": "Findings cite specific locations — store/export.go and the relevant function (ExportUserOrders, lookupLabel) and ideally line numbers — not vague whole-file complaints.",
+      "max_score": 7
+    },
+    {
+      "name": "Verdict is Request Changes",
+      "description": "The Overall Recommendation verdict is REQUEST CHANGES (not APPROVED or APPROVED WITH COMMENTS), matching Critical-severity findings.",
+      "max_score": 7
+    },
+    {
+      "name": "Grounded and complete review",
+      "description": "The review includes Positive Observations for something genuinely good in the diff (e.g. defer rows.Close(), the wrapped os.Create error), does not fabricate defects that are not in the code, and does not claim to have run go build/vet/tests.",
+      "max_score": 7
+    }
+  ]
+}

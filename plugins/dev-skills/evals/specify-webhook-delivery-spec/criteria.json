@@ -1,0 +1,61 @@
+{
+  "context": "Tests whether the agent transforms a deliberately incomplete high-level design (webhook delivery service) into a full technical specification following the specify skill's documented output structure and rules: complete section set from Overview through Open Questions & Assumptions, FR-identifier functional requirements carrying Input/Processing/Output/Edge Cases/Validation, concrete values chosen for details the design leaves open (retry intervals, signing and replay protection, disabling threshold), quantified performance targets, complete API contracts with error codes, indexed data models, explicitly deferred decisions recorded as open questions, and precise language throughout.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Overview section complete",
+      "description": "spec.md has an Overview section explicitly containing Purpose, Scope and Success Criteria subsections.",
+      "max_score": 10
+    },
+    {
+      "name": "Scope records the design's non-goals",
+      "description": "The Scope explicitly excludes the customer-facing console UI and inbound third-party webhook reception (the design's stated non-goals), plus any further exclusions the agent adds.",
+      "max_score": 8
+    },
+    {
+      "name": "Functional requirements use FR identifiers",
+      "description": "Functional requirements are individually identified with FR-001-style identifiers.",
+      "max_score": 8
+    },
+    {
+      "name": "FR template fields present",
+      "description": "Each functional requirement includes Input, Processing, Output, Edge Cases and Validation parts (or equivalents at that granularity), not a one-line description.",
+      "max_score": 12
+    },
+    {
+      "name": "Retry policy concrete",
+      "description": "The retry policy states concrete numbers: the 5-attempt cap from the design and a specific backoff interval sequence (e.g. 1m, 4m, 16m...), not bare 'exponential backoff'.",
+      "max_score": 10
+    },
+    {
+      "name": "Signature scheme concrete",
+      "description": "The signing specification names the algorithm (e.g. HMAC-SHA256), the exact header name(s), and a concrete replay-prevention mechanism (e.g. a timestamp header plus a rejection window).",
+      "max_score": 12
+    },
+    {
+      "name": "Admin API contract complete",
+      "description": "At least the endpoint-registration contract specifies the method/path, request body, the success response, and error responses with concrete status codes (e.g. 400, 409).",
+      "max_score": 12
+    },
+    {
+      "name": "Data model with schema and indexes",
+      "description": "The data model section defines the webhook-endpoint and delivery-record entities with fields and a database schema that includes indexes for the documented query patterns (endpoint lookup by workspace, delivery-record retrieval).",
+      "max_score": 10
+    },
+    {
+      "name": "Performance targets quantified",
+      "description": "Non-functional performance targets are stated with numbers (latency, throughput, volume), not vague adjectives.",
+      "max_score": 8
+    },
+    {
+      "name": "Deferred decisions recorded as open",
+      "description": "An Open Questions & Assumptions section records retention duration for delivery records and customer-initiated replay as open questions, rather than silently deciding them in the requirements.",
+      "max_score": 7
+    },
+    {
+      "name": "No ambiguous language in requirements",
+      "description": "Requirement statements avoid bare modal/uncertainty words such as 'should', 'might', 'probably', 'maybe'.",
+      "max_score": 3
+    }
+  ]
+}

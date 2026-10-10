@@ -1,0 +1,1 @@
+{"description": "Trap case: review a colleague's draft breakdown that bundles an oversized 16-hour task, and produce a revised breakdown that splits it into atomic 2-4 hour tasks with explicit dependencies per the taskify rules","include":["./inputs"]}
