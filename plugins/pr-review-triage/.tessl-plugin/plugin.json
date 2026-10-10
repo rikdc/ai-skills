@@ -1,0 +1,8 @@
+{
+  "name": "rikdc/pr-review-triage",
+  "version": "1.0.0",
+  "description": "Triage PR review comments — classify, accept/reject, and track follow-up work",
+  "private": true,
+  "skills": "./skills/",
+  "commands": "./commands/"
+}
