@@ -1,0 +1,1 @@
+{"description": "Agent executes the documented completion protocol for a finished parent task: run tests via ci.sh, stage, clean temp files, multi -m conventional commit, then mark the parent [x]", "include": ["./inputs"]}

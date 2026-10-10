@@ -1,0 +1,1 @@
+{"description": "Agent writes the complete nine-section PRD file at tasks/prd-expense-report-export.md from a prompt plus a collected answers fixture, written for a junior developer", "include": ["./inputs"]}

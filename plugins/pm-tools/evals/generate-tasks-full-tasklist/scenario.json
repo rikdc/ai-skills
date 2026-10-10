@@ -1,0 +1,1 @@
+{"description": "Agent completes the final two-phase task list for a PRD after explicit 'Go' confirmation, following the rule's exact Markdown output format including Relevant Files and Notes", "include": ["./inputs"]}

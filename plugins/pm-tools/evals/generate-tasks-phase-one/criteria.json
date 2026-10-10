@@ -1,0 +1,46 @@
+{
+  "context": "Tests whether the agent respects the generate-tasks rule's two-phase interaction model: parent tasks generated from PRD analysis, explicit pause with the documented confirmation question, and production of sub-tasks or the final task-list file only after user confirmation.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Phase 1 artifact exists",
+      "description": "phase1-parent-tasks.md exists in the working directory.",
+      "max_score": 10
+    },
+    {
+      "name": "Parent tasks derived from the PRD",
+      "description": "The parent tasks trace back to the PRD's functional requirements and user stories (matching invoice upload, matcher, reconciliation/reporting), not generic boilerplate.",
+      "max_score": 15
+    },
+    {
+      "name": "Reasonable parent granularity",
+      "description": "The parent list is a small number of high-level tasks (roughly five), each a phase or component rather than a line-level step.",
+      "max_score": 10
+    },
+    {
+      "name": "Parent tasks as checklist items",
+      "description": "Parent tasks use the '- [ ] N.0 Title' checkbox convention of the rule's output format (or an equivalent pending-checkable list).",
+      "max_score": 10
+    },
+    {
+      "name": "Confirmation question quoted",
+      "description": "The file contains the documented pause prompt ('I have generated the high-level tasks based on the PRD. Ready to generate the sub-tasks? Respond with 'Go' to proceed.') verbatim or near-verbatim.",
+      "max_score": 15
+    },
+    {
+      "name": "No sub-tasks generated",
+      "description": "The artifact contains no sub-task breakdowns (no 'N.1', 'N.2' items); Phase 2 was not started.",
+      "max_score": 15
+    },
+    {
+      "name": "Final task-list file not created",
+      "description": "tasks/tasks-prd-invoice-matching.md does not exist; generation stopped at Phase 1.",
+      "max_score": 15
+    },
+    {
+      "name": "PRD not modified",
+      "description": "tasks/prd-invoice-matching.md is unchanged; the agent read it but did not rewrite it.",
+      "max_score": 10
+    }
+  ]
+}

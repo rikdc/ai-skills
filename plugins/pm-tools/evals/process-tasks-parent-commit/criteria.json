@@ -1,0 +1,56 @@
+{
+  "context": "Tests whether the agent follows the process-tasks completion protocol in the documented order after a parent task's sub-tasks are all done: test suite run before anything, git add only when tests pass, temp files cleaned before committing, a multi -m conventional commit referencing the task and PRD, then the parent checkbox flipped to [x] and Relevant Files maintained.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Test suite actually run",
+      "description": "A ci-result.txt artifact (or recorded log) shows ci.sh was executed and passed - not merely claimed in prose without the run.",
+      "max_score": 10
+    },
+    {
+      "name": "Commit exists with implementation",
+      "description": "The git history contains a commit that includes the audit-export implementation files (src/audit/...).",
+      "max_score": 10
+    },
+    {
+      "name": "Conventional commit type",
+      "description": "The commit message begins with a conventional type prefix such as feat:/fix:.",
+      "max_score": 10
+    },
+    {
+      "name": "Multi -m message structure",
+      "description": "The commit was made with multiple -m flags producing a subject plus body paragraphs (key changes list, task number/PRD reference), matching the rule's example format.",
+      "max_score": 11
+    },
+    {
+      "name": "Commit references the task",
+      "description": "The message references parent task 1.0 and the audit-export PRD context.",
+      "max_score": 10
+    },
+    {
+      "name": "Temp file excluded",
+      "description": "notes.tmp.md was removed before committing and does not appear in the commit; the working tree afterward contains no stray temp artifacts.",
+      "max_score": 15
+    },
+    {
+      "name": "Changes staged before commit",
+      "description": "The commit stages the whole implementation (src/, tests/ and task list if updated) rather than a partial add; nothing relevant left unstaged.",
+      "max_score": 8
+    },
+    {
+      "name": "Parent 1.0 marked [x]",
+      "description": "In tasks/tasks-prd-audit-export.md the parent 1.0 checkbox is now [x].",
+      "max_score": 10
+    },
+    {
+      "name": "Relevant Files updated",
+      "description": "The Relevant Files section lists the files created/modified for parent 1.0 with one-line purposes.",
+      "max_score": 8
+    },
+    {
+      "name": "Parent 2.0 not started",
+      "description": "Parent task 2.0 remains [ ] and no work on it was begun; the working tree has only parent-1.0 changes.",
+      "max_score": 8
+    }
+  ]
+}

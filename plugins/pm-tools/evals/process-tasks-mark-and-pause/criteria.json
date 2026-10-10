@@ -1,0 +1,51 @@
+{
+  "context": "Tests whether the agent applies one sub-task at a time and stops: marks the finished sub-task [x], deliberately leaves sibling sub-tasks and the parent unchecked (parent completion requires ALL subtasks done), and pauses awaiting user permission rather than starting the next sub-task.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Finished sub-task 2.1 marked [x]",
+      "description": "Sub-task 2.1's checkbox in tasks/tasks-prd-payment-retry.md changed from [ ] to [x].",
+      "max_score": 15
+    },
+    {
+      "name": "Sibling sub-tasks untouched",
+      "description": "Sub-tasks 2.2 and 2.3 remain [ ]; no other unchecked sub-task was marked done.",
+      "max_score": 15
+    },
+    {
+      "name": "Parent task 2.0 not marked",
+      "description": "Parent 2.0's checkbox remains [ ]; the rule marks a parent only after ALL its subtasks are complete.",
+      "max_score": 15
+    },
+    {
+      "name": "Other parents untouched",
+      "description": "Parent 1.0's state is unchanged (sub-task 1.3 is still open).",
+      "max_score": 10
+    },
+    {
+      "name": "status.md written",
+      "description": "status.md exists and reports which sub-task was marked.",
+      "max_score": 10
+    },
+    {
+      "name": "status.md states the pause",
+      "description": "status.md says the agent is waiting for the user's permission before starting the next sub-task.",
+      "max_score": 10
+    },
+    {
+      "name": "status.md lists what was left",
+      "description": "status.md names the sibling sub-tasks and the parent as deliberately not marked.",
+      "max_score": 10
+    },
+    {
+      "name": "Scratch file untouched",
+      "description": "backoff-scratch.md still exists with its original content; the active file Mateo is editing was not modified or deleted.",
+      "max_score": 10
+    },
+    {
+      "name": "No next sub-task started",
+      "description": "No implementation for 2.2 or later sub-tasks was attempted (no source changes implementing retry persistence or deadline escalation).",
+      "max_score": 5
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+{"description": "Agent asks clarifying questions before generating the PRD when the user has given only a one-line prompt and no answers exist", "include": ["./inputs"]}
