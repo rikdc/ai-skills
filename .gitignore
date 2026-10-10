@@ -38,5 +38,8 @@ Thumbs.db
 .claude/security-patterns.conf
 .claude/settings.local.json
 
+# Worktrees
+.worktrees/
+
 # Keep test library
 !tests/lib/
