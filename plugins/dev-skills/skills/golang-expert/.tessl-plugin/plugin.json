@@ -1,9 +1,0 @@
-{
-  "name": "rikdc/golang-expert",
-  "description": "Senior Go engineer and technical advisor — use for any Go question, design decision, or implementation task. Covers idiomatic patterns, concurrency, error handling, project structure, performance optimisation, observability, and testing. Invoke whenever the user is writing, reviewing, debugging, or designing Go code, asking about goroutines, channels, interfaces, generics, modules, or benchmarks, or wants a second opinion on a Go architecture. Triggers on: Go, Golang, goroutine, channel, interface, gRPC, go.mod, go test, pprof, golangci-lint.",
-  "private": true,
-  "skills": [
-    "."
-  ],
-  "version": "0.1.1"
-}
