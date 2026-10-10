@@ -1,0 +1,41 @@
+{
+  "context": "Tests whether the agent enforces the triage-reviews skill's idempotency rule on re-run: comments 201 and 202 already have their reaction, reply and resolution recorded, so only comment 203 (a new security finding) must receive actions, and the pre-existing follow-up item must not be duplicated.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Handled comment 201 untouched",
+      "description": "gh-record.json contains exactly one react action for comment 201 (the seeded one) — no duplicate reaction was added.",
+      "max_score": 18
+    },
+    {
+      "name": "Handled comment 202 untouched",
+      "description": "gh-record.json contains exactly one reply in_reply_to 202 (the seeded one) and no duplicate reply or re-resolution beyond what was seeded.",
+      "max_score": 18
+    },
+    {
+      "name": "New comment 203 accepted",
+      "description": "gh-record.json contains a new react action with content +1 for comment 203 (the unhandled SQL-injection finding).",
+      "max_score": 16
+    },
+    {
+      "name": "New follow-up registered once",
+      "description": "followups.json contains the error-handling follow-up for src/handler.py:9 (from the previous pass) exactly once, plus one follow-up entry for the SQL injection fix at src/handler.py:12.",
+      "max_score": 16
+    },
+    {
+      "name": "Report distinguishes skipped vs acted",
+      "description": "triage-report.md states comments 201 and 202 were skipped as already performed and 203 was newly processed.",
+      "max_score": 14
+    },
+    {
+      "name": "Correct classification of new comment",
+      "description": "Comment 203 is classified as security (or correctness) with an accept decision consistent with the skill's critical-category rule.",
+      "max_score": 10
+    },
+    {
+      "name": "No spurious GitHub writes",
+      "description": "gh-record.json contains no other actions: no reply to comment 203 (accept flow needs none), no duplicate rows, no references to non-existent comment ids beyond the seed.",
+      "max_score": 8
+    }
+  ]
+}

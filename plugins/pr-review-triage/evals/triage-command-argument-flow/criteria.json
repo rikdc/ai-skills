@@ -1,0 +1,46 @@
+{
+  "context": "Tests whether the agent executes the /triage command definition faithfully for '42 --dry-run': targets the PR named by the arguments (not the current branch's PR as returned by gh pr view), filters out the owner's self-review and thread replies, classifies the remaining comments, and stops in dry-run without any write action.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Argument-selected PR targeted",
+      "description": "triage-report.md's header names PR #42 / 'Add payment processing endpoint', not the current branch's PR #7 'Release tooling maintenance'.",
+      "max_score": 14
+    },
+    {
+      "name": "Filtered comments correct",
+      "description": "Exactly comments 101, 102, 103, 104 are triaged: the self-review (105, author payment-dev) and the thread reply (106, in_reply_to 102) are excluded.",
+      "max_score": 14
+    },
+    {
+      "name": "Exclusions explained",
+      "description": "The report states comment 105 was skipped as a self-review and comment 106 as a thread reply, per the command's filtering rules.",
+      "max_score": 10
+    },
+    {
+      "name": "Security comment accepted",
+      "description": "Comment 101 is classified security (or correctness) and accepted with a follow-up proposal, grounded in the interpolated SQL string in src/handler.py.",
+      "max_score": 12
+    },
+    {
+      "name": "Style suggestion rejected with convention",
+      "description": "Comment 102 is classified style/nit and rejected citing the CLAUDE.md snake_case convention or ruff rule N802.",
+      "max_score": 12
+    },
+    {
+      "name": "Praise and question acknowledged",
+      "description": "Comment 103 is acknowledged as praise (thank) and comment 104 answered as a question, per the acknowledge branch.",
+      "max_score": 12
+    },
+    {
+      "name": "Dry-run stop honoured",
+      "description": "gh-record.json is absent or an empty JSON list: no reactions, replies, or resolutions were performed.",
+      "max_score": 14
+    },
+    {
+      "name": "Report is command-shaped",
+      "description": "The output notes the run was executed with --dry-run mode and is written as the command's step-5 summary (grouped proposed actions), not as executed results.",
+      "max_score": 12
+    }
+  ]
+}
