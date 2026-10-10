@@ -1,0 +1,71 @@
+{
+  "context": "Tests whether the agent creates a draft pull request for an existing branch using a plain-text conventional-commit title and a succinct body covering exactly the branch changes (one feature commit, one docs commit). Checks title format rules, body structure (Summary/Changes/Testing), draft and base flags, and absence of emoji or essay-style padding.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Draft PR created",
+      "description": "pr-record.json shows the gh shim was called with the create subcommand and --draft (record['draft'] is true).",
+      "max_score": 10
+    },
+    {
+      "name": "Base branch set",
+      "description": "The create call specifies the base branch as main (record['base'] is 'main').",
+      "max_score": 5
+    },
+    {
+      "name": "Title is conventional commit format",
+      "description": "record['title'] starts with a conventional type prefix such as feat:, fix:(scope) or docs: — matching one of the branch's commit types.",
+      "max_score": 15
+    },
+    {
+      "name": "Title imperative mood",
+      "description": "The title subject verb is imperative (e.g. 'route', 'add'), not past tense or gerund.",
+      "max_score": 8
+    },
+    {
+      "name": "Title lower case",
+      "description": "Everything after the type prefix in the title begins lower-case (no capitalised first word).",
+      "max_score": 5
+    },
+    {
+      "name": "Title no trailing period",
+      "description": "The title does not end with a period.",
+      "max_score": 3
+    },
+    {
+      "name": "Title under 70 chars",
+      "description": "The full title including type prefix is fewer than 70 characters.",
+      "max_score": 4
+    },
+    {
+      "name": "No emoji in title or body",
+      "description": "Neither the title nor the recorded body contains emoji characters.",
+      "max_score": 10
+    },
+    {
+      "name": "Body has Summary section",
+      "description": "The body contains a '## Summary' section with one to three sentences describing what the branch changes and why.",
+      "max_score": 10
+    },
+    {
+      "name": "Body Changes bullets cover branch",
+      "description": "The body has a '## Changes' section with one bullet per meaningful change on the branch (replica routing feature; routing documentation), no more.",
+      "max_score": 10
+    },
+    {
+      "name": "Body has Testing line",
+      "description": "The body contains a '## Testing' section. It may state plainly that nothing was run; it must not claim unverified test runs.",
+      "max_score": 8
+    },
+    {
+      "name": "No padding sections",
+      "description": "The body contains no 'Notes for reviewers', 'Future work', 'Impact' or risk-assessment sections beyond the Summary/Changes/Testing template.",
+      "max_score": 5
+    },
+    {
+      "name": "Body does not claim unverified behaviour",
+      "description": "The body does not assert behaviour or results that the branch does not demonstrate (e.g. claiming benchmark results that are not in the commits).",
+      "max_score": 7
+    }
+  ]
+}

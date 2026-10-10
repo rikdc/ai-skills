@@ -1,0 +1,66 @@
+{
+  "context": "Tests whether the agent writes a correct conventional commit message for a breaking-change rename whose non-obvious reason (upstream library deprecation) cannot be inferred from the diff alone. The agent must include a concise body explaining the reason, while following all formatting rules: imperative subject, lowercase, no emoji, correct type with breaking-change indication, and no diff-restating commentary.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Commit landed",
+      "description": "Running `git log -1` inside `repo/` shows exactly one new commit beyond the initial commit (i.e. the agent actually committed the staged change).",
+      "max_score": 5
+    },
+    {
+      "name": "Verification step run",
+      "description": "`repo/commit_log.txt` exists and contains the full commit message, consistent with the agent having run `git log -1` after committing.",
+      "max_score": 5
+    },
+    {
+      "name": "Diff inspection",
+      "description": "The commit message reflects the actual staged change (rename of parse_record to read_record), indicating the agent inspected the diff before writing the message rather than guessing.",
+      "max_score": 8
+    },
+    {
+      "name": "Conventional commit format",
+      "description": "The subject line follows conventional commit format: `<type>(<optional scope>): <subject>`.",
+      "max_score": 10
+    },
+    {
+      "name": "Breaking change indicated",
+      "description": "The message indicates the breaking nature - via a `!` after the type (e.g. `refactor!:`), a `BREAKING CHANGE:` footer, or body text stating callers must update.",
+      "max_score": 10
+    },
+    {
+      "name": "Imperative mood subject",
+      "description": "The subject verb is in imperative mood rather than past tense or gerund.",
+      "max_score": 10
+    },
+    {
+      "name": "Lowercase subject",
+      "description": "Everything after the type prefix in the subject begins lower-case.",
+      "max_score": 5
+    },
+    {
+      "name": "No emoji in commit message",
+      "description": "The commit message (subject and body) contains no emoji characters.",
+      "max_score": 5
+    },
+    {
+      "name": "Body present",
+      "description": "The commit message includes a body - a subject-only message is insufficient because the breaking-change reason cannot be inferred from the diff.",
+      "max_score": 10
+    },
+    {
+      "name": "Body explains non-obvious reason",
+      "description": "The body mentions the upstream library deprecation or the breaking-change impact on callers - information that cannot be inferred from the diff alone.",
+      "max_score": 12
+    },
+    {
+      "name": "Body is concise",
+      "description": "The body is at most two sentences OR at most three bullets - it does not exceed this cap.",
+      "max_score": 10
+    },
+    {
+      "name": "No diff restatement",
+      "description": "The body does NOT restate what the diff already shows (e.g. does not say 'renamed parse_record to read_record in src/reader.py', list filenames, or describe the code change line by line).",
+      "max_score": 10
+    }
+  ]
+}

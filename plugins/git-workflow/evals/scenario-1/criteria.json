@@ -1,0 +1,61 @@
+{
+  "context": "Tests whether the agent recognises a mixed-concern diff (new feature, bug fix, and documentation update) and proposes atomic commits rather than bundling everything into one. Also checks that each resulting commit message follows conventional commit format: correct type prefix, imperative-mood subject under 60 characters, no emoji, and no trailing period.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Multiple commits created",
+      "description": "The repository has at least 2 new commits on top of the initial skeleton commit (i.e. git log shows 3 or more commits total), reflecting a split of the mixed concerns",
+      "max_score": 15
+    },
+    {
+      "name": "Feature in its own commit",
+      "description": "src/feature.py is introduced in a separate commit whose type prefix is 'feat'",
+      "max_score": 10
+    },
+    {
+      "name": "Bug fix in its own commit",
+      "description": "The whitespace-stripping change to src/parser.py is in a separate commit whose type prefix is 'fix'",
+      "max_score": 10
+    },
+    {
+      "name": "Docs in its own commit",
+      "description": "The README update is in a separate commit whose type prefix is 'docs'",
+      "max_score": 10
+    },
+    {
+      "name": "No emoji in any commit message",
+      "description": "None of the new commit messages (subject or body) contain emoji characters",
+      "max_score": 10
+    },
+    {
+      "name": "Subject line imperative mood",
+      "description": "Every new commit subject begins with an imperative verb (e.g. 'add', 'fix', 'update') rather than a past-tense or noun form",
+      "max_score": 8
+    },
+    {
+      "name": "Subject line lower case",
+      "description": "Every new commit subject starts with a lower-case letter (after the type prefix and colon)",
+      "max_score": 7
+    },
+    {
+      "name": "Subject line under 60 characters",
+      "description": "Every new commit subject (the full first line including type prefix) is 60 characters or fewer",
+      "max_score": 7
+    },
+    {
+      "name": "No trailing period in subject",
+      "description": "No new commit subject line ends with a full stop / period character",
+      "max_score": 5
+    },
+    {
+      "name": "All pending files committed",
+      "description": "git status shows a clean working tree after the agent finishes — no uncommitted modifications or untracked source files remain",
+      "max_score": 8
+    },
+    {
+      "name": "commit-plan.md present",
+      "description": "A file named commit-plan.md exists in the working directory and contains a rationale for how the changes were split across commits",
+      "max_score": 10
+    }
+  ]
+}
