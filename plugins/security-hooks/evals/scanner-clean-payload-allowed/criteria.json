@@ -1,0 +1,56 @@
+{
+  "context": "Grades the mcp-security-scanner hook's allow path: a benign MCP payload passes with exit 0, empty decision output, a 'Security scan passed' log line, and a non-MCP tool payload is skipped without any scan.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Allow-path run recorded",
+      "description": "record/allow/ contains exit-code, stderr.txt and stdout.txt artifacts.",
+      "max_score": 10
+    },
+    {
+      "name": "Clean payload exit 0",
+      "description": "record/allow/exit-code is exactly 0 (the documented allow exit code).",
+      "max_score": 15
+    },
+    {
+      "name": "No decision output on allow",
+      "description": "record/allow/stderr.txt and stdout.txt contain no {\"decision\": \"block\"} JSON and no 'block' text.",
+      "max_score": 12
+    },
+    {
+      "name": "Scan passed logged",
+      "description": "record/security-scan.log contains 'Security scan passed for tool: mcp__notion__create-page'.",
+      "max_score": 10
+    },
+    {
+      "name": "No violation logged",
+      "description": "record/security-scan.log contains no 'SECURITY VIOLATION' line.",
+      "max_score": 8
+    },
+    {
+      "name": "Non-MCP run recorded",
+      "description": "record/non-mcp/ contains exit-code, stderr.txt and stdout.txt artifacts for the Bash-tool payload.",
+      "max_score": 10
+    },
+    {
+      "name": "Non-MCP skipped silently",
+      "description": "record/non-mcp/exit-code is 0 and non-mcp/stderr.txt contains no decision block (all-empty artifacts acceptable).",
+      "max_score": 10
+    },
+    {
+      "name": "No scan for out-of-scope tool",
+      "description": "record/security-scan.log shows no scan entry for the Bash tool call (no 'Using' or 'Security scan passed for tool: Bash').",
+      "max_score": 10
+    },
+    {
+      "name": "Verdict states scope",
+      "description": "record/verdict.txt says the release-notes request may proceed and the Bash request was skipped.",
+      "max_score": 5
+    },
+    {
+      "name": "Fixtures untouched",
+      "description": "hooks/, payloads/ and security-patterns.conf remain byte-identical to the plugin originals.",
+      "max_score": 10
+    }
+  ]
+}

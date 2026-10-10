@@ -1,0 +1,56 @@
+{
+  "context": "Grades the protect-main-branch hook on Write tool calls: a Write targeting a file in a main checkout is denied through stdout permissionDecision JSON while exit code stays 0, the same Write against a linked worktree on a feature branch is allowed silently, and the deny reason carries the documented branch-creation remedy.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Both runs recorded",
+      "description": "record/main/ and record/feature/ each contain exit-code, stdout.txt and stderr.txt artifacts.",
+      "max_score": 10
+    },
+    {
+      "name": "PreToolUse exit contract held",
+      "description": "Both recorded exit codes are 0; PreToolUse hooks never signal deny by exit code under this contract.",
+      "max_score": 8
+    },
+    {
+      "name": "Main Write denied on stdout",
+      "description": "record/main/stdout.txt parses with jq as JSON with .hookSpecificOutput.permissionDecision == \"deny\".",
+      "max_score": 12
+    },
+    {
+      "name": "Deny reason names the branch",
+      "description": "record/main/stdout.txt's hookSpecificOutput.permissionDecisionReason mentions the protected branch 'main'.",
+      "max_score": 10
+    },
+    {
+      "name": "Deny reason gives branch remedy",
+      "description": "The reason text tells the user to make a feature branch and includes the 'git checkout -b' command form.",
+      "max_score": 10
+    },
+    {
+      "name": "Feature Write allowed silently",
+      "description": "record/feature/stdout.txt contains no hookSpecificOutput JSON and record/feature/stderr.txt has no deny content.",
+      "max_score": 12
+    },
+    {
+      "name": "Violation logged once",
+      "description": "record/protect-main-branch.log contains a 'PROTECTED BRANCH VIOLATION' entry for the main run only, plus a non-protected/allow trace for the feature run.",
+      "max_score": 10
+    },
+    {
+      "name": "Decision consistent with hook",
+      "description": "record/decision-main.txt says deny (not run), consistent with the recorded hook verdict.",
+      "max_score": 10
+    },
+    {
+      "name": "Remedy quoted verbatim from hook",
+      "description": "record/remedy.txt is the git checkout -b command with a branch name, not an edit-on-main or delete-the-hook workaround.",
+      "max_score": 10
+    },
+    {
+      "name": "Fixtures untouched",
+      "description": "hooks/, payloads/ and both checkouts' files remain as setup left them; neither config.py file content was modified, and the hook script was not disabled.",
+      "max_score": 8
+    }
+  ]
+}

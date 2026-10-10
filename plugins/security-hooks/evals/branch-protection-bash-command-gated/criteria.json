@@ -1,0 +1,56 @@
+{
+  "context": "Grades the protect-main-branch hook's Bash analysis: six simulated Bash payloads against a main checkout are recorded, with git push and branch deletion denied, .git tampering denied, and read-only git, git checkout -b and non-git commands deliberately allowed.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "All six cases recorded",
+      "description": "record/cases/<id>/ holds exit-code, stdout.txt, stderr.txt and verdict for status, push, branch-delete, gitdir-tamper, create-branch and foreign-write.",
+      "max_score": 12
+    },
+    {
+      "name": "Exit contract holds everywhere",
+      "description": "Every recorded exit-code is 0; denial is only ever signalled via stdout permissionDecision, never by exit code.",
+      "max_score": 6
+    },
+    {
+      "name": "Push denied",
+      "description": "push/stdout.txt parses with jq as hookSpecificOutput.permissionDecision \"deny\", reason mentioning git push.",
+      "max_score": 10
+    },
+    {
+      "name": "Branch deletion denied",
+      "description": "branch-delete/stdout.txt carries a deny permissionDecision clearly caused by a branch-write (deletion) rule, not a generic message.",
+      "max_score": 10
+    },
+    {
+      "name": ".git tampering denied",
+      "description": "gitdir-tamper/stdout.txt carries a deny decision with a reason about shell writes under .git/.",
+      "max_score": 10
+    },
+    {
+      "name": "Read-only git allowed",
+      "description": "status/verdict is allow with no hookSpecificOutput JSON in stdout.txt.",
+      "max_score": 10
+    },
+    {
+      "name": "Branch creation allowed",
+      "description": "create-branch/verdict is allow with no deny JSON, matching the documented deliberate carve-out for checkout -b.",
+      "max_score": 12
+    },
+    {
+      "name": "Non-git write allowed",
+      "description": "foreign-write/verdict is allow with no deny JSON, matching the documented pass-through for commands the parser does not treat as git writes.",
+      "max_score": 10
+    },
+    {
+      "name": "Log distinguishes denied cases",
+      "description": "record/protect-main-branch.log shows PROTECTED BRANCH VIOLATION entries for exactly the three denied cases.",
+      "max_score": 10
+    },
+    {
+      "name": "Summary names deliberate allows",
+      "description": "record/summary.txt's six id:verdict lines match recorded behaviour and the final lines name create-branch and foreign-write as deliberate allows.",
+      "max_score": 10
+    }
+  ]
+}

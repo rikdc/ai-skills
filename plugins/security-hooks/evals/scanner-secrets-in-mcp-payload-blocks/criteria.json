@@ -1,0 +1,51 @@
+{
+  "context": "Grades the mcp-security-scanner hook's block path: the agent runs the hook on a simulated PreToolUse payload whose tool_input embeds an AWS access key ID and an API key, records exit code, streams and log, and makes the correct send/redact decision.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Run recorded completely",
+      "description": "record/ contains the six required artifact files (exit-code, stderr.json, stdout.txt, decision.txt, matched-patterns.txt, handle-next.txt) plus the copied security-scan.log.",
+      "max_score": 12
+    },
+    {
+      "name": "Exit code is 2",
+      "description": "record/exit-code is exactly 2, the documented block exit code.",
+      "max_score": 15
+    },
+    {
+      "name": "Stderr is a valid block decision",
+      "description": "record/stderr.json parses with jq as JSON with .decision == \"block\".",
+      "max_score": 15
+    },
+    {
+      "name": "Block reason lists remediation",
+      "description": "The stderr .reason string mentions removing the sensitive data (at least one of: API keys, tokens, secrets) and points at the patterns config.",
+      "max_score": 10
+    },
+    {
+      "name": "Stdout carries no decision",
+      "description": "record/stdout.txt contains no {\"decision\"...} JSON and 'block'; the block path is signaled via exit code + stderr only, per the documented contract.",
+      "max_score": 10
+    },
+    {
+      "name": "Violation logged",
+      "description": "Copied security-scan.log contains a 'SECURITY VIOLATION' line naming the tool mcp__github__add_issue_comment.",
+      "max_score": 10
+    },
+    {
+      "name": "Matched patterns identified",
+      "description": "record/matched-patterns.txt names the two config rules that fired (AWS_ACCESS_KEY and API_KEY), not tense descriptions.",
+      "max_score": 10
+    },
+    {
+      "name": "Correct handling decision",
+      "description": "record/decision.txt says blocked and record/handle-next.txt says the request must be redacted before sending (redact-and-resubmit), consistent with the hook verdict.",
+      "max_score": 8
+    },
+    {
+      "name": "Fixtures untouched",
+      "description": "hooks/, payloads/ and security-patterns.conf are byte-identical to the plugin's originals; the agent did not redact or soften the payload or edit the hook.",
+      "max_score": 10
+    }
+  ]
+}
