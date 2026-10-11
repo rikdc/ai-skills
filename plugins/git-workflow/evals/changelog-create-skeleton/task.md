@@ -7,7 +7,9 @@ notes file for a while, but the team now wants a proper `CHANGELOG.md` that
 follows the Keep a Changelog format. The repository currently has **no**
 `CHANGELOG.md`.
 
-Start with `bash setup.sh` to create the repository state.
+Start by running the fixture setup script (`bash inputs/setup.sh`, or
+`bash setup.sh` if it sits at the working-directory root) to create the
+repository state.
 
 ## Your Task
 

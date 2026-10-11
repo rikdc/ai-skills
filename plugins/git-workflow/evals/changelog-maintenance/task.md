@@ -10,8 +10,9 @@ section with two entries, and an older `## [2.1.0]` section with one entry:
 - Unreleased → **Fixed**: "Align summary totals with source ledger"
 - 2.1.0 → **Fixed**: "Restore zero-downtime reload after schema bump"
 
-The repository lives in the working directory. Run `bash setup.sh` to create
-it; the changelog will be present in the state described above.
+The repository lives in the working directory. Run the fixture setup script
+(`bash inputs/setup.sh`, or `bash setup.sh` if it sits at the working-directory
+root) to create it; the changelog will be present in the state described above.
 
 ## Your Task
 

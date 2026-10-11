@@ -7,8 +7,10 @@ team records every user-facing change in `CHANGELOG.md` following the Keep a
 Changelog format and Semantic Versioning. The current changelog has an
 `## [Unreleased]` section with three entries already recorded.
 
-The repository lives in the working directory. Run `bash setup.sh` to create
-it; the changelog will be present with the three unreleased entries.
+The repository lives in the working directory. Run the fixture setup script
+(`bash inputs/setup.sh`, or `bash setup.sh` if it sits at the working-directory
+root) to create it; the changelog will be present with the three unreleased
+entries.
 
 Your job: record one more unreleased entry and then cut a release.
 
@@ -26,5 +28,5 @@ section at the top. Do not tag, commit, or push.
 
 - `CHANGELOG.md` with the new `Fixed` entry, a `## [1.4.0] - <today>` section
   containing all four entries, and a fresh empty `## [Unreleased]` above it
-- `changelog.md` is untouched elsewhere — existing entry wording and
+- `CHANGELOG.md` is untouched elsewhere — existing entry wording and
   category order preserved

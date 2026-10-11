@@ -4,7 +4,7 @@
   "checklist": [
     {
       "name": "Commit landed",
-      "description": "Running `git log -1` inside `repo/` shows exactly one new commit beyond the initial commit (i.e. the agent actually committed the staged change).",
+      "description": "`git rev-list --count HEAD` inside `repo/` returns exactly 2 (the initial scaffold plus the rename commit) - i.e. the agent actually committed the staged change.",
       "max_score": 5
     },
     {

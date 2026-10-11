@@ -1,10 +1,18 @@
-#!/bin/bash
-# Initialize the git repo and stage the bug fix for the agent to commit.
-set -e
+#!/usr/bin/env bash
+# Initialise the git repo and stage the bug fix for the agent to commit.
+set -euo pipefail
 
-git init
+git init -q
+# Keep fixture files out of the repository's status, whichever layout the
+# harness uses (inputs/ preserved, or flattened into the working directory).
+printf 'inputs/\nsetup.sh\nsetup_repo.sh\n' >> .git/info/exclude
 git config user.email "dev@example.com"
 git config user.name "Dev"
+
+# The harness may copy this fixture as-is or flatten it into the working
+# directory; make sure the Makefile the checks target sits at the root.
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+[ -f Makefile ] || cp "$here/Makefile" Makefile
 
 # Create the original broken version and commit it
 cat > calculator.py << 'PYEOF'

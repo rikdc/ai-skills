@@ -18,10 +18,11 @@ appropriate message, following the team's standard commit workflow.
 
 ## Your Task
 
-1. Run the setup script to initialise the repository and stage the change:
+1. Run the fixture setup script to initialise the repository and stage the
+   change:
 
 ```
-bash inputs/setup_repo.sh
+bash inputs/setup_repo.sh  # or `bash setup_repo.sh` if the fixture sits at the working-directory root
 ```
 
 This creates a `repo/` directory containing the project with one staged

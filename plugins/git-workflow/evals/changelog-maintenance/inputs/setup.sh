@@ -5,6 +5,9 @@
 set -euo pipefail
 
 git init -q
+# Keep fixture files out of the repository's status, whichever layout the
+# harness uses (inputs/ preserved, or flattened into the working directory).
+printf 'inputs/\nsetup.sh\nsetup_repo.sh\n' >> .git/info/exclude
 git config user.email "dev@example.com"
 git config user.name "Dev"
 
@@ -34,6 +37,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 MDEOF
 
 git add CHANGELOG.md
-git commit -q -m "chore: changelog state for 2.1.1 cut"
+git commit -q -m "chore: seed changelog snapshot"
 
 echo "Repo ready; CHANGELOG.md has Unreleased entries and a prior 2.1.0 release."

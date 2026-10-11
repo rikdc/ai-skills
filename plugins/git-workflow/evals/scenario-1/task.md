@@ -8,10 +8,10 @@ who made these changes left no staged commits and no notes on what was changed
 or why. Your job is to tidy this up by committing everything that is pending.
 
 The project lives in the current working directory. Before you start, run the
-setup script to initialise the repository with its pending changes:
+fixture setup script to initialise the repository with its pending changes:
 
 ```bash
-bash inputs/setup.sh
+bash inputs/setup.sh  # or `bash setup.sh` if the fixture sits at the working-directory root
 ```
 
 This will create a git repository in the current directory with an initial

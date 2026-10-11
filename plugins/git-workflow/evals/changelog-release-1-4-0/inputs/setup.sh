@@ -5,6 +5,9 @@
 set -euo pipefail
 
 git init -q
+# Keep fixture files out of the repository's status, whichever layout the
+# harness uses (inputs/ preserved, or flattened into the working directory).
+printf 'inputs/\nsetup.sh\nsetup_repo.sh\n' >> .git/info/exclude
 git config user.email "dev@example.com"
 git config user.name "Dev"
 
@@ -20,12 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- TCP preload path for warm connections
+- Add TCP preload path for warm connections
 
 ### Fixed
 
-- Socket connector drops keepalive between idle periods
-- CSV parser mishandles quoted fields containing embedded newlines
+- Fix keepalive drops between idle periods in the socket connector
+- Fix CSV parser mishandling of quoted fields with embedded newlines
 MDEOF
 
 git add CHANGELOG.md
