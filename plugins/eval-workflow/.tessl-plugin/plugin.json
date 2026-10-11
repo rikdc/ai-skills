@@ -1,6 +1,6 @@
 {
   "name": "rikdc/eval-workflow",
-  "description": "Generates and verifies tessl eval scenarios for repository plugins",
+  "description": "Plugin eval scenario generation and offline verification (tessl-compatible evals format)",
   "version": "0.1.0",
   "private": true,
   "skills": "./skills/"

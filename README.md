@@ -51,7 +51,7 @@ make test
 | [pr-review-triage](plugins/pr-review-triage/) | Workflow | Triage of PR review comments and follow-up tracking |
 | [forgejo-review](plugins/forgejo-review/) | Workflow | Advisory Forgejo pull-request review — one COMMENT review with inline comments |
 | [nix-skills](plugins/nix-skills/) | Development | Expert guidance on Nix, NixOS, and home-manager |
-| [eval-workflow](plugins/eval-workflow/) | Development | Generation and offline verification of tessl eval scenarios |
+| [eval-workflow](plugins/eval-workflow/) | Development | Eval scenario generation and offline verification (tessl-compatible) |
 
 ## Security hooks
 

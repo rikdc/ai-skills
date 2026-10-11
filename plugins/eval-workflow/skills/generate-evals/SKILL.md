@@ -1,13 +1,13 @@
 ---
 name: generate-evals
-description: Generates and verifies tessl eval scenarios for a repository plugin, covering its skills, commands, and hooks. Migrates the plugin to tessl structure when needed (adds .tessl-plugin/plugin.json, colocates evals/), authors self-gradable scenarios, runs the offline verification ladder, and commits. Use when the user asks to build evals for a plugin, generate eval scenarios, or verify that a skill actually works.
+description: Generates and verifies eval scenarios for a repository plugin — covering its skills, commands, and hooks — using the tessl-compatible evals/ layout (task.md, criteria.json, scenario.json) so they run under `tessl eval run` and grade offline with any judge. Migrates the plugin to tessl structure when needed (adds .tessl-plugin/plugin.json, colocates evals/), authors self-gradable scenarios, runs the offline verification ladder, and commits. Use when the user asks to build evals for a plugin, generate eval scenarios, or verify that a skill actually works.
 user-invocable: true
 argument-hint: "<plugin-path> [--count N] [--dry-run]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash(git *), Bash(make *), Bash(jq *), Bash(tessl plugin lint:*), Bash(mkdir *), Bash(mv *), Bash(chmod *), Bash(cp -R *), Bash(bash inputs/*), Bash(bash /tmp/eval-*), Bash(rm -rf /tmp/eval-*)
 ---
-# Generate Evals - tessl scenarios for repository plugins
+# Generate Evals - eval scenarios for repository plugins
 
-Builds and verifies tessl eval scenarios that prove a plugin's skills,
+Builds and verifies eval scenarios that prove a plugin's skills,
 commands, or hooks change agent behaviour. Scenarios live **inside the
 plugin directory** at `evals/`, so `tessl eval run plugins/<name>` can run
 them against the plugin. `plugins/git-workflow/evals/` in this repository is
