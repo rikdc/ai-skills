@@ -1,6 +1,6 @@
 ---
 name: generate-evals
-description: Generates and verifies eval scenarios for a repository plugin — covering its skills, commands, and hooks — using the tessl-compatible evals/ layout (task.md, criteria.json, scenario.json) so they run under `tessl eval run` and grade offline with any judge. Migrates the plugin to tessl structure when needed (adds .tessl-plugin/plugin.json, colocates evals/), authors self-gradable scenarios, runs the offline verification ladder, and commits. Use when the user asks to build evals for a plugin, generate eval scenarios, or verify that a skill actually works.
+description: Generates and verifies eval scenarios for a repository plugin — covering its skills, commands, and hooks — using the tessl-compatible evals/ layout (task.md, criteria.json, scenario.json) so they run under `tessl eval run` and grade offline with any judge. Authors self-gradable scenarios, runs the offline verification ladder, and commits. Plugins in this repository are already tessl-native; this skill never restructures them. Use when the user asks to build evals for a plugin, generate eval scenarios, or verify that a skill actually works.
 user-invocable: true
 argument-hint: "<plugin-path> [--count N] [--dry-run]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash(git *), Bash(make *), Bash(jq *), Bash(tessl plugin lint:*), Bash(mkdir *), Bash(mv *), Bash(chmod *), Bash(cp -R *), Bash(bash inputs/*), Bash(bash /tmp/eval-*), Bash(rm -rf /tmp/eval-*)
@@ -20,7 +20,7 @@ ones.
   (for example `plugins/dev-skills`).
 - `--count N`: target scenarios per unit. Default is 3; fewer is acceptable
   for small units. One "unit" is a skill, a command, or a hook script.
-- `--dry-run`: print the migration plan and the scenario list; write nothing.
+- `--dry-run`: print the scenario list and any coverage gaps; write nothing.
 
 ## Workflow
 
@@ -28,30 +28,19 @@ ones.
 1. Read `.claude-plugin/plugin.json`, the README, and the directory tree.
 2. Classify the content: `skills/<name>/SKILL.md`, `commands/*.md`,
    `hooks/*.sh` (or scripts exercised as hooks), or a mix.
-3. Note existing `evals/` content and any **nested** `skills/*/.tessl-plugin/`
-   directories that need migration.
+3. Note existing `evals/` content so new scenario names do not collide with
+   it.
 4. For hooks, also read the relevant `tests/test-*.sh` to understand the
    contract - but never let a scenario duplicate unit-level test coverage.
 
-### 2. Migrate to tessl structure (only when needed)
-1. Add `.tessl-plugin/plugin.json` mirroring the Claude manifest's
-   `version`/`description`. Use `workspace/plugin-name` format for `name`
-   (the workspace is the first segment of the root `tessl.json` name), and
-   `"private": true`.
-2. Point the manifest at what the plugin ships: `"skills": "./skills/"` (or
-   an array of skill dirs) when skills exist, `"commands": "./commands/"`
-   when commands exist. For hooks-only plugins declare at least one content
-   key - `tessl plugin lint` rejects a manifest with none of skills,
-   commands, rules, `hooks`, or `nativeHooks`. These Claude-native hooks
-   translate to the tessl `hooks` (cross-agent) schema: event names
-   (`PreToolUse`, matcher, command array) with
-   `"${TESSL_PLUGIN_DIR}"/hooks/<script>.sh` as the command; verify with
-   lint.
-3. Remove any **nested** per-skill `skills/*/.tessl-plugin/` manifests - the
-   parent manifest supersedes them. Mention the removal in the commit body.
-4. `evals/` belongs at the plugin root, never under `skills/`.
-5. HARD BOUNDARY: never modify `.claude-plugin/**`, hook scripts, or hook
-   registration. Migration adds files only.
+### 2. Standing structure and boundaries
+1. Scenarios live at the plugin root: `plugins/<plugin>/evals/<scenario>/`,
+   beside `skills/` - never inside a skill directory and never at the
+   repository root. Plugins in this repository are already tessl-native
+   (each has `.tessl-plugin/plugin.json`); do not create, delete, or
+   restructure manifests. If a plugin is missing its manifest, stop and ask.
+2. HARD BOUNDARY: never modify `.claude-plugin/**`, hook scripts, or hook
+   registration. Scenarios add files only.
 
 ### 3. Design scenarios per behaviour group
 1. Default three scenarios per unit: the happy path; an edge or trap case
@@ -93,7 +82,8 @@ Scenarios run in a sandbox without network or credentials.
 1. Every `criteria.json`: `jq -e .` passes and
    `jq '[.checklist[].max_score] | add'` returns exactly 100.
 2. `tessl plugin lint <plugin>` reports valid (`tessl` lives at
-   `~/.local/bin`).
+   `~/.local/bin`). If it fails for reasons unrelated to your scenarios,
+   stop and report - do not modify manifests.
 3. Smoke-test every scenario: copy `inputs/` to a fresh
    `/tmp/eval-smoke-<scenario>/` directory, `bash inputs/setup.sh`, assert
    exit 0 and that the fixture state matches the task (e.g. the change is
@@ -108,10 +98,8 @@ Scenarios run in a sandbox without network or credentials.
 
 ### 6. Commit
 Conventional commits, scoped to the plugin, no other files touched, do not
-push:
-1. If migration happened: `chore(<plugin>): adopt tessl plugin structure`.
-2. `test(<plugin>): add eval scenarios for <units>` - one commit either way
-   for the scenarios themselves.
+push: `test(<plugin>): add eval scenarios for <units>`. Manifests and other
+plugin files stay untouched.
 
 ### 7. Batching across plugins (orchestrator notes)
 1. One worktree per plugin, branched off the branch that carries this skill:

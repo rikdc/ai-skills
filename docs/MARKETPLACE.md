@@ -278,7 +278,7 @@ claude code plugins install forgejo-review
 
 **Components**:
 
-- `generate-evals` - Generates and verifies eval scenarios for a plugin (skills, commands, or hooks) using the tessl-compatible evals format, migrating the plugin to the tessl plugin structure when needed
+- `generate-evals` - Generates and verifies eval scenarios for a plugin (skills, commands, or hooks) using the tessl-compatible evals format
 
 **Installation**:
 

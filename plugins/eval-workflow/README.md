@@ -1,9 +1,8 @@
 # eval-workflow
 
 Eval scenario authoring for this repository's plugins, in the tessl-compatible evals/ format. The
-`generate-evals` skill migrates a plugin to the tessl plugin structure
-(`.tessl-plugin/plugin.json` + plugin-root `evals/`) and authors offline
-verifiable scenarios for its skills, commands, and hooks, then runs the local
+`generate-evals` skill authors offline verifiable scenarios at the plugin
+root `evals/` for its skills, commands, and hooks, then runs the local
 verification ladder (`tessl plugin lint`, criteria sums, per-scenario smoke
 tests, `make test`).
 
