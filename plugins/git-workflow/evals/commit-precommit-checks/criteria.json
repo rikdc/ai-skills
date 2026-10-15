@@ -1,21 +1,26 @@
 {
-  "context": "The agent must commit a single-file Python bug fix to a project that has a Makefile with a 'checks' target. The scenario tests whether the agent runs pre-commit checks via 'make checks' and writes a properly-formatted conventional commit message (correct type, imperative mood, lower case, no trailing period, under 60 characters, no emoji, no unnecessary body).",
+  "context": "The agent must commit a single-file Python bug fix to a project that has a Makefile with a 'checks' target. The scenario tests whether the agent runs pre-commit checks via 'make checks' and writes a properly-formatted conventional commit message (correct type, imperative mood, lower case, no trailing period, under 60 characters, no emoji, no unnecessary body), leaving the rest of the repository alone.",
   "type": "weighted_checklist",
   "checklist": [
     {
       "name": "Ran make checks",
       "description": "workflow.md contains evidence that 'make checks' was run before committing (e.g. output line 'checks passed' or the command itself)",
-      "max_score": 18
+      "max_score": 15
     },
     {
       "name": "Checks passed before commit",
       "description": "workflow.md shows the pre-commit check completed without errors (not skipped, not failed silently)",
-      "max_score": 12
+      "max_score": 11
+    },
+    {
+      "name": "Commit landed",
+      "description": "`git rev-list --count HEAD` in the scenario repository returns exactly 2 (the scaffold plus the fix)",
+      "max_score": 5
     },
     {
       "name": "Correct commit type",
       "description": "The commit message subject starts with 'fix' (not feat, chore, refactor, or any other type)",
-      "max_score": 18
+      "max_score": 14
     },
     {
       "name": "Imperative mood subject",
@@ -40,11 +45,16 @@
     {
       "name": "No emoji in commit message",
       "description": "The commit message (subject and body if present) contains no emoji characters",
-      "max_score": 12
+      "max_score": 10
     },
     {
       "name": "Subject-line-only commit",
       "description": "The commit message has no body — it is a subject line alone (no extra paragraphs or bullets after the subject)",
+      "max_score": 5
+    },
+    {
+      "name": "Commit contains only the intended change",
+      "description": "The new commit carries the calculator.py fix and no compiled artefacts (`__pycache__/`, `*.pyc`) or other repository files it modified",
       "max_score": 5
     }
   ]

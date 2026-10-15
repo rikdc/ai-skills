@@ -19,7 +19,7 @@
     },
     {
       "name": "Title is conventional commit format",
-      "description": "record['title'] starts with a conventional type prefix such as feat:, fix:(scope) or docs: - matching one of the branch's commit types.",
+      "description": "record['title'] starts with a conventional type prefix such as feat:, fix(scope): or docs: - matching one of the branch's commit types.",
       "max_score": 12
     },
     {

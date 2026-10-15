@@ -16,8 +16,8 @@ repository state.
    process.
 
 2. Record these two unreleased changes:
-   - *Added*: "Detect duplicate snapshots during capture"
-   - *Fixed*: "Remove stale lockfiles that blocked snapshot cleanup"
+   - duplicate snapshots are now detected during capture
+   - stale lockfiles no longer block snapshot cleanup
 
 3. Leave the new file uncommitted — do not commit or push.
 

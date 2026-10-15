@@ -9,7 +9,8 @@ mkdir -p bin
 cat > bin/gh << 'SHIM'
 #!/usr/bin/env bash
 # Offline stand-in for `gh`: records what a real `gh pr create` would submit.
-record="pr-record.json"
+# Real gh records against the repository; write where the grader expects it.
+record="$(git rev-parse --show-toplevel 2>/dev/null || echo .)/pr-record.json"
 cmd="${1:-}"; shift || true
 case "$cmd" in
   pr)
@@ -59,6 +60,10 @@ while i < len(args):
         i += 1
     else:
         i += 1
+
+# gh uses the repository's default branch when --base is omitted.
+if record["base"] is None:
+    record["base"] = "main"
 
 # --fill mirrors gh: title and body come from the branch's commits.
 if record["fill"] and record["title"] is None:

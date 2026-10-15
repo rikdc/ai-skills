@@ -1,5 +1,5 @@
 {
-  "context": "Tests whether the agent can create a CHANGELOG.md from scratch in Keep a Changelog format, add two entries in the correct categories via the Unreleased section, and not overreach (no invented entries, no placeholder bullets under empty category headings, no extra sections).",
+  "context": "Tests whether the agent can create a CHANGELOG.md from scratch in Keep a Changelog format, categorise and phrase two changes as the changelog skill requires, and not overreach (no invented entries, no placeholder bullets under empty category headings, no extra sections).",
   "type": "weighted_checklist",
   "checklist": [
     {
@@ -10,26 +10,26 @@
     {
       "name": "Skeleton structure correct",
       "description": "The file opens with the Keep a Changelog header: '# Changelog', the 'All notable changes' line, the 'The format is based on' line, and the Semantic Versioning adherence sentence.",
+      "max_score": 14
+    },
+    {
+      "name": "Unreleased is the only release heading",
+      "description": "The only release heading is '## [Unreleased]' - no dated version sections - and the two entries sit under it.",
       "max_score": 12
     },
     {
-      "name": "Empty Unreleased section present",
-      "description": "A '## [Unreleased]' heading appears below the header with no other release version headings.",
-      "max_score": 10
-    },
-    {
       "name": "Added entry present and categorised",
-      "description": "The 'Detect duplicate snapshots during capture' bullet sits under a '### Added' heading inside the Unreleased section.",
-      "max_score": 10
+      "description": "An entry about detecting duplicate snapshots sits under a '### Added' heading inside the Unreleased section.",
+      "max_score": 12
     },
     {
       "name": "Fixed entry present and categorised",
-      "description": "The 'Remove stale lockfiles that blocked snapshot cleanup' bullet sits under a '### Fixed' heading inside the Unreleased section.",
-      "max_score": 10
+      "description": "An entry about stale lockfiles no longer blocking snapshot cleanup sits under a '### Fixed' heading inside the Unreleased section.",
+      "max_score": 12
     },
     {
       "name": "Entry style correct",
-      "description": "Each entry is a single line, leads with an imperative verb (Detect, Remove), and contains no file paths, hashes, or commit references, as the changelog skill's entry style requires.",
+      "description": "Each entry is one line leading with an imperative verb (e.g. 'Detect duplicate snapshots during capture', 'Remove stale lockfiles blocking snapshot cleanup') with no file paths, hashes, or commit references, as the changelog skill's entry style requires.",
       "max_score": 8
     },
     {
@@ -39,17 +39,12 @@
     },
     {
       "name": "No invented entries",
-      "description": "Only the two requested entries exist; the agent did not seed extra entries from git history or invent work.",
+      "description": "Only the two requested changes are recorded; the agent did not seed extra entries from git history or invent work.",
       "max_score": 10
     },
     {
       "name": "Category order conventional",
       "description": "If both Added and Fixed headings exist, Added appears before Fixed, matching the category order the changelog skill lists (added, changed, deprecated, removed, fixed, security).",
-      "max_score": 8
-    },
-    {
-      "name": "No release action taken",
-      "description": "The agent left the new file uncommitted and did not cut a version section, tag, or push, as the task instructs; the changelog remains unreleased-only.",
       "max_score": 8
     },
     {

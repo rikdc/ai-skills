@@ -3,7 +3,7 @@ name: generate-evals
 description: Generates and verifies eval scenarios for a repository plugin — covering its skills, commands, and hooks — using the tessl-compatible evals/ layout (task.md, criteria.json, scenario.json) so they run under `tessl eval run` and grade offline with any judge. Authors self-gradable scenarios, runs the offline verification ladder, and commits. This skill never restructures plugins. Use when the user asks to build evals for a plugin, generate eval scenarios, or verify that a skill actually works.
 user-invocable: true
 argument-hint: "<plugin-path> [--count N] [--dry-run]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash(git *), Bash(make *), Bash(jq *), Bash(tessl *), Bash(mkdir *), Bash(mv *), Bash(chmod *), Bash(cp -R *), Bash(bash inputs/*), Bash(bash /tmp/eval-*), Bash(./bin/*), Bash(bin/*), Bash(gh *), Bash(PATH=*), Bash(rm -rf /tmp/eval-*)
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash(git *), Bash(make *), Bash(jq *), Bash(tessl *), Bash(mkdir *), Bash(mv *), Bash(chmod *), Bash(cp -R *), Bash(bash inputs/*), Bash(bash /tmp/eval-*), Bash(./bin/*)
 ---
 # Generate Evals - eval scenarios for repository plugins
 
@@ -45,11 +45,12 @@ ones.
    root `tessl.json` name) plus `/` and the plugin name, `"version"` and
    `"description"` are copied from `.claude-plugin/plugin.json`, and
    `"private": true`. Add the pointers the plugin ships - `"skills":
-   "./skills/"`, `"commands": "./commands/"` - and note that `tessl plugin
-   lint` rejects a manifest with none of skills, commands, rules, hooks or
-   nativeHooks, so a hooks-only plugin must declare its hooks (see
-   `plugins/security-hooks/.tessl-plugin/plugin.json`). If the Claude
-   manifest is missing or malformed, stop and ask.
+   "./skills/"`, `"commands": "./commands/"`. Note that `tessl plugin lint`
+   rejects a manifest with none of skills, commands, rules, hooks or
+   nativeHooks, so a hooks-only plugin must declare its hooks in the tessl
+   hooks schema (event name, matcher, and a command pointing at the bundled
+   script through `${TESSL_PLUGIN_DIR}`). If the Claude manifest is missing
+   or malformed, stop and ask.
 3. HARD BOUNDARY: never modify `.claude-plugin/**`, hook scripts, hook
    registration, or a skill body. Scenarios add files, plus a manifest when
    one is absent.
@@ -123,9 +124,11 @@ Scenarios run in a sandbox without network or credentials.
    a value-taking flag as that value even when it starts with `-`. Record
    every field the rubric grades, including values the tool infers rather
    than receives as an argument (the branch `gh pr create` derives from the
-   working tree) and flags whose effects the real tool computes (`--fill`
-   taking title and body from the branch's commits) - otherwise a correct
-   invocation can be graded wrong.
+   working tree, the default branch it uses when `--base` is omitted) and
+   flags whose effects the real tool computes (`--fill` taking title and
+   body from the branch's commits) - otherwise a correct invocation can be
+   graded wrong. Write the recording to a path the grader can find whatever
+   directory the agent ran from.
 3. Install shims inside the fixture (for example `./bin`) and keep them out
    of the fixture's `git status` with `.git/info/exclude`. Never write to
    `$HOME` or anywhere outside the scenario workspace: authors run every
@@ -143,13 +146,16 @@ Scenarios run in a sandbox without network or credentials.
    A setup that runs `git init` in the working tree leaves `inputs/` (and,
    when a harness flattens the fixture, the setup script itself) untracked;
    exclude them or the "clean working tree" criteria fail on a correct
-   solution.
+   solution. Exclude build by-products too: `python3 -m py_compile` leaves
+   `__pycache__/`, which the unit's own auto-staging rule would otherwise
+   sweep into the commit under test.
 7. Hook scenarios have no harness to fire the hook, so trigger it the way
-   its manifest declares: build a fixture in the required state, pipe the
-   documented hook payload to the hook script on stdin, and grade the
-   decision it returns (the deny/allow JSON, the exit status, the stderr
-   message) rather than a tool call the agent never made. See
-   `plugins/security-hooks/evals/` for the pattern.
+   its manifest declares: build a fixture in the required state, copy or
+   reference the hook script from the plugin, pipe the documented hook
+   payload to it on stdin, and grade the decision it returns (the deny or
+   allow JSON, the exit status, the stderr message) rather than a tool call
+   the agent never made. Do not modify the hook under test; give the
+   scenario its own copy if the fixture needs one.
 
 ### 5. Verification ladder (run ALL before claiming done)
 
@@ -159,14 +165,16 @@ Scenarios run in a sandbox without network or credentials.
    If it fails for reasons unrelated to your scenarios, stop and report - do
    not modify manifests.
 3. Smoke-test every scenario: copy `inputs/` to a fresh
-   `/tmp/eval-smoke-<scenario>/` directory, `bash inputs/setup.sh`, assert
-   exit 0 and that the fixture state matches the task (e.g. the change is
-   staged, the shim is executable). Remove the temp dirs afterwards.
-4. Exercise the graded path, not just the setup: run each recording shim the
-   way a plausible agent would call it (both flag styles, both a correct and
-   an incorrect invocation) and confirm the recorded fields distinguish them.
-   Run the setup in both layouts (`inputs/` preserved and flattened) when the
-   harness's behaviour is unknown.
+   `/tmp/eval-smoke-<scenario>/` directory, run `bash inputs/setup.sh` there,
+   assert exit 0 and that the fixture state matches the task (e.g. the change
+   is staged, the shim is executable). Remove the temp dirs afterwards
+   (deleting them may need approval).
+4. Exercise the graded path, not just the setup: call each recording shim
+   the way a plausible agent would (`./bin/gh pr create ...`, with `./bin` on
+   PATH only for the duration of that command), using both flag styles, a
+   correct and an incorrect invocation, and confirm the recorded fields
+   distinguish them. Run the setup in both layouts (`inputs/` preserved and
+   flattened) when the harness's behaviour is unknown.
 5. For one representative scenario per unit type, play the intended
    solution path end-to-end yourself (produce the artifact the criteria
    grade) to prove the rubric is answerable, then clean up.

@@ -8,14 +8,9 @@
       "max_score": 20
     },
     {
-      "name": "Existing version detected",
-      "description": "workflow.md states that 2.1.0 already appears in the file (or that the release already exists).",
-      "max_score": 15
-    },
-    {
-      "name": "Ordering rule applied",
-      "description": "workflow.md states that 2.1.0 is not higher than the most recent version present.",
-      "max_score": 15
+      "name": "Refusal reason stated",
+      "description": "workflow.md states at least one of the failing preconditions - that 2.1.0 already appears in the file, or that it is not higher than the most recent version present. Either alone is a sufficient reason to stop.",
+      "max_score": 30
     },
     {
       "name": "No changelog edits",
@@ -24,7 +19,7 @@
     },
     {
       "name": "Reason reported",
-      "description": "workflow.md explains the refusal in its own words rather than only quoting the rule, and does not ask the agent to proceed anyway.",
+      "description": "workflow.md explains the refusal in the agent's own words rather than only quoting the rule, and does not proceed with the release anyway.",
       "max_score": 10
     },
     {

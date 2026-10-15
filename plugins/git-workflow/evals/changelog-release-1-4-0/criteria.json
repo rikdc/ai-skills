@@ -19,7 +19,7 @@
     },
     {
       "name": "Release section created",
-      "description": "CHANGELOG.md now has a '## [1.4.0] - <today's date>' section with today's actual date (whatever 'date +%F' yields at run time), not a guessed date.",
+      "description": "CHANGELOG.md now has a '## [1.4.0] - <today's date>' section whose date is the day the scenario ran - compare it with the fixture repository's initial commit date (`git log -1 --format=%cs`), not with a guessed or invented date.",
       "max_score": 10
     },
     {

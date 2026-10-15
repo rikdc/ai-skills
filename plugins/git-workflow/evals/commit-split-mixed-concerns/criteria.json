@@ -18,8 +18,8 @@
       "max_score": 10
     },
     {
-      "name": "Docs in its own commit",
-      "description": "The README update is in a separate commit whose type prefix is 'docs'",
+      "name": "Docs change committed",
+      "description": "The README update is committed - either in its own 'docs' commit or alongside the feature commit whose settings it documents",
       "max_score": 10
     },
     {
