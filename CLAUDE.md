@@ -10,7 +10,7 @@ This is the AI Skills project, which provides security hooks and testing infrast
 
 ## Marketplace Structure
 
-The repository is organized as a **marketplace with 7 installable plugins**:
+The repository is organized as a **marketplace with 10 installable plugins**:
 
 - **security-hooks**: MCP security scanner and protected branch hooks
 - **dev-skills**: Expert skills for Go, documentation, and architecture
@@ -19,6 +19,9 @@ The repository is organized as a **marketplace with 7 installable plugins**:
 - **code-quality**: Code quality analysis, review, and cleanup
 - **prompt-tools**: AI prompt generation and review tools
 - **pr-review-triage**: Triage of PR review comments and follow-up tracking
+- **forgejo-review**: Advisory Forgejo pull-request review workflow
+- **nix-skills**: Expert guidance on Nix, NixOS, and home-manager
+- **eval-workflow**: Eval scenario generation and offline verification
 
 ### Directory Structure
 

@@ -1,0 +1,56 @@
+{
+  "context": "Tests whether the agent can create a CHANGELOG.md from scratch in Keep a Changelog format, categorise and phrase two changes as the changelog skill requires, and not overreach (no invented entries, no placeholder bullets under empty category headings, no extra sections).",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "CHANGELOG.md created",
+      "description": "A CHANGELOG.md file exists in the working directory after the agent finishes.",
+      "max_score": 10
+    },
+    {
+      "name": "Skeleton structure correct",
+      "description": "The file opens with the Keep a Changelog header: '# Changelog', the 'All notable changes' line, the 'The format is based on' line, and the Semantic Versioning adherence sentence.",
+      "max_score": 14
+    },
+    {
+      "name": "Unreleased is the only release heading",
+      "description": "The only release heading is '## [Unreleased]' - no dated version sections - and the two entries sit under it.",
+      "max_score": 12
+    },
+    {
+      "name": "Added entry present and categorised",
+      "description": "An entry about detecting duplicate snapshots sits under a '### Added' heading inside the Unreleased section.",
+      "max_score": 12
+    },
+    {
+      "name": "Fixed entry present and categorised",
+      "description": "An entry about stale lockfiles no longer blocking snapshot cleanup sits under a '### Fixed' heading inside the Unreleased section.",
+      "max_score": 12
+    },
+    {
+      "name": "Entry style correct",
+      "description": "Each entry is one line leading with an imperative verb (e.g. 'Detect duplicate snapshots during capture', 'Remove stale lockfiles blocking snapshot cleanup') with no file paths, hashes, or commit references, as the changelog skill's entry style requires.",
+      "max_score": 8
+    },
+    {
+      "name": "No placeholder content",
+      "description": "No placeholder bullet, no 'TODO', no fake version headings, and no category headings that contain no entries.",
+      "max_score": 10
+    },
+    {
+      "name": "No invented entries",
+      "description": "Only the two requested changes are recorded; the agent did not seed extra entries from git history or invent work.",
+      "max_score": 10
+    },
+    {
+      "name": "Category order conventional",
+      "description": "If both Added and Fixed headings exist, Added appears before Fixed, matching the category order the changelog skill lists (added, changed, deprecated, removed, fixed, security).",
+      "max_score": 8
+    },
+    {
+      "name": "Existing files untouched",
+      "description": "Files other than CHANGELOG.md have not been modified or added to (src/capture.py is unchanged).",
+      "max_score": 4
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "eval-workflow",
+  "description": "Plugin eval scenario generation and offline verification (tessl-compatible evals format)",
+  "version": "0.1.0",
+  "author": {
+    "name": "Richard Claydon"
+  },
+  "license": "MPL-2.0",
+  "keywords": ["evals", "tessl", "scenarios", "testing"],
+  "skills": ["./skills/"]
+}

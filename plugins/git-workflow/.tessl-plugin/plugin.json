@@ -1,0 +1,7 @@
+{
+  "name": "rikdc/git-workflow",
+  "description": "Git workflow automation skills for commits, PRs, and changelog management",
+  "version": "2.0.0",
+  "private": true,
+  "skills": "./skills/"
+}

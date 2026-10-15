@@ -1,0 +1,7 @@
+{
+  "name": "rikdc/eval-workflow",
+  "description": "Plugin eval scenario generation and offline verification (tessl-compatible evals format)",
+  "version": "0.1.0",
+  "private": true,
+  "skills": "./skills/"
+}

@@ -1,0 +1,1 @@
+{ "description": "Atomic commit splitting for mixed-concern diff", "include": ["./inputs"] }

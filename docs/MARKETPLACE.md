@@ -271,6 +271,25 @@ claude code plugins install forgejo-review
 
 ---
 
+### 10. eval-workflow
+
+**Category**: Development
+**Source**: `./plugins/eval-workflow`
+
+**Components**:
+
+- `generate-evals` - Generates and verifies eval scenarios for a plugin (skills, commands, or hooks) using the tessl-compatible evals format
+
+**Installation**:
+
+```bash
+claude code plugins install eval-workflow
+```
+
+**Documentation**: [plugins/eval-workflow/README.md](../plugins/eval-workflow/README.md)
+
+---
+
 ## Plugin Structure
 
 Each plugin follows this structure:

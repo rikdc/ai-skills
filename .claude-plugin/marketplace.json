@@ -79,6 +79,14 @@
       "version": "1.0.0",
       "keywords": ["pr-review", "code-review", "forgejo", "workflow", "advisory"],
       "category": "workflow"
+    },
+    {
+      "name": "eval-workflow",
+      "source": "./plugins/eval-workflow",
+      "description": "Plugin eval scenario generation and offline verification (tessl-compatible evals format)",
+      "version": "0.1.0",
+      "keywords": ["evals", "tessl", "scenarios", "testing"],
+      "category": "development"
     }
   ]
 }

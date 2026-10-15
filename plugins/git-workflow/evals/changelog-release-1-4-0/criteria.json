@@ -1,0 +1,56 @@
+{
+  "context": "Tests whether the agent adds a Keep a Changelog entry in the right category (Fixed) and style (imperative verb, user-facing) and cuts a 1.4.0 release correctly: verifies preconditions, stamps today's date, preserves existing wording, keeps a fresh empty Unreleased section on top, and neither tags, commits, nor pushes.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "New Fixed entry added",
+      "description": "CHANGELOG.md contains a new bullet about the socket connector no longer retrying authentication failures / duplicate-login loop.",
+      "max_score": 15
+    },
+    {
+      "name": "Entry under correct category",
+      "description": "The new bullet sits under a '### Fixed' heading rather than Added/Changed/Removed - under '## [Unreleased]' before the release is cut, and under '## [1.4.0]' once it has been.",
+      "max_score": 10
+    },
+    {
+      "name": "Entry style matches existing",
+      "description": "The new bullet leads with an imperative verb and is a single line describing a user-facing change, in the same style as the existing 'Fixed' bullets (e.g. no past tense 'We fixed…', no file paths, no commit hashes).",
+      "max_score": 10
+    },
+    {
+      "name": "Release section created",
+      "description": "CHANGELOG.md now has a '## [1.4.0] - <today's date>' section whose date is the day the scenario ran - compare it with the fixture repository's initial commit date (`git log -1 --format=%cs`), not with a guessed or invented date.",
+      "max_score": 10
+    },
+    {
+      "name": "All entries moved into release",
+      "description": "The 1.4.0 section contains all four entries (three original + the new Fixed entry), with each original bullet's wording unchanged.",
+      "max_score": 10
+    },
+    {
+      "name": "Fresh empty Unreleased restored",
+      "description": "A fresh empty '## [Unreleased]' heading sits above the 1.4.0 section, with no placeholder bullet under it.",
+      "max_score": 10
+    },
+    {
+      "name": "Header and format preserved",
+      "description": "The Keep a Changelog header lines ('The format is based on…', 'Semantic Versioning') are unchanged and remain in their original place above the release sections.",
+      "max_score": 8
+    },
+    {
+      "name": "No version preconditions violated",
+      "description": "The agent did not release when Unreleased was empty, did not pick an already-used version, and picked 1.4.0 (higher than any version in the file). If preconditions were met it proceeded without asking.",
+      "max_score": 7
+    },
+    {
+      "name": "No tag/commit/push",
+      "description": "No git tag, commit, or push was made during this scenario (git log shows only the initial commit).",
+      "max_score": 10
+    },
+    {
+      "name": "No invented sections or placeholders",
+      "description": "No placeholder bullets under empty category headings and no new category headings without entries.",
+      "max_score": 10
+    }
+  ]
+}
