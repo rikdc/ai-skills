@@ -3,7 +3,7 @@ name: generate-evals
 description: Generates and verifies eval scenarios for a repository plugin — covering its skills, commands, and hooks — using the tessl-compatible evals/ layout (task.md, criteria.json, scenario.json) so they run under `tessl eval run` and grade offline with any judge. Authors self-gradable scenarios, runs the offline verification ladder, and commits. This skill never restructures plugins. Use when the user asks to build evals for a plugin, generate eval scenarios, or verify that a skill actually works.
 user-invocable: true
 argument-hint: "<plugin-path> [--count N] [--dry-run]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash(git *), Bash(make *), Bash(jq *), Bash(tessl plugin lint:*), Bash(mkdir *), Bash(mv *), Bash(chmod *), Bash(cp -R *), Bash(bash inputs/*), Bash(bash /tmp/eval-*), Bash(rm -rf /tmp/eval-*)
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash(git *), Bash(make *), Bash(jq *), Bash(tessl *), Bash(mkdir *), Bash(mv *), Bash(chmod *), Bash(cp -R *), Bash(bash inputs/*), Bash(bash /tmp/eval-*), Bash(./bin/*), Bash(bin/*), Bash(gh *), Bash(PATH=*), Bash(rm -rf /tmp/eval-*)
 ---
 # Generate Evals - eval scenarios for repository plugins
 
@@ -33,14 +33,24 @@ ones.
 4. For hooks, also read the relevant `tests/test-*.sh` to understand the
    contract - but never let a scenario duplicate unit-level test coverage.
 
-### 2. Standing structure and boundaries
+### 2. Standing structure, manifests and boundaries
 1. Scenarios live at the plugin root: `plugins/<plugin>/evals/<scenario>/`,
    beside `skills/` - never inside a skill directory and never at the
-   repository root. Do not create, delete, or restructure
-   `.tessl-plugin/plugin.json`; if a plugin is missing its tessl manifest,
-   stop and ask - do not invent one.
-2. HARD BOUNDARY: never modify `.claude-plugin/**`, hook scripts, or hook
-   registration. Scenarios add files only.
+   repository root.
+2. A plugin must have its tessl manifest before its evals can run. If
+   `plugins/<plugin>/.tessl-plugin/plugin.json` is missing, create it from
+   the Claude manifest: `"name"` is the workspace (the first segment of the
+   root `tessl.json` name) plus `/` and the plugin name, `"version"` and
+   `"description"` are copied from `.claude-plugin/plugin.json`, and
+   `"private": true`. Add the pointers the plugin ships - `"skills":
+   "./skills/"`, `"commands": "./commands/"` - and note that `tessl plugin
+   lint` rejects a manifest with none of skills, commands, rules, hooks or
+   nativeHooks, so a hooks-only plugin must declare its hooks (see
+   `plugins/security-hooks/.tessl-plugin/plugin.json`). If the Claude
+   manifest is missing or malformed, stop and ask.
+3. HARD BOUNDARY: never modify `.claude-plugin/**`, hook scripts, hook
+   registration, or a skill body. Scenarios add files, plus a manifest when
+   one is absent.
 
 ### 3. Design scenarios per behaviour group
 1. Default three scenarios per unit: the happy path; an edge or trap case
@@ -48,11 +58,12 @@ ones.
    guard. Two is the floor for tiny units.
 2. Every scenario must name an exact documented behaviour from the unit -
    never invent features the unit does not claim.
-3. Scenario directory names: lowercase-hyphen, unit-prefixed when the plugin
-   has several units (`commit-failing-checks`, `pr-draft-read-replica`).
-   NEVER name hand-written scenarios `scenario-N`: tessl merges/overwrites
-   canonical `scenario-N` directories on re-download. Keep existing
-   tessl-generated `scenario-N` dirs untouched.
+3. Scenario directory names: lowercase-hyphen and descriptive
+   (`commit-failing-checks`, `pr-draft-read-replica`). Never name one
+   `scenario-N`: tessl's downloader writes and overwrites those canonical
+   names, so a re-download silently replaces hand-edited files. If a
+   generated `scenario-N` directory already exists, rename it to a
+   descriptive name before touching it.
 4. Each scenario directory contains:
    - `task.md`: Problem/Feature Description written in realistic narrative
      (a colleague, a project, a change pending review), then **Your Task**
@@ -63,6 +74,11 @@ ones.
      "checklist": [...]}` with 8-13 items whose `max_score` sums to exactly
      100. Every item must be gradeable from observable state: file presence
      or content, git state, exit codes, or recorded output.
+   - The task states the user's intent - what to achieve - and leaves the
+     process to the unit. If the task spells out the unit's own procedure
+     step by step, an agent without the unit passes too and the scenario
+     proves nothing. Quote the unit's rules only when the scenario is
+     specifically testing whether they are followed.
 5. Make every criterion check something the fixture can actually produce.
    Read the fixture and the rubric together before committing: if the
    criteria demand a style or a state the fixture contradicts, or a check
@@ -73,22 +89,27 @@ ones.
    criterion that a correct run cannot satisfy is broken: requiring a clean
    working tree when the task tells the agent to leave an artifact
    untracked, or requiring a heading the task's own final step moves away
-   from. Also check that the task does not demand behaviour the unit's
-   SKILL.md never documents (e.g. choosing a release version when the skill
-   only releases a version it is given) - if the behaviour is not
-   documented, hand it to the agent in the task instead of grading it.
+   from. A criterion satisfied by simply following the task's own
+   instructions - an artefact the task hands over, a fact the task states -
+   grades the task, not the unit; drop it or reduce it to a token weight.
+7. Never grade behaviour the unit does not document: if the unit does not
+   document it, either hand it to the agent in the task or drop the
+   criterion.
 
 ### 4. Make it gradeable offline
 Scenarios run in a sandbox without network or credentials.
 1. `inputs/setup.sh` is POSIX bash: `#!/usr/bin/env bash`, `set -euo
    pipefail`, `git init -q` plus `git config user.email/user.name`, heredoc
-   fixtures, and an echo of the final state. Deterministic, prompt-free and
-   executable (`chmod +x`). Keep the name `inputs/setup.sh` across scenarios
-   and state the invocation tolerantly in task.md - `bash inputs/setup.sh`,
-   or `bash setup.sh` if a harness flattens the fixture into the working
-   directory - so the instruction survives either layout. Every checked-in
-   fixture file is either written by the script or read by it, never both: a
-   copy the script overwrites is dead weight that drifts silently.
+   fixtures, quiet commits, and an echo of the final state. Deterministic,
+   prompt-free and executable (`chmod +x`). Keep the name `inputs/setup.sh`
+   across scenarios and state the invocation tolerantly in task.md - `bash
+   inputs/setup.sh`, or `bash setup.sh` if a harness flattens the fixture
+   into the working directory - so the instruction survives either layout.
+   Every checked-in fixture file is either written by the script or read by
+   it, never both: a copy the script overwrites is dead weight that drifts
+   silently. The sandbox provides `python3` (the recording shims and at
+   least one Makefile depend on it) and the POSIX coreutils; state any
+   further tool a fixture needs in task.md.
 2. Build recording shims for external CLIs the agent would call (a `gh`
    shim that writes `title`, `body`, `draft`, `base` and `head` to
    `pr-record.json`), so the graded call is observable. See the git-workflow
@@ -109,19 +130,28 @@ Scenarios run in a sandbox without network or credentials.
    `commit_log.txt`, plan files) when criteria need to reference the steps
    the agent took, not just the end state.
 5. State plainly in task.md that network actions must be skipped, and give
-   the equivalent dry-run instruction instead.
+   the equivalent dry-run instruction instead. If a task's narrative implies
+   a remote or a push, say so explicitly ("the branch is already pushed; do
+   not push or fetch") - the fixture has no remote and an agent that tries
+   will hit an avoidable failure.
 6. The fixture's own files must not contaminate the graded repository state.
    A setup that runs `git init` in the working tree leaves `inputs/` (and,
    when a harness flattens the fixture, the setup script itself) untracked;
    exclude them or the "clean working tree" criteria fail on a correct
    solution.
+7. Hook scenarios have no harness to fire the hook, so trigger it the way
+   its manifest declares: build a fixture in the required state, pipe the
+   documented hook payload to the hook script on stdin, and grade the
+   decision it returns (the deny/allow JSON, the exit status, the stderr
+   message) rather than a tool call the agent never made. See
+   `plugins/security-hooks/evals/` for the pattern.
 
 ### 5. Verification ladder (run ALL before claiming done)
 1. Every `criteria.json`: `jq -e .` passes and
    `jq '[.checklist[].max_score] | add'` returns exactly 100.
-2. `tessl plugin lint <plugin>` reports valid (`tessl` lives at
-   `~/.local/bin`). If it fails for reasons unrelated to your scenarios,
-   stop and report - do not modify manifests.
+2. `tessl plugin lint <plugin>` reports valid (`tessl` must be on `PATH`).
+   If it fails for reasons unrelated to your scenarios, stop and report - do
+   not modify manifests.
 3. Smoke-test every scenario: copy `inputs/` to a fresh
    `/tmp/eval-smoke-<scenario>/` directory, `bash inputs/setup.sh`, assert
    exit 0 and that the fixture state matches the task (e.g. the change is
@@ -141,8 +171,8 @@ Scenarios run in a sandbox without network or credentials.
 
 ### 6. Commit
 Conventional commits, scoped to the plugin, no other files touched, do not
-push: `test(<plugin>): add eval scenarios for <units>`. Manifests and other
-plugin files stay untouched.
+push: `test(<plugin>): add eval scenarios for <units>`. Skill bodies and
+other plugin files stay untouched.
 
 ### 7. Batching across plugins (orchestrator notes)
 1. One worktree per plugin, branched off the commit that carries this skill

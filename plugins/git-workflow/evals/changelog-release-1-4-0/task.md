@@ -12,21 +12,16 @@ The repository lives in the working directory. Run the fixture setup script
 root) to create it; the changelog will be present with the three unreleased
 entries.
 
-Your job: record one more unreleased entry and then cut a release.
+## Your Task
 
-The new entry: `Fixed` — the socket connector no longer retries
-authentication failures, which previously caused a duplicate-login loop.
-Use the same style as the existing entries.
+1. Record one more unreleased entry: `Fixed` — the socket connector no longer
+   retries authentication failures, which previously caused a duplicate-login
+   loop.
 
-Then release version `1.4.0`. The release step must follow the team's
-process: verify there are unreleased entries to release, verify the version
-is not already used and is higher than the last release, rename the
-Unreleased section with today's date, and leave a fresh empty Unreleased
-section at the top. Do not tag, commit, or push.
+2. Then cut the release as version `1.4.0`.
 
 ## Output Specification
 
-- `CHANGELOG.md` with the new `Fixed` entry, a `## [1.4.0] - <today>` section
-  containing all four entries, and a fresh empty `## [Unreleased]` above it
-- `CHANGELOG.md` is untouched elsewhere — existing entry wording and
+- `CHANGELOG.md` reflecting both actions
+- `CHANGELOG.md` is untouched otherwise — existing entry wording and
   category order preserved

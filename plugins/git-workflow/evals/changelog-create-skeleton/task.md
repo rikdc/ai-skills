@@ -2,10 +2,9 @@
 
 ## Background
 
-The snapshot-tool repository has been keeping releases in Chandler's release
-notes file for a while, but the team now wants a proper `CHANGELOG.md` that
-follows the Keep a Changelog format. The repository currently has **no**
-`CHANGELOG.md`.
+The snapshot-tool repository keeps its release notes in a shared document,
+but the team now wants a proper `CHANGELOG.md` following the Keep a Changelog
+format. The repository currently has **no** `CHANGELOG.md`.
 
 Start by running the fixture setup script (`bash inputs/setup.sh`, or
 `bash setup.sh` if it sits at the working-directory root) to create the
@@ -13,23 +12,16 @@ repository state.
 
 ## Your Task
 
-1. Create `CHANGELOG.md` using the Keep a Changelog skeleton: header, the
-   format/adheres lines, and an empty `## [Unreleased]` section. No version
-   sections, no placeholder bullets under empty headings.
+1. Create `CHANGELOG.md` for the project, following the team's changelog
+   process.
 
-2. Seed it with two entries the team wants recorded as unreleased:
-   - *Added*: "Detect duplicate snapshots during capture" — under Added.
-   - *Fixed*: "Remove stale lockfiles that blocked snapshot cleanup" — under Fixed.
+2. Record these two unreleased changes:
+   - *Added*: "Detect duplicate snapshots during capture"
+   - *Fixed*: "Remove stale lockfiles that blocked snapshot cleanup"
 
-   Follow the style rules: one line per entry, verb-first, user-facing, no
-   file paths or commit hashes.
-
-3. Do not invent additional entries from git history unless asked, and do not
-   fill category headings that have nothing to record.
+3. Leave the new file uncommitted — do not commit or push.
 
 ## Output Specification
 
-- `CHANGELOG.md` exists in the working directory
-- Header lines and empty `## [Unreleased]` present, with the two seeded
-  entries under `### Added` and `### Fixed`
-- No other categories or version sections; no placeholder text
+- `CHANGELOG.md` exists in the working directory with the two changes
+  recorded

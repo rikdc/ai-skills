@@ -1,0 +1,46 @@
+{
+  "context": "Tests whether the agent applies the documented release preconditions instead of carrying out an instruction blindly: the requested version 2.1.0 already appears in the file and is not higher than the most recent version, so the changelog process says to stop and report the reason. Graded on the changelog being left unchanged and the reason being reported, with no tag, commit, or push.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Release not cut",
+      "description": "CHANGELOG.md has no new release section: '## [Unreleased]' still holds the two entries and no '## [2.1.0]' section was added or duplicated.",
+      "max_score": 20
+    },
+    {
+      "name": "Existing version detected",
+      "description": "workflow.md states that 2.1.0 already appears in the file (or that the release already exists).",
+      "max_score": 15
+    },
+    {
+      "name": "Ordering rule applied",
+      "description": "workflow.md states that 2.1.0 is not higher than the most recent version present.",
+      "max_score": 15
+    },
+    {
+      "name": "No changelog edits",
+      "description": "CHANGELOG.md is byte-identical to the fixture state - no renamed Unreleased heading, no date stamp, no reordering, no whitespace churn.",
+      "max_score": 15
+    },
+    {
+      "name": "Reason reported",
+      "description": "workflow.md explains the refusal in its own words rather than only quoting the rule, and does not ask the agent to proceed anyway.",
+      "max_score": 10
+    },
+    {
+      "name": "No tag/commit/push",
+      "description": "No git tag, commit, or push was made; git log still shows only the initial commit.",
+      "max_score": 10
+    },
+    {
+      "name": "No invented entries",
+      "description": "No new bullets, version headings, or placeholder content appeared anywhere in the changelog.",
+      "max_score": 10
+    },
+    {
+      "name": "Entries preserved",
+      "description": "The two Unreleased entries and the existing 2.1.0 section keep their wording and order.",
+      "max_score": 5
+    }
+  ]
+}

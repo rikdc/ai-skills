@@ -6,11 +6,11 @@ A colleague on the backend team has patched a long-standing bug in the shared `c
 
 The project lives in your current working directory and already has a `Makefile` — run the fixture setup script (`bash inputs/setup.sh`, or `bash setup.sh` if it sits at the working-directory root) first to initialize the git repository and leave the fix in a ready-to-commit state. After that, your job is to commit the change by following the team's standard commit workflow.
 
-To help the team trace what was done, write a `workflow.md` file in the working directory documenting the steps you took: any pre-commit checks you ran (including their output), the commit command used, and the verification step output.
+To help the team trace what was done, write a `workflow.md` file in the working directory documenting the steps you took: any pre-commit checks you ran (including their output) and the commit command used.
 
 ## Output Specification
 
 After you finish, the working directory should contain:
 
 - A committed git history that includes the bug fix for `calculator.py`
-- `workflow.md` — a plain-text log of the steps you followed: pre-commit check results, the commit message you used, and the output of any post-commit verification you ran
+- `workflow.md` — a plain-text log of the steps you followed: pre-commit check results and the commit message you used

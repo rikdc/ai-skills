@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Initialise the git repo and stage the bug fix for the agent to commit.
+# Initialise the git repo with the bug fix present but unstaged.
 set -euo pipefail
 
 git init -q
@@ -33,7 +33,7 @@ def multiply(a, b):
 PYEOF
 
 git add calculator.py Makefile
-git commit -m "chore: initial project scaffold"
+git commit -q -m "chore: initial project scaffold"
 
 # Now apply the bug fix (add zero-division guard) but leave it unstaged
 cat > calculator.py << 'PYEOF'

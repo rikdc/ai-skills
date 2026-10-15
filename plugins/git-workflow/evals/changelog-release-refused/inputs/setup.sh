@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Initialises a git repo containing a CHANGELOG.md with an Unreleased
-# section (Added + Fixed) and a prior 2.1.0 release, so the agent can
-# perform the implied maintenance cut.
+# section (Added + Fixed) and a prior 2.1.0 release, so the agent can be
+# asked for an invalid release (2.1.0) and must refuse it.
 set -euo pipefail
 
 git init -q

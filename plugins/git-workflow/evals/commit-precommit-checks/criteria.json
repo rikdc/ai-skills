@@ -1,31 +1,31 @@
 {
-  "context": "The agent must commit a single-file Python bug fix to a project that has a Makefile with a 'checks' target. The scenario tests whether the agent runs pre-commit checks via 'make checks', uses a properly-formatted conventional commit message (correct type, imperative mood, lower case, no trailing period, under 60 characters, no emoji, no unnecessary body), and verifies the commit landed with 'git log -1 --stat'.",
+  "context": "The agent must commit a single-file Python bug fix to a project that has a Makefile with a 'checks' target. The scenario tests whether the agent runs pre-commit checks via 'make checks' and writes a properly-formatted conventional commit message (correct type, imperative mood, lower case, no trailing period, under 60 characters, no emoji, no unnecessary body).",
   "type": "weighted_checklist",
   "checklist": [
     {
       "name": "Ran make checks",
       "description": "workflow.md contains evidence that 'make checks' was run before committing (e.g. output line 'checks passed' or the command itself)",
-      "max_score": 15
+      "max_score": 18
     },
     {
       "name": "Checks passed before commit",
       "description": "workflow.md shows the pre-commit check completed without errors (not skipped, not failed silently)",
-      "max_score": 10
+      "max_score": 12
     },
     {
       "name": "Correct commit type",
       "description": "The commit message subject starts with 'fix' (not feat, chore, refactor, or any other type)",
-      "max_score": 15
+      "max_score": 18
     },
     {
       "name": "Imperative mood subject",
       "description": "The commit subject verb is in imperative mood (e.g. 'fix', 'guard', 'prevent', 'handle') rather than past tense ('fixed', 'added') or gerund ('fixing')",
-      "max_score": 10
+      "max_score": 13
     },
     {
       "name": "Lower case subject",
       "description": "The commit subject (after the type prefix) begins with a lower-case letter",
-      "max_score": 10
+      "max_score": 12
     },
     {
       "name": "No trailing period",
@@ -40,17 +40,12 @@
     {
       "name": "No emoji in commit message",
       "description": "The commit message (subject and body if present) contains no emoji characters",
-      "max_score": 10
+      "max_score": 12
     },
     {
       "name": "Subject-line-only commit",
       "description": "The commit message has no body — it is a subject line alone (no extra paragraphs or bullets after the subject)",
       "max_score": 5
-    },
-    {
-      "name": "Verified with git log",
-      "description": "workflow.md contains output from 'git log -1 --stat' or similar verification confirming the commit landed",
-      "max_score": 15
     }
   ]
 }

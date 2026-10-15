@@ -3,10 +3,14 @@
 ## Background
 
 You are working on the metrics service repository. A branch named
-`feature/replica-routing` has been pushed to the shared GitHub repository and
-contains two commits ahead of `main`. The team reviews only draft PRs first,
-and the team standard is a plain-text conventional-commit title with a short
-body describing what the branch changes.
+`feature/replica-routing` exists in the repository and contains two commits
+ahead of `main`. The team reviews only draft PRs first, and the team standard
+is a plain-text conventional-commit title with a short body describing what
+the branch changes.
+
+**Network actions must be skipped** — there is no network and no remote in
+this sandbox. Treat the branch as already pushed: do not `git push` or
+`git fetch`. Create the PR through the `gh` shim.
 
 The repository lives in the working directory. Run the fixture setup script to
 prepare it:
