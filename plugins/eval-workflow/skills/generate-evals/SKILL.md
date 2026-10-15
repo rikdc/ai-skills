@@ -169,12 +169,11 @@ Scenarios run in a sandbox without network or credentials.
    assert exit 0 and that the fixture state matches the task (e.g. the change
    is staged, the shim is executable). Remove the temp dirs afterwards
    (deleting them may need approval).
-4. Exercise the graded path, not just the setup: call each recording shim
-   the way a plausible agent would (`./bin/gh pr create ...`, with `./bin` on
-   PATH only for the duration of that command), using both flag styles, a
-   correct and an incorrect invocation, and confirm the recorded fields
-   distinguish them. Run the setup in both layouts (`inputs/` preserved and
-   flattened) when the harness's behaviour is unknown.
+4. Exercise the graded path, not just the setup: call each recording shim the
+   way a plausible agent would (`./bin/gh pr create ...`), using both flag
+   styles, a correct and an incorrect invocation, and confirm the recorded
+   fields distinguish them. Run the setup in both layouts (`inputs/`
+   preserved and flattened) when the harness's behaviour is unknown.
 5. For one representative scenario per unit type, play the intended
    solution path end-to-end yourself (produce the artifact the criteria
    grade) to prove the rubric is answerable, then clean up.

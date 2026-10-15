@@ -9,7 +9,7 @@
     },
     {
       "name": "Base branch set",
-      "description": "The create call specifies the base branch as main (record['base'] is 'main').",
+      "description": "record['base'] is 'main' - passed explicitly with --base or defaulted by the shim the way real gh uses the repository's default branch.",
       "max_score": 5
     },
     {

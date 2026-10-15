@@ -54,7 +54,7 @@
     },
     {
       "name": "Commit contains only the intended change",
-      "description": "The new commit carries the calculator.py fix and no compiled artefacts (`__pycache__/`, `*.pyc`) or other repository files it modified",
+      "description": "The new commit carries the calculator.py fix and nothing else: no compiled artefacts (`__pycache__/`, `*.pyc`) and no evidence file such as workflow.md. The fixture keeps both out of the index, so a skill-following run never stages them",
       "max_score": 5
     }
   ]

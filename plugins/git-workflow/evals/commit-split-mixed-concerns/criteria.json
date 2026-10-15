@@ -5,22 +5,17 @@
     {
       "name": "Multiple commits created",
       "description": "The repository has at least 2 new commits on top of the initial skeleton commit (i.e. git log shows 3 or more commits total), reflecting a split of the mixed concerns",
-      "max_score": 15
+      "max_score": 17
     },
     {
       "name": "Feature in its own commit",
       "description": "src/feature.py is introduced in a separate commit whose type prefix is 'feat'",
-      "max_score": 10
+      "max_score": 13
     },
     {
       "name": "Bug fix in its own commit",
       "description": "The whitespace-stripping change to src/parser.py is in a separate commit whose type prefix is 'fix'",
-      "max_score": 10
-    },
-    {
-      "name": "Docs change committed",
-      "description": "The README update is committed - either in its own 'docs' commit or alongside the feature commit whose settings it documents",
-      "max_score": 10
+      "max_score": 13
     },
     {
       "name": "No emoji in any commit message",
@@ -49,8 +44,8 @@
     },
     {
       "name": "All pending files committed",
-      "description": "git status shows every pending change to project files committed, apart from the commit-plan.md artifact the task asks the agent to leave in the working directory",
-      "max_score": 8
+      "description": "Every pending change is committed - the new src/feature.py, the src/parser.py whitespace fix and the docs/README.md update - with no modified or untracked project files left behind apart from the commit-plan.md artifact the task asks for",
+      "max_score": 10
     },
     {
       "name": "commit-plan.md present",
