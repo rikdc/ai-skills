@@ -4,10 +4,10 @@
 
 A previous, partial triage pass ran against the payments repository's PR
 before the reviewer pushed new feedback. The service lives in the working
-directory. Run `bash setup.sh` to prepare it: it creates the repo
+directory. Run `bash inputs/setup.sh` (or `bash setup.sh` if the fixture sits at the working-directory root) to prepare it: it creates the repo
 (`CLAUDE.md` conventions plus `src/handler.py`), provides
 `triage-report-previous.md` summarising what the earlier pass did, and
-installs a fake `gh` shim at `~/bin/gh` (put `~/bin` first on your PATH so
+installs a fake `gh` shim at `./bin/gh` (put `./bin` first on your PATH so
 the shim is used instead of any real `gh`). The shim answers the fetch
 calls from fixtures and records every WRITE action in `gh-record.json`,
 which already contains the previous pass's recorded actions.

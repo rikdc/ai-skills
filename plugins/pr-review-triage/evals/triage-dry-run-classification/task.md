@@ -3,9 +3,9 @@
 ## Background
 
 You are triaging review feedback on the payments service repository. The
-service lives in the working directory. Run `bash setup.sh` to prepare it:
+service lives in the working directory. Run `bash inputs/setup.sh` (or `bash setup.sh` if the fixture sits at the working-directory root) to prepare it:
 it creates the repo (`CLAUDE.md` conventions plus `src/handler.py` and
-`src/service.py`) and installs a fake `gh` shim at `~/bin/gh` (put `~/bin`
+`src/service.py`) and installs a fake `gh` shim at `./bin/gh` (put `./bin`
 first on your PATH so the shim is used instead of any real `gh`). The
 repository's open PR is #42 "Add payment processing endpoint" with four
 review comments from two reviewers.

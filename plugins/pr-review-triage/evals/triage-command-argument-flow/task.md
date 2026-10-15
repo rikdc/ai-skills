@@ -4,10 +4,10 @@
 
 You received the slash-command invocation `/triage 42 --dry-run` in the
 payments service repository. The service lives in the working directory.
-Run `bash setup.sh` to prepare it: it creates the repo (`CLAUDE.md`
+Run `bash inputs/setup.sh` (or `bash setup.sh` if the fixture sits at the working-directory root) to prepare it: it creates the repo (`CLAUDE.md`
 conventions plus `src/handler.py` and `src/service.py`), provides the
 offline GitHub state (the target PR #42 is "Add payment processing
-endpoint"), and installs a fake `gh` shim at `~/bin/gh` (put `~/bin` first
+endpoint"), and installs a fake `gh` shim at `./bin/gh` (put `./bin` first
 on your PATH so the shim is used instead of any real `gh`). Beware: the
 shim's `gh pr view` reports the *current branch's* PR, which is a different
 PR (#7) — the command's arguments are what decide the target.

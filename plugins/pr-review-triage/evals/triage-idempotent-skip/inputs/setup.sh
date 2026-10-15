@@ -6,8 +6,8 @@
 # so a dry-run triage can be graded by the absence of recorded actions.
 set -euo pipefail
 
-mkdir -p "$HOME/bin"
-cat > "$HOME/bin/gh" << 'SHIM'
+mkdir -p "./bin"
+cat > "./bin/gh" << 'SHIM'
 #!/usr/bin/env bash
 # Offline gh shim for triage scenarios.
 set -euo pipefail
@@ -110,9 +110,12 @@ PYEOF
   *) echo "gh $cmd: not supported in this scenario"; exit 1 ;;
 esac
 SHIM
-chmod +x "$HOME/bin/gh"
+chmod +x "./bin/gh"
 
 git init -q
+# Keep fixture files out of the repository's status, whichever layout the
+# harness uses (inputs/ preserved, or flattened into the working directory).
+printf 'inputs/\nbin/\nsetup.sh\n' >> .git/info/exclude
 git config user.email "payment-dev@example.com"
 git config user.name "Payment Dev"
 
@@ -198,6 +201,6 @@ rows.append({"action": "resolve", "query": "comment 202"})
 json.dump(rows, open("gh-record.json", "w"), indent=2)
 PYEOF
 
-echo "Repo ready: payments service + gh shim at $HOME/bin/gh (prepend ~/bin to PATH)."
+echo "Repo ready: payments service + gh shim at ./bin/gh (prepend ./bin to PATH)."
 echo "PR #42 'Add payment processing endpoint' has 3 top-level review comments: 201 (already accepted), 202 (already handled), 203 (new security finding)."
 echo "This fixture supports IDEMPOTENT re-triage: comments 201 and 202 were already handled in a previous pass (their prior actions are seeded in gh-record.json), comment 203 is new. The shim records any new action."

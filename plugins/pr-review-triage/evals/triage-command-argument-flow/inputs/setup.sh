@@ -6,8 +6,8 @@
 # so a dry-run triage can be graded by the absence of recorded actions.
 set -euo pipefail
 
-mkdir -p "$HOME/bin"
-cat > "$HOME/bin/gh" << 'SHIM'
+mkdir -p "./bin"
+cat > "./bin/gh" << 'SHIM'
 #!/usr/bin/env bash
 # Offline gh shim for triage scenarios.
 set -euo pipefail
@@ -110,9 +110,12 @@ PYEOF
   *) echo "gh $cmd: not supported in this scenario"; exit 1 ;;
 esac
 SHIM
-chmod +x "$HOME/bin/gh"
+chmod +x "./bin/gh"
 
 git init -q
+# Keep fixture files out of the repository's status, whichever layout the
+# harness uses (inputs/ preserved, or flattened into the working directory).
+printf 'inputs/\nbin/\nsetup.sh\n' >> .git/info/exclude
 git config user.email "payment-dev@example.com"
 git config user.name "Payment Dev"
 
@@ -181,6 +184,6 @@ git commit -q -m "chore: add offline gh fixtures for PR 42"
 
 echo '[]' > gh-record.json
 
-echo "Repo ready: payments service + gh shim at $HOME/bin/gh (prepend ~/bin to PATH)."
+echo "Repo ready: payments service + gh shim at ./bin/gh (prepend ./bin to PATH)."
 echo "PR #42 (named via the command arguments) has 6 comment objects: 4 top-level reviewer comments (101-104), 1 self-review by the PR owner (105), 1 reply in a thread (106)."
 echo "This fixture supports the /triage COMMAND with explicit arguments 42 --dry-run: gh pr view reports a different PR (7), so the argument decides the target. The shim records any write action."
