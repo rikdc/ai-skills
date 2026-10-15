@@ -25,6 +25,7 @@ ones.
 ## Workflow
 
 ### 1. Inventory the plugin
+
 1. Read `.claude-plugin/plugin.json`, the README, and the directory tree.
 2. Classify the content: `skills/<name>/SKILL.md`, `commands/*.md`,
    `hooks/*.sh` (or scripts exercised as hooks), or a mix.
@@ -34,6 +35,7 @@ ones.
    contract - but never let a scenario duplicate unit-level test coverage.
 
 ### 2. Standing structure, manifests and boundaries
+
 1. Scenarios live at the plugin root: `plugins/<plugin>/evals/<scenario>/`,
    beside `skills/` - never inside a skill directory and never at the
    repository root.
@@ -53,6 +55,7 @@ ones.
    one is absent.
 
 ### 3. Design scenarios per behaviour group
+
 1. Default three scenarios per unit: the happy path; an edge or trap case
    (boundary, refusal path, error handling); a formatting or anti-pattern
    guard. Two is the floor for tiny units.
@@ -97,7 +100,9 @@ ones.
    criterion.
 
 ### 4. Make it gradeable offline
+
 Scenarios run in a sandbox without network or credentials.
+
 1. `inputs/setup.sh` is POSIX bash: `#!/usr/bin/env bash`, `set -euo
    pipefail`, `git init -q` plus `git config user.email/user.name`, heredoc
    fixtures, quiet commits, and an echo of the final state. Deterministic,
@@ -147,6 +152,7 @@ Scenarios run in a sandbox without network or credentials.
    `plugins/security-hooks/evals/` for the pattern.
 
 ### 5. Verification ladder (run ALL before claiming done)
+
 1. Every `criteria.json`: `jq -e .` passes and
    `jq '[.checklist[].max_score] | add'` returns exactly 100.
 2. `tessl plugin lint <plugin>` reports valid (`tessl` must be on `PATH`).
@@ -170,11 +176,13 @@ Scenarios run in a sandbox without network or credentials.
    server-side, needs `tessl login`.
 
 ### 6. Commit
+
 Conventional commits, scoped to the plugin, no other files touched, do not
 push: `test(<plugin>): add eval scenarios for <units>`. Skill bodies and
 other plugin files stay untouched.
 
 ### 7. Batching across plugins (orchestrator notes)
+
 1. One worktree per plugin, branched off the commit that carries this skill
    (the current HEAD): `git worktree add .worktrees/eval-<plugin> -b
    evals/<plugin> HEAD`.
@@ -188,6 +196,7 @@ other plugin files stay untouched.
    make validate` on the merged result.
 
 ## Non-goals
+
 - Never grade behaviour the unit does not document; if a unit is too thin to
   evaluate, say so instead of padding.
 - No placeholder directories: a scenario without runnable inputs or an
