@@ -17,12 +17,12 @@ provided by a local simulation that has already been prepared (see below).
 1. Run the setup once (idempotent) from your working directory:
 
    ```bash
-   export PATH="$HOME/bin:$PATH"
+   export PATH="./bin:$PATH"
    bash inputs/setup.sh
    ```
 
    This installs recording shims for `curl` and the `kanban_comment` /
-   `kanban_block` / `kanban_complete` commands in `~/bin`, seeds the
+   `kanban_block` / `kanban_complete` commands in `./bin`, seeds the
    repository, and writes the card to `card.txt`. Read the card body first —
    every field the review needs (repo, PR number, base and head shas, clone
    URL) is in it.

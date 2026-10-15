@@ -19,7 +19,7 @@ that no review can land no matter how the request is shaped. Everything else
 1. Run the setup once (idempotent) from your working directory:
 
    ```bash
-   export PATH="$HOME/bin:$PATH"
+   export PATH="./bin:$PATH"
    bash inputs/setup.sh
    ```
 

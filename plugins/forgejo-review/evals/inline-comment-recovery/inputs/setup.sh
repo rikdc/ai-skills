@@ -11,18 +11,18 @@ if [ -f .forgejo-sim-ready ]; then
   exit 0
 fi
 
-mkdir -p "$HOME/bin" "$HOME/.forgejo-shim"
+mkdir -p bin .forgejo-shim
 sim_dir="$(pwd)/forgejo-sim"
 rm -rf "$sim_dir"
 mkdir -p "$sim_dir"
 
 # --- shims -----------------------------------------------------------------
 install_bins () {
-  mkdir -p "$HOME/bin"
-  cp -R inputs/shims/. "$HOME/bin/"
-  chmod +x "$HOME/bin/curl" "$HOME/bin/kanban_comment" \
-           "$HOME/bin/kanban_block" "$HOME/bin/kanban_complete" \
-           "$HOME/bin/.forgejo_shim.py"
+  mkdir -p bin
+  cp -R inputs/shims/. bin/
+  chmod +x "bin/curl" "bin/kanban_comment" \
+           "bin/kanban_block" "bin/kanban_complete" \
+           "bin/.forgejo_shim.py"
 }
 install_bins
 
@@ -86,7 +86,7 @@ base_sha="$(cat "$sim_dir/base_sha")"
 head_sha="$(cat "$sim_dir/head_sha")"
 
 # --- shim environment ------------------------------------------------------
-env_file="$HOME/.forgejo-shim/env"
+env_file=".forgejo-shim/env"
 cat > "$env_file" <<ENVEOF
 SIM=$sim_dir
 PR=42
@@ -118,4 +118,4 @@ echo "  clone URL:         $sim_dir/origin   (stand-in for the forgejo host)"
 echo "  diff fixture:      $sim_dir/pull-42.diff"
 echo "  graded records:    $(pwd)/forgejo-record.json, $(pwd)/kanban-record.json"
 echo "  shim mode:         always_422"
-echo "  PATH note:         prepend \$HOME/bin so the curl/kanban shim is used."
+echo "  PATH note:         prepend ./bin so the curl/kanban shim is used."

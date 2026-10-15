@@ -22,7 +22,7 @@ over-merge findings, and re-POST. Retry up to 3 times; never collapse the
 1. Run the setup once (idempotent) from your working directory:
 
    ```bash
-   export PATH="$HOME/bin:$PATH"
+   export PATH="./bin:$PATH"
    bash inputs/setup.sh
    ```
 

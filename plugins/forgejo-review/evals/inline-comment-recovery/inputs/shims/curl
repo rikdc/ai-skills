@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-exec python3 "$HOME/bin/.forgejo_shim.py" --mode api "$@"
+exec python3 "$(dirname "$0")/.forgejo_shim.py" --mode api "$@"

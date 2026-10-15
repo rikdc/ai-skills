@@ -6,7 +6,7 @@ Executed through tiny wrapper scripts on PATH:
     curl                              -> --mode api    (Forgejo REST API)
     kanban_comment|kanban_block|kanban_complete -> --mode kanban
 
-Configuration comes from $HOME/.forgejo-shim/env (written by inputs/setup.sh):
+Configuration comes from ../.forgejo-shim/env, relative to this script (written by inputs/setup.sh):
 
     SIM           absolute path of the simulation directory
     PR            pull request number
@@ -25,7 +25,7 @@ import sys
 
 def load_conf():
     conf = {}
-    with open(os.path.expanduser("~/.forgejo-shim/env")) as handle:
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, ".forgejo-shim", "env")) as handle:
         for line in handle:
             line = line.strip()
             if line and not line.startswith("#"):
