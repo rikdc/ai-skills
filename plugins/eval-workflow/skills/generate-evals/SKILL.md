@@ -69,6 +69,14 @@ ones.
    that any outcome satisfies (e.g. `git log -1`, which always prints
    something), the scenario cannot discriminate. Prefer countable checks
    (`git rev-list --count HEAD`, recorded fields) over "looks right" ones.
+6. Check the rubric against the end state the task itself asks for. A
+   criterion that a correct run cannot satisfy is broken: requiring a clean
+   working tree when the task tells the agent to leave an artifact
+   untracked, or requiring a heading the task's own final step moves away
+   from. Also check that the task does not demand behaviour the unit's
+   SKILL.md never documents (e.g. choosing a release version when the skill
+   only releases a version it is given) - if the behaviour is not
+   documented, hand it to the agent in the task instead of grading it.
 
 ### 4. Make it gradeable offline
 Scenarios run in a sandbox without network or credentials.
@@ -78,25 +86,35 @@ Scenarios run in a sandbox without network or credentials.
    executable (`chmod +x`). Keep the name `inputs/setup.sh` across scenarios
    and state the invocation tolerantly in task.md - `bash inputs/setup.sh`,
    or `bash setup.sh` if a harness flattens the fixture into the working
-   directory - so the instruction survives either layout.
+   directory - so the instruction survives either layout. Every checked-in
+   fixture file is either written by the script or read by it, never both: a
+   copy the script overwrites is dead weight that drifts silently.
 2. Build recording shims for external CLIs the agent would call (a `gh`
    shim that writes `title`, `body`, `draft`, `base` and `head` to
    `pr-record.json`), so the graded call is observable. See the git-workflow
    PR scenario. A shim must parse its CLI the way the real tool does: long
-   and short flags, `--flag=value`, and `-` for stdin. Record every field
-   the rubric grades, including values the tool infers rather than receives
-   as an argument (for example the branch `gh pr create` derives from the
-   working tree) - otherwise a correct invocation can be graded wrong.
-3. Require durable evidence artifacts in task.md (`workflow.md`,
+   and short flags, `--flag=value`, and `-` for stdin, taking the token after
+   a value-taking flag as that value even when it starts with `-`. Record
+   every field the rubric grades, including values the tool infers rather
+   than receives as an argument (the branch `gh pr create` derives from the
+   working tree) and flags whose effects the real tool computes (`--fill`
+   taking title and body from the branch's commits) - otherwise a correct
+   invocation can be graded wrong.
+3. Install shims inside the fixture (for example `./bin`) and keep them out
+   of the fixture's `git status` with `.git/info/exclude`. Never write to
+   `$HOME` or anywhere outside the scenario workspace: authors run every
+   setup script locally, so a `$HOME/bin` install silently replaces the
+   contributor's real tools, and a temp directory elsewhere does not undo it.
+4. Require durable evidence artifacts in task.md (`workflow.md`,
    `commit_log.txt`, plan files) when criteria need to reference the steps
    the agent took, not just the end state.
-4. State plainly in task.md that network actions must be skipped, and give
+5. State plainly in task.md that network actions must be skipped, and give
    the equivalent dry-run instruction instead.
-5. Fixture copies must not contaminate the graded repository state: when the
-   harness copies `inputs/` into the working tree, a fixture that runs
-   `git init` there leaves `inputs/` untracked. Exclude it (`printf 'inputs/\n'
-   >> .git/info/exclude`) or the "clean working tree" criteria fail on a
-   correct solution.
+6. The fixture's own files must not contaminate the graded repository state.
+   A setup that runs `git init` in the working tree leaves `inputs/` (and,
+   when a harness flattens the fixture, the setup script itself) untracked;
+   exclude them or the "clean working tree" criteria fail on a correct
+   solution.
 
 ### 5. Verification ladder (run ALL before claiming done)
 1. Every `criteria.json`: `jq -e .` passes and
@@ -111,6 +129,8 @@ Scenarios run in a sandbox without network or credentials.
 4. Exercise the graded path, not just the setup: run each recording shim the
    way a plausible agent would call it (both flag styles, both a correct and
    an incorrect invocation) and confirm the recorded fields distinguish them.
+   Run the setup in both layouts (`inputs/` preserved and flattened) when the
+   harness's behaviour is unknown.
 5. For one representative scenario per unit type, play the intended
    solution path end-to-end yourself (produce the artifact the criteria
    grade) to prove the rubric is answerable, then clean up.

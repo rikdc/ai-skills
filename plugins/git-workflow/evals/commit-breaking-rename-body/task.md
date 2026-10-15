@@ -22,7 +22,7 @@ appropriate message, following the team's standard commit workflow.
    change:
 
 ```
-bash inputs/setup_repo.sh  # or `bash setup_repo.sh` if the fixture sits at the working-directory root
+bash inputs/setup.sh  # or `bash setup.sh` if the fixture sits at the working-directory root
 ```
 
 This creates a `repo/` directory containing the project with one staged

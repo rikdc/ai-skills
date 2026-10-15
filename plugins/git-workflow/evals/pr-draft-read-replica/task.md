@@ -16,8 +16,8 @@ bash inputs/setup.sh  # or `bash setup.sh` if the fixture sits at the working-di
 ```
 
 This initialises the repository with `main` and the two branch commits, and
-installs a `gh` shim at `~/bin/gh` (put `~/bin` first on your PATH so the shim
-is used instead of any real `gh`). The shim records arguments to
+installs a `gh` shim at `./bin/gh` (prepend `./bin` to your PATH so the shim is
+used instead of any real `gh`). The shim records arguments to
 `pr-record.json` in the repository root with the fields `title`, `body`,
 `draft`, `base` and `head` - `head` is taken from `--head`, or, exactly as
 real `gh` does, from the branch you are on when you run it.

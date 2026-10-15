@@ -39,7 +39,7 @@
     },
     {
       "name": "Subject line under 60 characters",
-      "description": "Every new commit subject (the full first line including type prefix) is 60 characters or fewer",
+      "description": "Every new commit subject (the full first line including type prefix) is under 60 characters - 59 or fewer",
       "max_score": 7
     },
     {
@@ -49,7 +49,7 @@
     },
     {
       "name": "All pending files committed",
-      "description": "git status shows a clean working tree after the agent finishes — no uncommitted modifications or untracked source files remain",
+      "description": "git status shows every pending change to project files committed, apart from the commit-plan.md artifact the task asks the agent to leave in the working directory",
       "max_score": 8
     },
     {

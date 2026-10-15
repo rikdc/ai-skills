@@ -16,21 +16,21 @@ root) to create it; the changelog will be present in the state described above.
 
 ## Your Task
 
-Perform the maintenance actions the current state implies:
+The maintainer has decided the next release is `2.2.0`. Cut it following the
+team's changelog process:
 
-1. Decide from the changelog's state whether anything needs releasing now. If
-   so, cut the release following the team's process (verify unreleased
-   entries exist, version is unused and higher than the last, stamp the
-   current date, and leave a fresh empty `## [Unreleased]` above). Do not
-   tag, commit, or push unless asked.
+1. Run the process's precondition checks before writing: there must be
+   unreleased entries to release, `2.2.0` must not already appear in the file,
+   and it must be higher than the most recent version present.
+2. Stamp the release with today's date and keep the existing entries under
+   their categories.
+3. Leave a fresh empty `## [Unreleased]` section above the new release.
 
-2. Decide whether any additional maintenance action is warranted based purely
-   on the changelog content (e.g. a release already exists, or Unreleased is
-   empty, or the version sequence doesn't go backwards). Perform it, or state
-   plainly that no further action is needed and why.
+Do not tag, commit, or push.
 
 ## Output Specification
 
-- `CHANGELOG.md` reflecting whatever maintenance action was taken
-- `workflow.md` in the working directory describing which actions you took
-  and why, or why no further action was needed
+- `CHANGELOG.md` with a `## [2.2.0] - <today>` section containing the two
+  previously unreleased entries, and a fresh empty `## [Unreleased]` above it
+- `workflow.md` in the working directory recording the steps you took and the
+  precondition checks you ran
