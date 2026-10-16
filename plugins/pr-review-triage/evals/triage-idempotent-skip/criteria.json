@@ -18,9 +18,14 @@
       "max_score": 16
     },
     {
-      "name": "New follow-up registered once",
-      "description": "followups.json contains the error-handling follow-up for src/handler.py:9 (from the previous pass) exactly once, plus one follow-up entry for the SQL injection fix at src/handler.py:12.",
-      "max_score": 16
+      "name": "New follow-up registered",
+      "description": "followups.json contains a follow-up entry for the SQL injection fix at src/handler.py:12, added by this pass.",
+      "max_score": 10
+    },
+    {
+      "name": "Follow-up not duplicated",
+      "description": "followups.json still contains the pre-existing error-handling follow-up for src/handler.py:9 exactly once — the re-run did not add a second copy.",
+      "max_score": 6
     },
     {
       "name": "Report distinguishes skipped vs acted",
