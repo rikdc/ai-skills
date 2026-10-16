@@ -8,6 +8,9 @@ set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 
 git init -q
+# Keep fixture files out of the repository's status, whichever layout the
+# harness uses (inputs/ preserved, or flattened into the working directory).
+printf 'inputs/\nsetup.sh\n' >> .git/info/exclude
 git config user.email "dev@example.com"
 git config user.name "Dev"
 git checkout -q -b main
