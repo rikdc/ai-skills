@@ -1,0 +1,51 @@
+{
+  "context": "Tests whether the agent refuses to propagate an undefined request ('good documentation summaries') into a finished prompt: vagueness is captured as explicit assumptions or clarifying questions, the prompt replaces vague terms with concrete requirements, defines an error-handling path for unclear input, and avoids unqualified quality words.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Assumptions file present",
+      "description": "assumptions.md exists.",
+      "max_score": 8
+    },
+    {
+      "name": "Gaps surfaced as assumptions or questions",
+      "description": "assumptions.md states, for each key gap, either a concrete assumption or a clarifying question — no gap is just ignored.",
+      "max_score": 14
+    },
+    {
+      "name": "Output requirements made concrete",
+      "description": "The finished prompt defines what a summary must contain or how long it must be (e.g. max length, required elements), not just 'write a good summary'.",
+      "max_score": 14
+    },
+    {
+      "name": "Input format specified",
+      "description": "The prompt states what input the AI receives (e.g. raw technical documentation text) and how to process it.",
+      "max_score": 10
+    },
+    {
+      "name": "Error handling path defined",
+      "description": "The prompt states what to do when the input is unclear, empty, or invalid (e.g. ask for clarification, report invalid input).",
+      "max_score": 12
+    },
+    {
+      "name": "Success is verifiable",
+      "description": "The prompt defines how output quality is measured or validated (criteria the grader of the summary could check).",
+      "max_score": 12
+    },
+    {
+      "name": "No undefined vague words",
+      "description": "summary-prompt.md contains no unqualified 'good', 'better', 'properly', 'clearly' giving instructions without a definition attached.",
+      "max_score": 14
+    },
+    {
+      "name": "Prompt file is a usable prompt",
+      "description": "summary-prompt.md contains the finished prompt itself, ready to paste into an AI system — not notes about it.",
+      "max_score": 8
+    },
+    {
+      "name": "Evidence files only",
+      "description": "The working directory contains assumptions.md and summary-prompt.md as the deliverables (setup fixture may also exist).",
+      "max_score": 8
+    }
+  ]
+}

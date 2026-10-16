@@ -1,0 +1,56 @@
+{
+  "context": "Tests whether the agent executes the prompt-reviewer standard workflow on a deliberately flawed prompt: separates reasoning from the recorded report, cites the exact vague terms and missing requirements in the fixture, identifies the pattern, rates with a score, and provides concrete revised sections rather than generic advice.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Report file present",
+      "description": "review-report.md exists in the working directory.",
+      "max_score": 8
+    },
+    {
+      "name": "Quality score given",
+      "description": "The report includes an overall quality assessment with a score out of 10 (e.g. 'Quality Score: 4/10').",
+      "max_score": 10
+    },
+    {
+      "name": "Flags vague language",
+      "description": "The report calls out the fixture's vague terms (e.g. 'natural English question', 'relevant', 'reasonable') as ambiguous, quoting or paraphrasing them.",
+      "max_score": 13
+    },
+    {
+      "name": "Flags missing output format",
+      "description": "The report identifies that the prompt never defines the SQL output format (no dialect, no query/explanation structure).",
+      "max_score": 13
+    },
+    {
+      "name": "Flags missing examples",
+      "description": "The report identifies that the prompt contains no examples despite being few-shot-suitable, or assesses the example situation explicitly.",
+      "max_score": 10
+    },
+    {
+      "name": "Flags missing error handling",
+      "description": "The report identifies the missing edge-case/error-handling path (invalid SQL request, unanswerable question).",
+      "max_score": 10
+    },
+    {
+      "name": "Identifies and evaluates the pattern",
+      "description": "The report names the prompt pattern in use and says whether it fits the task (not just praises it).",
+      "max_score": 10
+    },
+    {
+      "name": "Prioritised by severity",
+      "description": "Findings are ordered critical → major → minor (as the command prescribes), not a flat list.",
+      "max_score": 10
+    },
+    {
+      "name": "Concrete revised sections",
+      "description": "The report includes revised prompt text (critical sections) that fixes at least the output-format problem, not just advice like 'add examples'.",
+      "max_score": 10
+    },
+    {
+      "name": "No imaginary features",
+      "description": "The review does not credit or criticise features the fixture does not have; findings are anchored in the file.",
+      "max_score": 6
+    }
+  ]
+}

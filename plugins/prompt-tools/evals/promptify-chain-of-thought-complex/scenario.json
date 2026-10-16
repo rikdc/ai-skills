@@ -1,0 +1,1 @@
+{"description":"Promptify pattern-selection case: for a multi-step triage task the agent must pick a reasoning pattern and author a chained-step prompt with an explicit final output and edge-case handling.","include":["./inputs"]}

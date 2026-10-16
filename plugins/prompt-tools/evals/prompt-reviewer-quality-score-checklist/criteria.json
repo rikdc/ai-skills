@@ -1,0 +1,51 @@
+{
+  "context": "Tests whether the agent produces the prompt-reviewer command's structured standard-mode report elements: a justified numeric quality score, the full best-practices checklist with every item marked, explicit pattern identification, strengths anchored in the fixture, and iteration-minded next steps.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Report file present",
+      "description": "catalogue-review.md exists in the working directory.",
+      "max_score": 10
+    },
+    {
+      "name": "Numeric score in X/10 form",
+      "description": "The report states the quality score explicitly as 'X/10' (e.g. 'Quality Score: 8/10').",
+      "max_score": 14
+    },
+    {
+      "name": "Score is critical, not auto-ten",
+      "description": "The score reflects real weaknesses found (e.g. missing error handling or no negative examples); a flat 10/10 with no findings is not grounded.",
+      "max_score": 12
+    },
+    {
+      "name": "Strengths section anchored in the fixture",
+      "description": "The strengths section points at concrete properties of the prompt (role assignment, explicit output structure, constraints) rather than generic praise.",
+      "max_score": 12
+    },
+    {
+      "name": "Full checklist completed",
+      "description": "The best-practices checklist is reproduced with each of its items marked done or not done (e.g. checkbox states) — not a summary sentence.",
+      "max_score": 16
+    },
+    {
+      "name": "Pattern identified",
+      "description": "The report names the prompt pattern in use (Structured Output) and says it fits the task.",
+      "max_score": 10
+    },
+    {
+      "name": "Score justified by checklist items",
+      "description": "The report connects strengths marked as done to the numeric score (explicit justification).",
+      "max_score": 12
+    },
+    {
+      "name": "Next steps are iteration-minded",
+      "description": "The next-steps section recommends testing with real inputs, iterating, and/or versioning as the command's post-review section prescribes.",
+      "max_score": 8
+    },
+    {
+      "name": "Prompt file untouched",
+      "description": "prompts/release-summary.md is unchanged from the fixture.",
+      "max_score": 6
+    }
+  ]
+}

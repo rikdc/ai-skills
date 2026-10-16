@@ -1,0 +1,51 @@
+{
+  "context": "Tests whether the agent executes the promptify workflow end-to-end: records a structured request analysis, picks a defensible documented pattern for a code-security-review request, and authors a complete prompt that a team could use unchanged (role assignment, concrete instructions, output format, constraints, verifiable quality criteria).",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Analysis file present",
+      "description": "analysis.md exists and contains a Purpose field describing what the AI should accomplish.",
+      "max_score": 10
+    },
+    {
+      "name": "Analysis covers inputs and outputs",
+      "description": "analysis.md states the Input (a Go source file) and the Output (a structured vulnerability report).",
+      "max_score": 10
+    },
+    {
+      "name": "Analysis names a documented pattern",
+      "description": "analysis.md picks exactly one of the documented patterns (Role-Based, Task-Oriented, Few-Shot Learning, Chain-of-Thought, Structured Output) and briefly justifies it.",
+      "max_score": 12
+    },
+    {
+      "name": "Generated prompt file present",
+      "description": "generated-prompt.md exists and contains a complete prompt, not notes about a prompt.",
+      "max_score": 10
+    },
+    {
+      "name": "Prompt assigns a specific role",
+      "description": "The prompt opens with a specific expert role/identity (e.g. 'You are a security engineer specialising in Go'), not a generic instruction.",
+      "max_score": 13
+    },
+    {
+      "name": "Prompt instructions are specific",
+      "description": "The instructions name the concrete vulnerability classes to analyse (e.g. authentication, authorization, input validation, data handling) or equivalent specific scope, not generic 'find bugs'.",
+      "max_score": 13
+    },
+    {
+      "name": "Prompt defines output format",
+      "description": "The prompt specifies an exact output format (e.g. markdown with severity/location/description/fix fields) the reviewing agent must follow.",
+      "max_score": 15
+    },
+    {
+      "name": "Prompt has constraints or quality criteria",
+      "description": "The prompt includes constraints (what NOT to do, boundaries) or explicit quality criteria for the report.",
+      "max_score": 10
+    },
+    {
+      "name": "No vague quality words",
+      "description": "The prompt does not use unqualified vague words like 'good', 'better', 'properly' without definition.",
+      "max_score": 7
+    }
+  ]
+}
