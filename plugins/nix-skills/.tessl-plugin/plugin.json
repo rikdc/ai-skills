@@ -1,0 +1,7 @@
+{
+  "name": "rikdc/nix-skills",
+  "version": "1.0.0",
+  "description": "Expert guidance on Nix, NixOS, and home-manager — expressions, flakes, packaging, secrets, and hardening",
+  "private": true,
+  "skills": "./skills/"
+}

@@ -1,0 +1,4 @@
+{
+  "description": "Commits a staged flake.lock change with a message whose body carries the update summary and a why-line for the pinned input.",
+  "include": ["./inputs"]
+}

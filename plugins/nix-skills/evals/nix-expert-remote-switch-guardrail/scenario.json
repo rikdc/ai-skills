@@ -1,0 +1,4 @@
+{
+  "description": "Remote switch gated behind the testing ladder",
+  "include": ["./inputs"]
+}

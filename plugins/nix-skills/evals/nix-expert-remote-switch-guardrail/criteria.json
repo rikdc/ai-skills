@@ -1,0 +1,51 @@
+{
+  "context": "Baseline failure mode: a generic agent answers 'your plan sounds reasonable, run switch and you can always roll back, and sure, free some disk with nix-collect-garbage' — direct-switch advice plus a blithe garbage-collection endorsement. The skill's documented rules change that output: the dry-activate/test rungs must run before any switch on a remote host that cannot be physically reached, nix-collect-garbage -d deletes every rollback target and must never be run as a first response or right after an unverified switch, and firewall/SSH changes go one at a time with a second session open. Items below score 0 on the baseline answer.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Verdict: switch-first is unsafe",
+      "description": "advice.md exists and states plainly that jumping straight to switch on an unreachable remote host is not safe, rather than endorsing the plan.",
+      "max_score": 10
+    },
+    {
+      "name": "Names the lockout risk",
+      "description": "The advice identifies what could lock them out: a bad networking or openssh change on a host with no physical access, before the reboot that rollback would otherwise rely on.",
+      "max_score": 12
+    },
+    {
+      "name": "Full ladder in order with commands",
+      "description": "The advice lists the ordered rungs dry-build, build, dry-activate, test, switch, each with its flake/nixos-rebuild command, without reordering.",
+      "max_score": 16
+    },
+    {
+      "name": "Each rung's proof explained",
+      "description": "The advice explains what each rung proves (evaluates, compiles, which units restart, activates without bootloader, makes boot default) — not just bare command names.",
+      "max_score": 12
+    },
+    {
+      "name": "Names dry-activate as the commonly skipped rung",
+      "description": "The advice explicitly calls out rung 3 (dry-activate) as the rung people usually skip and why it matters (it reveals postgresql/sshd-style restarts before they happen).",
+      "max_score": 12
+    },
+    {
+      "name": "Remote-specific safety net",
+      "description": "The advice requires building locally / pushing the closure with activation under a safety net (test --target-host with second SSH session open, or equivalent), and sequencing the openssh and firewall changes one at a time.",
+      "max_score": 12
+    },
+    {
+      "name": "Garbage collection danger stated",
+      "description": "The advice rejects running nix-collect-garbage -d before/after an unverified switch and explains it deletes every rollback target; frames disk cleanup as never a first response.",
+      "max_score": 14
+    },
+    {
+      "name": "Rollback commands provided",
+      "description": "The advice includes the rollback path: list-generations, switch --rollback (or switch-generation N) and the rule to keep two or three recent generations.",
+      "max_score": 10
+    },
+    {
+      "name": "Advisory-only, no fabricated runs",
+      "description": "The advice does not claim to have executed any rebuild against the host; commands are presented as what the colleague should run.",
+      "max_score": 2
+    }
+  ]
+}
