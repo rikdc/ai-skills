@@ -15,6 +15,9 @@ fi
 chmod +x hooks/*.sh
 
 git init -q repo
+# Keep fixture files out of the repository's status, whichever layout the
+# harness uses (inputs/ preserved, or flattened into the working directory).
+printf 'inputs/\nsetup.sh\n' >> repo/.git/info/exclude
 git -C repo config user.email agent@example.com
 git -C repo config user.name "Eval Fixture"
 mkdir -p repo/.claude repo/src

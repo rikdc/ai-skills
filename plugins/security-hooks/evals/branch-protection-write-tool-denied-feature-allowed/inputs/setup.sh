@@ -17,6 +17,9 @@ chmod +x hooks/*.sh
 make_repo() {
     local dir="$1"
     git init -q "$dir"
+    # Keep fixture files out of the repository's status, whichever layout
+    # the harness uses (inputs/ preserved, or flattened into the working dir).
+    printf 'inputs/\nsetup.sh\n' >> "$dir/.git/info/exclude"
     git -C "$dir" config user.email agent@example.com
     git -C "$dir" config user.name "Eval Fixture"
     mkdir -p "$dir/selective" "$dir/src"
