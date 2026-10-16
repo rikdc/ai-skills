@@ -1,0 +1,1 @@
+{"description": "Advisory Forgejo review where the Forgejo simulation rejects the first POST to the reviews endpoint with 422: the agent must recover per skill section 6 by recomputing inline positions from the diff hunks and re-POSTing the same review intact, without collapsing or dropping findings.", "include": ["./inputs"]}
