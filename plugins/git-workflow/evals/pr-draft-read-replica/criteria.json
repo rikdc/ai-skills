@@ -63,14 +63,9 @@
       "max_score": 6
     },
     {
-      "name": "No padding sections",
-      "description": "The body contains no 'Notes for reviewers', 'Future work', 'Impact' or risk-assessment sections beyond the Summary/Changes/Testing template.",
-      "max_score": 3
-    },
-    {
-      "name": "Body does not claim unverified behaviour",
-      "description": "The body does not assert behaviour or results that the branch does not demonstrate (e.g. claiming benchmark results that are not in the commits).",
-      "max_score": 7
+      "name": "No padding or unverified claims",
+      "description": "The body stays within the template - no 'Notes for reviewers', 'Future work' or 'Impact' sections - and asserts nothing the branch does not demonstrate (e.g. benchmark results that are not in the commits).",
+      "max_score": 10
     }
   ]
 }

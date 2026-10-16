@@ -1,7 +1,6 @@
 ---
 name: go-backend-implementor
 description: Expert Go software engineer for implementing production-grade backend services. Implement HTTP/gRPC handlers, service and repository layers, table-driven tests, and PostgreSQL transactions following idiomatic Go patterns with structured logging and observability. Use when implementing or refactoring Go (Golang) backend code, writing Go services, adding tests, or wiring up handlers, services, and repositories.
-description: Expert Go software engineer for implementing production-grade backend services. Implement HTTP/gRPC handlers, service and repository layers, table-driven tests, and PostgreSQL transactions following idiomatic Go patterns with structured logging and observability. Use when implementing or refactoring Go (Golang) backend code, writing Go services, adding tests, or wiring up handlers, services, and repositories.
 user-invocable: true
 argument-hint: "[task] [--service <name>] [--handler <name>] [--test <file>]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash(go test:*), Bash(go build:*), Bash(go fmt:*), Bash(go vet:*), Bash(go mod:*), Bash(make:*), Bash(git:*)

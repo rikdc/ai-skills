@@ -22,6 +22,7 @@ TEST_SCRIPT := $(TESTS_DIR)/test-scanner.sh
 TEST_PROTECT_BRANCH_SCRIPT := $(TESTS_DIR)/test-protect-main-branch.sh
 TEST_MARKETPLACE_SCRIPT := $(TESTS_DIR)/test-marketplace.sh
 TEST_CODEX_SKILLS_SCRIPT := $(TESTS_DIR)/test-codex-skills.sh
+TEST_EVALS_SCRIPT := $(TESTS_DIR)/test-evals.sh
 VALIDATE_SCRIPT := $(SCRIPTS_DIR)/validate-config.sh
 SYNC_CODEX_SKILLS_SCRIPT := $(SCRIPTS_DIR)/sync-codex-skills.sh
 
@@ -53,6 +54,9 @@ test: ## Run complete test suite
 	@echo
 	@echo -e "$(BLUE)🧪 Running Codex skill symlink tests...$(NC)"
 	@$(TEST_CODEX_SKILLS_SCRIPT)
+	@echo
+	@echo -e "$(BLUE)🧪 Running eval and skill quality gate...$(NC)"
+	@$(TEST_EVALS_SCRIPT)
 
 .PHONY: validate
 validate: ## Validate plugin manifest, hook scripts, and dependencies

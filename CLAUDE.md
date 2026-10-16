@@ -98,6 +98,7 @@ The project uses a simple, focused testing approach:
 
 - **Security Scanner Tests** (`tests/test-scanner.sh`): Validates core security scanner functionality including sensitive data detection and MCP tool filtering
 - **Protected Branch Tests** (`tests/test-protect-main-branch.sh`): Validates branch protection logic, tool blocking, and feature branch allowance
+- **Eval and Skill Quality Gate** (`tests/test-evals.sh`): Validates eval scenario layout, rubric arithmetic, fixture hygiene, plugin manifests, and skill frontmatter conventions — deterministic, no model needed
 - **Fast Execution**: Tests run in seconds and focus on essential functionality
 - **Test Coverage**: Both hooks have comprehensive test suites ensuring correct behavior
 
