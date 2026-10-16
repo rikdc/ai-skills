@@ -1,0 +1,1 @@
+{"description": "The PreToolUse protected-branch hook denies a Write targeting the main checkout through stdout JSON (exit 0) while the same Write against a linked feature-branch worktree is allowed silently", "include": ["./inputs"]}

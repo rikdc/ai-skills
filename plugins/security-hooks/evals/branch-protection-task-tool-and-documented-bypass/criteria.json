@@ -1,0 +1,51 @@
+{
+  "context": "Grades the protect-main-branch hook's Task-tool judgment on session cwd, the master deny case, and the documented ALLOW_PROTECTED_BRANCH_EDIT bypass that must be set in the hook process's own environment.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Three runs recorded",
+      "description": "record/task-main/, record/write-master/ and record/task-bypass/ each contain exit-code, stdout.txt and stderr.txt.",
+      "max_score": 12
+    },
+    {
+      "name": "Task on main denied with exit 0",
+      "description": "task-main exit-code is 0 while task-main/stdout.txt parses with jq as hookSpecificOutput.permissionDecision \"deny\".",
+      "max_score": 10
+    },
+    {
+      "name": "Task denial judged by session dir",
+      "description": "The task-main deny reason describes Task tool activity rather than a file that was edited \u2014 no file_path pretext.",
+      "max_score": 10
+    },
+    {
+      "name": "Write on master denied",
+      "description": "write-master/stdout.txt carries a deny decision whose reason names 'master'.",
+      "max_score": 13
+    },
+    {
+      "name": "Bypass allows task silently",
+      "description": "task-bypass exit-code is 0 and stdout.txt contains no hookSpecificOutput JSON.",
+      "max_score": 13
+    },
+    {
+      "name": "Bypass skipped at branch check",
+      "description": "record/protect-main-branch.log shows a bypass warning (ALLOW_PROTECTED_BRANCH_EDIT mention) rather than a second PROTECTED BRANCH VIOLATION for the bypass run.",
+      "max_score": 10
+    },
+    {
+      "name": "decisions.txt consistent",
+      "description": "record/decisions.txt records task-main deny, write-master deny, task-bypass allow \u2014 matching recorded hook behaviour.",
+      "max_score": 12
+    },
+    {
+      "name": "Bypass variable explanation correct",
+      "description": "record/decisions.txt names ALLOW_PROTECTED_BRANCH_EDIT and states it must be in the hook process's environment (setting it inline on the payload's task command has no effect).",
+      "max_score": 10
+    },
+    {
+      "name": "Fixtures untouched",
+      "description": "hooks/, payloads/ and both repositories remain as setup left them; protection was never disabled by editing files.",
+      "max_score": 10
+    }
+  ]
+}

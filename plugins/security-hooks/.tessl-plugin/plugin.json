@@ -1,0 +1,28 @@
+{
+  "name": "rikdc/security-hooks",
+  "description": "MCP security scanner and protected branch hooks for Claude Code",
+  "version": "1.1.1",
+  "private": true,
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${TESSL_PLUGIN_DIR}/hooks/mcp-security-scanner.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "^(Edit|Write|Bash|Task)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${TESSL_PLUGIN_DIR}/hooks/protect-main-branch.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
