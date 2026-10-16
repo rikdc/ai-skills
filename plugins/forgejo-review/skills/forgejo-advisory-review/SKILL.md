@@ -2,7 +2,7 @@
 name: forgejo-advisory-review
 description: Step-by-step procedure for producing ONE advisory COMMENT review on a Forgejo pull request — clone at the head sha, fetch the diff, apply general and language review criteria, post a single Reviews-API review with inline comments, recover from 422s, then verify and close the kanban card. Use when a kanban card assigns an advisory PR review on git.home.claydon.co.
 user-invocable: false
-allowed-tools: Read, Glob, Grep, Bash
+allowed-tools: Read, Glob, Grep, Bash(git:*), Bash(curl:*)
 ---
 
 # Forgejo advisory review — procedure

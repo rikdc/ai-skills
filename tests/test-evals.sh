@@ -41,12 +41,17 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --root)
-            ROOT="${2-}"
-            shift 2
-            ;;
-        --changes)
-            CHANGES_REF="${2-}"
+        --root | --changes)
+            if [[ $# -lt 2 || -z "$2" ]]; then
+                echo "test-evals: $1 needs a value" >&2
+                usage >&2
+                exit 2
+            fi
+            if [[ "$1" == "--root" ]]; then
+                ROOT="$2"
+            else
+                CHANGES_REF="$2"
+            fi
             shift 2
             ;;
         -h | --help)
@@ -65,6 +70,7 @@ cd "$ROOT" || {
     echo "test-evals: cannot enter $ROOT" >&2
     exit 2
 }
+ROOT="$(pwd)"
 
 # --- --changes: which skills and scenarios a ref touched ---------------------
 # Informational only: a reviewer, or an agent running on a contributor's
@@ -235,26 +241,40 @@ for scenario_dir in plugins/*/evals/*/; do
             findings+="$setup: writes outside the workspace (\$HOME) - authors run setups locally"$'\n'
         fi
 
-        if grep -q 'git init' "$setup"; then
-            grep -q 'git init -q' "$setup" ||
-                findings+="$setup: git init must be quiet (git init -q)"$'\n'
-            # A script that initialises the working directory must keep its own
-            # files out of the graded status; one that cd's into a subdirectory
-            # (a nested fixture repo) has nothing to exclude.
-            first_cd="$(grep -n '^[[:space:]]*cd ' "$setup" | head -1 | cut -d: -f1)"
-            first_init="$(grep -n 'git init' "$setup" | head -1 | cut -d: -f1)"
-            if [[ -z "$first_cd" || "$first_cd" -gt "$first_init" ]]; then
-                grep -q '\.git/info/exclude' "$setup" ||
-                    findings+="$setup: initialises the working directory without a .git/info/exclude for fixture files"$'\n'
-            fi
+        # Every git init must be quiet. A script that initialises the working
+        # directory must keep its own files out of the graded status; one that
+        # cd's into a subdirectory first (a nested fixture repo) has nothing to
+        # exclude. A cd back to the script's own location, or to . or .., is
+        # still the working directory.
+        init_report="$(awk '
+            /^[[:space:]]*#/ { next }
+            match($0, /(^|[;&|(])[[:space:]]*cd[[:space:]]+[^;&|)]+/) {
+                target = substr($0, RSTART, RLENGTH)
+                sub(/^.*cd[[:space:]]+/, "", target)
+                sub(/[[:space:]]+$/, "", target)
+                nested = (target !~ /dirname|\$0|BASH_SOURCE/ && target !~ /^"?\.\.?\/?"?$/)
+            }
+            /git init/ {
+                if ($0 !~ /git init[^;&|#]*[[:space:]](-q|--quiet)([[:space:];&|)]|$)/) print "loud " NR
+                if (!nested) top = 1
+            }
+            END { if (top) print "top" }
+        ' "$setup")"
+        while IFS= read -r loud; do
+            [[ -z "$loud" ]] && continue
+            findings+="$setup:${loud#loud }: git init must be quiet (git init -q)"$'\n'
+        done <<<"$(grep '^loud ' <<<"$init_report")"
+        if grep -qx 'top' <<<"$init_report"; then
+            grep -q '\.git/info/exclude' "$setup" ||
+                findings+="$setup: initialises the working directory without a .git/info/exclude for fixture files"$'\n'
         fi
 
         # Dead fixtures: every checked-in fixture file has to be used, otherwise
         # it is dead weight that drifts away from what the script writes.
-        for fixture in "$scenario"/inputs/*; do
+        for fixture in "$scenario"/inputs/* "$scenario"/inputs/.[!.]* "$scenario"/inputs/..?*; do
             base="$(basename "$fixture")"
             [[ "$base" == "setup.sh" ]] && continue
-            grep -q -- "$base" "$setup" ||
+            grep -qFw -- "$base" "$setup" ||
                 findings+="$fixture: nothing in setup.sh references it (dead fixture)"$'\n'
         done
     fi
@@ -295,11 +315,15 @@ for plugin_dir in plugins/*/; do
     elif ! jq -e . "$tessl" >/dev/null 2>&1; then
         findings+="$tessl: invalid JSON"$'\n'
     else
-        expected_name="${WORKSPACE}/${plugin}"
-        actual_name="$(jq -r '.name // ""' "$tessl")"
-        [[ "$actual_name" == "$expected_name" ]] ||
-            findings+="$tessl: name is '$actual_name' (expected '$expected_name')"$'\n'
-        [[ "$(jq -r '.private // true' "$tessl")" == "true" ]] ||
+        # Without a workspace there is no expected name; tessl.json has
+        # already failed above, so don't repeat that failure per plugin.
+        if [[ -n "$WORKSPACE" ]]; then
+            expected_name="${WORKSPACE}/${plugin}"
+            actual_name="$(jq -r '.name // ""' "$tessl")"
+            [[ "$actual_name" == "$expected_name" ]] ||
+                findings+="$tessl: name is '$actual_name' (expected '$expected_name')"$'\n'
+        fi
+        [[ "$(jq -r 'if has("private") then .private else true end' "$tessl")" == "true" ]] ||
             findings+="$tessl: private must be true for repository plugins"$'\n'
 
         if [[ -f "$claude" ]] && jq -e . "$claude" >/dev/null 2>&1; then
@@ -324,6 +348,7 @@ echo "🚀 Skills..."
 
 for skill_md in plugins/*/skills/*/SKILL.md; do
     skill_name="$(basename "$(dirname "$skill_md")")"
+    frontmatter=""
     findings=""
 
     # Frontmatter: exactly one name and one description key. A duplicated key is
@@ -331,33 +356,38 @@ for skill_md in plugins/*/skills/*/SKILL.md; do
     if [[ "$(head -1 "$skill_md")" != "---" ]]; then
         findings+="$skill_md: no YAML frontmatter"$'\n'
     else
-        frontmatter="$(awk 'NR == 1 { next } /^---[[:space:]]*$/ { exit } { print }' "$skill_md")"
-        name_keys="$(printf '%s\n' "$frontmatter" | grep -c '^name:')"
-        description_keys="$(printf '%s\n' "$frontmatter" | grep -c '^description:')"
-        [[ "$name_keys" == "1" ]] ||
-            findings+="$skill_md: $name_keys 'name:' keys in frontmatter (expected 1)"$'\n'
-        [[ "$description_keys" == "1" ]] ||
-            findings+="$skill_md: $description_keys 'description:' keys in frontmatter (expected 1)"$'\n'
+        frontmatter="$(awk 'NR == 1 { next } /^---[[:space:]]*$/ { closed = 1; exit } { print } END { if (!closed) print "\001unclosed" }' "$skill_md")"
+        if [[ "$frontmatter" == *$'\001unclosed' ]]; then
+            findings+="$skill_md: frontmatter is not closed (no second ---)"$'\n'
+            frontmatter=""
+        else
+            name_keys="$(printf '%s\n' "$frontmatter" | grep -c '^name:')"
+            description_keys="$(printf '%s\n' "$frontmatter" | grep -c '^description:')"
+            [[ "$name_keys" == "1" ]] ||
+                findings+="$skill_md: $name_keys 'name:' keys in frontmatter (expected 1)"$'\n'
+            [[ "$description_keys" == "1" ]] ||
+                findings+="$skill_md: $description_keys 'description:' keys in frontmatter (expected 1)"$'\n'
 
-        declared_name="$(printf '%s\n' "$frontmatter" | sed -n 's/^name:[[:space:]]*//p' | head -1)"
-        [[ "$declared_name" == "$skill_name" ]] ||
-            findings+="$skill_md: frontmatter name '$declared_name' does not match the directory '$skill_name'"$'\n'
+            declared_name="$(printf '%s\n' "$frontmatter" | sed -n 's/^name:[[:space:]]*//p' | head -1)"
+            [[ "$declared_name" == "$skill_name" ]] ||
+                findings+="$skill_md: frontmatter name '$declared_name' does not match the directory '$skill_name'"$'\n'
 
-        # The description may be inline or a YAML block scalar (">" / "|"), which
-        # spans the indented lines that follow it.
-        description="$(printf '%s\n' "$frontmatter" | sed -n 's/^description:[[:space:]]*//p' | head -1)"
-        case "$description" in
-            '>' | '>-' | '>+' | '|' | '|-' | '|+')
-                description="$(printf '%s\n' "$frontmatter" | awk '
-                    /^description:[[:space:]]*[|>]/ { collecting = 1; next }
-                    collecting && /^[[:space:]]+/ { sub(/^[[:space:]]+/, ""); printf "%s ", $0; next }
-                    collecting { exit }
-                ')"
-                ;;
-            *) ;;
-        esac
-        if (( ${#description} < 60 )); then
-            findings+="$skill_md: description is ${#description} characters - too short to carry activation triggers"$'\n'
+            # The description may be inline or a YAML block scalar (">" / "|"), which
+            # spans the indented lines that follow it.
+            description="$(printf '%s\n' "$frontmatter" | sed -n 's/^description:[[:space:]]*//p' | head -1)"
+            case "$description" in
+                '>' | '>-' | '>+' | '|' | '|-' | '|+')
+                    description="$(printf '%s\n' "$frontmatter" | awk '
+                        /^description:[[:space:]]*[|>]/ { collecting = 1; next }
+                        collecting && /^[[:space:]]+/ { sub(/^[[:space:]]+/, ""); printf "%s ", $0; next }
+                        collecting { exit }
+                    ')"
+                    ;;
+                *) ;;
+            esac
+            if (( ${#description} < 60 )); then
+                findings+="$skill_md: description is ${#description} characters - too short to carry activation triggers"$'\n'
+            fi
         fi
     fi
 
@@ -368,10 +398,19 @@ for skill_md in plugins/*/skills/*/SKILL.md; do
     # unbounded pattern grants far more than it looks like it does. Whether a
     # skill declares allowed-tools at all, and how narrowly, is a review
     # judgement - this gate rejects only the unbounded patterns.
-    for pattern in 'PATH=\*' 'Bash(\*)'; do
-        grep -q -- "$pattern" "$skill_md" &&
-            findings+="$skill_md: allowed-tools contains '$pattern' - it approves every command"$'\n'
-    done
+    # Read from the frontmatter only, inline or as a YAML list, so prose that
+    # mentions a pattern is not mistaken for a grant.
+    allowed_tools="$(printf '%s\n' "$frontmatter" | awk '
+        /^allowed-tools:/ { sub(/^allowed-tools:[[:space:]]*/, ""); print; collecting = 1; next }
+        collecting && /^[[:space:]]+-?[[:space:]]*/ { sub(/^[[:space:]]+-?[[:space:]]*/, ""); print; next }
+        collecting { exit }
+    ' | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//; s/^["'\'']//; s/["'\'']$//')"
+    while IFS= read -r tool; do
+        [[ -z "$tool" ]] && continue
+        if [[ "$tool" == "Bash" || "$tool" =~ ^Bash\([[:space:]]*:?[[:space:]]*\*[[:space:]]*\)$ || "$tool" == *"PATH=*"* ]]; then
+            findings+="$skill_md: allowed-tools contains '$tool' - it approves every command"$'\n'
+        fi
+    done <<<"$allowed_tools"
 
     # Dead pointers: repo paths a skill tells the agent to read must exist.
     # Only plugin paths: a worked example in prose (a hypothetical diff
@@ -383,7 +422,7 @@ for skill_md in plugins/*/skills/*/SKILL.md; do
         [[ "$path" == *"<"* || "$path" == *">"* || "$path" == *"*"* ]] && continue
         path="${path%%#*}"
         path="${path%%:*}"
-        [[ -e "$ROOT/$path" ]] ||
+        [[ -e "$path" ]] ||
             findings+="$skill_md: points at a path that does not exist: $path"$'\n'
     done <<<"$(grep -oE '`plugins/[^`]+`' "$skill_md" | tr -d '`')"
 
