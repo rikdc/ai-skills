@@ -26,7 +26,7 @@ directories.
 Run relevant checks before handing off changes:
 
 ```bash
-make test              # Hook tests, marketplace and Codex symlink consistency
+make test              # Hook, marketplace, Codex symlink, and eval/skill gate
 make validate           # Plugin manifest, scripts, and dependencies
 make lint               # ShellCheck/Markdown lint when installed
 make sync-codex-skills  # Regenerate .codex/skills/ after plugin skill changes

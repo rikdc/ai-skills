@@ -3,6 +3,11 @@
   "type": "weighted_checklist",
   "checklist": [
     {
+      "name": "workflow.md present",
+      "description": "workflow.md exists in the working directory, as the task's output specification asks for.",
+      "max_score": 5
+    },
+    {
       "name": "Release not cut",
       "description": "CHANGELOG.md has no new release section: '## [Unreleased]' still holds the two entries and no '## [2.1.0]' section was added or duplicated.",
       "max_score": 20
@@ -15,7 +20,7 @@
     {
       "name": "No changelog edits",
       "description": "CHANGELOG.md is byte-identical to the fixture state - no renamed Unreleased heading, no date stamp, no reordering, no whitespace churn.",
-      "max_score": 15
+      "max_score": 12
     },
     {
       "name": "Reason reported",
@@ -35,7 +40,7 @@
     {
       "name": "Entries preserved",
       "description": "The two Unreleased entries and the existing 2.1.0 section keep their wording and order.",
-      "max_score": 5
+      "max_score": 3
     }
   ]
 }

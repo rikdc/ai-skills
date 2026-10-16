@@ -8,7 +8,7 @@ Run everything through the Makefile:
 make test
 ```
 
-That runs the three suites below in order. Each is a standalone script, so an
+That runs the suites below in order. Each is a standalone script, so an
 individual suite can also be run directly.
 
 ## Test Files
@@ -52,6 +52,30 @@ failure rather than stopping at the first.
 
 ```bash
 ./tests/test-marketplace.sh
+```
+
+### `test-evals.sh`
+
+Deterministic checks over the eval scenarios and skills, with no model and no
+network, so it can run in CI on every pull request:
+
+- Scenario layout and naming (descriptive names, never `scenario-N`)
+- Rubric arithmetic — 8-13 checklist items whose `max_score` sums to 100
+- Fixture hygiene — one executable `inputs/setup.sh` that keeps its writes
+  inside the workspace and leaves the graded repository state clean
+- Plugin manifests — the tessl manifest matches the Claude manifest and the
+  workspace in `tessl.json`
+- Skill frontmatter — spec limits, duplicate keys, and dead path references
+
+Checks that need judgement — does a scenario discriminate, is a rubric fair to
+the unit it tests, is a recording shim faithful to the real CLI — are
+deliberately out of scope. Those need an LLM and run on a contributor's
+machine, not in public CI.
+
+```bash
+./tests/test-evals.sh
+./tests/test-evals.sh --root /path/to/copy     # check a copy of the repo
+./tests/test-evals.sh --changes origin/main    # list the skills/scenarios a ref touched
 ```
 
 ## Related Checks
