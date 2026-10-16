@@ -34,6 +34,7 @@ EOF
 # One repo, two views: main checkout plus a linked worktree on a feature
 # branch, exactly how a session editing "just a scratch copy" is judged.
 make_repo repo
+git -C repo branch -M main
 git -C repo branch feature/agent-work main
 # Worktree paths are resolved relative to the repo, so ../repo-feature lands
 # beside repo/ as the payloads expect.

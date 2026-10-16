@@ -27,6 +27,7 @@ EOF
 git -C repo add -A
 git -C repo commit -qm "chore: seed bash-gating fixture"
 # Branch about to be tampered with must exist for the payload to judge.
+git -C repo branch -M main
 git -C repo branch wip-lab main
 
 SANDBOX_ROOT=$(pwd)
