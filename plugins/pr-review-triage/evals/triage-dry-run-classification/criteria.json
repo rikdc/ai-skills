@@ -1,0 +1,51 @@
+{
+  "context": "Tests whether the agent can run the triage-reviews skill dry-run for PR 42: fetch the four review comments, classify each into one of the documented categories (security, correctness, error-handling, performance, design, testing, style, nit, praise, question), evaluate each against CLAUDE.md conventions and the actual code, and produce a summary report without performing any write action.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Report exists",
+      "description": "triage-report.md exists in the working directory and contains a PR header naming PR #42 or 'Add payment processing endpoint'.",
+      "max_score": 4
+    },
+    {
+      "name": "All comments covered",
+      "description": "The report covers all four review comments (ids 101, 102, 103, 104), each with a file/line reference or id.",
+      "max_score": 10
+    },
+    {
+      "name": "Security identified",
+      "description": "Comment 101 (string-interpolated SQL) is classified as security (or correctness) and its decision is accept.",
+      "max_score": 15
+    },
+    {
+      "name": "Naming rename rejected",
+      "description": "Comment 102 (rename process_payment to processPayment) is classified as style or nit, and its decision is reject with a reason citing the project's snake_case convention or ruff rule N802.",
+      "max_score": 15
+    },
+    {
+      "name": "Praise acknowledged",
+      "description": "Comment 103 is classified as praise and acknowledged (e.g. thank the reviewer), not fabricated into a task.",
+      "max_score": 10
+    },
+    {
+      "name": "Question answered or answered-acknowledged",
+      "description": "Comment 104 is classified as question with an answer or a statement of uncertainty, based on the actual code (the name comes from request.args).",
+      "max_score": 12
+    },
+    {
+      "name": "Classification grounded in code",
+      "description": "The report references the actual code at the commented locations (e.g. the interpolated query string in src/handler.py) rather than only quoting the comment text.",
+      "max_score": 11
+    },
+    {
+      "name": "Dry-run stop respected",
+      "description": "No write actions were performed: gh-record.json is absent or still an empty JSON list.",
+      "max_score": 10
+    },
+    {
+      "name": "Follow-up grouping noted for accepted items",
+      "description": "Accepted critical items are presented with a concrete follow-up proposal (e.g. a fix task for the SQL injection), though none was created.",
+      "max_score": 13
+    }
+  ]
+}

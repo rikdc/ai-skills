@@ -1,0 +1,51 @@
+{
+  "context": "Tests whether the agent can run the triage-reviews skill through to execution on an approved PR: accept the real security issue and register a tracked follow-up, reject the style/nit suggestion with a reply citing the project convention, thank the praise, answer the question, resolve handled threads, and confirm idempotent-quality action reporting.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Report exists with decisions",
+      "description": "triage-report.md exists and states for each of comments 101-104 a category and a decision (accept/reject/acknowledge) consistent with the skill's framework.",
+      "max_score": 10
+    },
+    {
+      "name": "Accept with reaction",
+      "description": "gh-record.json contains a react action with content +1 targeting comment 101 (the SQL injection finding).",
+      "max_score": 12
+    },
+    {
+      "name": "Follow-up item registered",
+      "description": "followups.json contains an item for the SQL injection fix referencing src/handler.py (line ~12) and the comment's html_url, with description and priority (critical/high).",
+      "max_score": 15
+    },
+    {
+      "name": "Reject reply cites convention",
+      "description": "gh-record.json contains a reply to comment 102 whose body cites the project's snake_case convention or ruff rule N802 (specific reason, not a generic refusal).",
+      "max_score": 15
+    },
+    {
+      "name": "Rejection reply tone",
+      "description": "The rejection reply is respectful and thanks the reviewer or offers further discussion, per the skill's tone guidance.",
+      "max_score": 5
+    },
+    {
+      "name": "Praise acknowledged with reply",
+      "description": "gh-record.json contains a reply to comment 103 (thank-you acknowledgement).",
+      "max_score": 9
+    },
+    {
+      "name": "Question answered",
+      "description": "gh-record.json contains a reply to comment 104 whose body answers from the code (the name is read from request.args) or flags uncertainty.",
+      "max_score": 10
+    },
+    {
+      "name": "Handled threads resolved",
+      "description": "gh-record.json contains resolve (minimise) actions for the rejected/praise/question threads (102, 103, 104) and does not resolve the accepted comment 101's thread.",
+      "max_score": 14
+    },
+    {
+      "name": "No stray actions",
+      "description": "No actions reference non-existent comment ids, and no duplicate react/reply/resolve for the same comment.",
+      "max_score": 10
+    }
+  ]
+}
