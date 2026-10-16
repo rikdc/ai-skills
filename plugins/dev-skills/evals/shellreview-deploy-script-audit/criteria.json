@@ -1,0 +1,71 @@
+{
+  "context": "Tests whether the agent reviews a deliberately flawed bash deploy script per the shell-script-reviewer skill: identifies the dialect, runs the static-analysis wrappers first (against the provided ShellCheck shim) and treats their codes as ground truth, then applies the documented manual categories in priority order (Security, Correctness, Portability, Style), writing review-report.md in the skill's output skeleton with severity grouping, context-specific explanations, concrete before/after fixes, named-authority grounding, summary tables, and no auto-fixing of the fixture.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Review report present",
+      "description": "review-report.md exists at the scenario working directory root and is a shell script review of deploy.sh (not empty, not unrelated content).\n",
+      "max_score": 5
+    },
+    {
+      "name": "Dialect identified as bash",
+      "description": "The report identifies the dialect as bash (e.g. a '**Dialect**: bash' header line) and shebang/line-count context is stated.",
+      "max_score": 5
+    },
+    {
+      "name": "eval on untrusted input flagged as top-severity Security",
+      "description": "The report flags `eval \"$task\"` on deploy.sh line 27 with Severity Critical or High and Category Security, placed first among the findings, with a context-specific risk sentence (arbitrary command execution from the CLI argument) and an allowlist-style fix (e.g. a case dispatch).",
+      "max_score": 12
+    },
+    {
+      "name": "Credential on the command line flagged as Security",
+      "description": "The report flags passing $WEBCONSOLE_TOKEN in the curl Authorization header as a Security finding with reasoning that the secret leaks via the process argument list (ps / /proc cmdline), and a fix that keeps the token off argv.",
+      "max_score": 8
+    },
+    {
+      "name": "Predictable temp file flagged with mktemp and trap fix",
+      "description": "The report flags /tmp/deploy.$stamp.log (predictable path in a shared directory, never cleaned up) as a Security finding and the fix uses mktemp plus a `trap ... EXIT` cleanup.",
+      "max_score": 8
+    },
+    {
+      "name": "Unchecked cd before destructive rm reported",
+      "description": "The report flags the unchecked `cd $dest` on line 11 as a Correctness finding with an explicit `cd ... || exit` (or `|| return`) check, explaining the script would run on in the wrong directory right before `rm -rf`; the review does NOT fix this by recommending adding set -e.",
+      "max_score": 10
+    },
+    {
+      "name": "Unquoted destructive expansions quoted or guarded",
+      "description": "The report flags the unquoted expansion before `rm -rf $dest/*` (and the adjacent cp path) with quoting (SC2086) and/or an `${var:?}` guard (SC2115) in the fix snippet.",
+      "max_score": 8
+    },
+    {
+      "name": "ls-parsing loop flagged with the documented fix",
+      "description": "The report flags `for dir in $(ls \"$RELEASE_DIR/pending\")` on line 30 citing SC2045 / BashPitfalls, and the proposed fix is a glob or `find ... -print0 | while IFS= read -r -d ''`, NOT merely double-quoting the $(ls ...) substitution.",
+      "max_score": 10
+    },
+    {
+      "name": "Style findings named",
+      "description": "The review reports the legacy backticks on line 19 (SC2006, replace with $(...)) and the missing `main` / `main \"$@\"` structure for a script with three functions (Google Shell Style Guide), as Style findings kept below severity of the security/correctness findings.",
+      "max_score": 9
+    },
+    {
+      "name": "Per-finding structure follows the output skeleton",
+      "description": "Every finding carries a Location as file:line, a Severity from Critical/High/Medium/Low, a Category from Security/Correctness/Portability/Style, a one-sentence risk specific to this script (not a generic rule restatement), and a concrete fix shown as Current/Fix code snippets.",
+      "max_score": 8
+    },
+    {
+      "name": "Summary count tables consistent",
+      "description": "The report ends with a summary count table by severity and one by category, and the counts are consistent with the findings listed; findings are grouped by severity with security/critical first.",
+      "max_score": 6
+    },
+    {
+      "name": "Findings grounded in named authorities",
+      "description": "Findings cite named authorities — specific ShellCheck codes (e.g. SC2086, SC2045, SC2006, SC2164/SC2115), BashPitfalls, the Google Shell Style Guide, or the security checklist — and the report distinguishes static-analysis-confirmed findings from manual/judgment findings where relevant.",
+      "max_score": 6
+    },
+    {
+      "name": "No auto-fix applied",
+      "description": "deploy.sh is unchanged relative to the baseline commit (git status shows no modification to deploy.sh; the baseline commit is intact) — the review only proposes diffs in the report.",
+      "max_score": 5
+    }
+  ]
+}

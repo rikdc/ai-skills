@@ -1,0 +1,71 @@
+{
+  "context": "Tests whether the agent, given a vague documentation request, identifies the audience first and selects the format that suits it (runbook for an on-call operator audience) instead of mechanically producing an OpenAPI/API doc from the developer README. Grades the recorded audience/format decision and the runbook against the documented runbook structure: ownership, health checks grounded in the real endpoint, common issues with diagnosis and resolution, monitoring, deployment/rollback, and escalation paths.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Decision note exists",
+      "description": "doc-choice.md exists in the repository root.",
+      "max_score": 8
+    },
+    {
+      "name": "Audience identified as operators",
+      "description": "doc-choice.md identifies the target audience as on-call engineers/operators, not developers or product.",
+      "max_score": 10
+    },
+    {
+      "name": "Format chosen is a runbook",
+      "description": "The chosen documentation type is a runbook / operational document.",
+      "max_score": 12
+    },
+    {
+      "name": "Format justification ties audience to format",
+      "description": "The rationale explains why a runbook fits on-call operations needs (incidents, health, escalation).",
+      "max_score": 6
+    },
+    {
+      "name": "Rejected alternative with reason",
+      "description": "doc-choice.md names at least one rejected alternative (e.g. API doc, onboarding guide) and why it does not fit the audience.",
+      "max_score": 5
+    },
+    {
+      "name": "Runbook document exists",
+      "description": "A runbook document exists (e.g. docs/notification-service-runbook.md).",
+      "max_score": 5
+    },
+    {
+      "name": "Service overview and ownership",
+      "description": "The runbook has a service overview section including ownership (owning team).",
+      "max_score": 7
+    },
+    {
+      "name": "Health checks grounded in real endpoint",
+      "description": "The health-check section documents the endpoint the code actually exposes (GET /healthz) rather than an invented one.",
+      "max_score": 10
+    },
+    {
+      "name": "Common issues cover the three incidents",
+      "description": "The runbook covers all three recurring issues from ops/incident-summary.md (worker backlog after marketing sends, SMTP provider timeouts, queue messages stuck retrying), each with diagnosis steps.",
+      "max_score": 11
+    },
+    {
+      "name": "Resolution steps are actionable",
+      "description": "Each common issue includes concrete resolution steps (commands/actions an operator can take), not just 'investigate'.",
+      "max_score": 8
+    },
+    {
+      "name": "Escalation and contacts present",
+      "description": "The runbook includes a contact/escalation path (who to page, provider contact as available in the fixture).",
+      "max_score": 7
+    },
+    {
+      "name": "Deployment and rollback expectations",
+      "description": "The runbook mentions deployment/rollback procedure or explicitly states it lives elsewhere (deploy repo), per the documented runbook structure.",
+      "max_score": 6
+    },
+    {
+      "name": "No onboarding content dumped",
+      "description": "The runbook does not contain developer onboarding material (installation steps, prerequisites) or a full OpenAPI schema dump irrelevant to operators.",
+      "max_score": 5
+    }
+  ]
+}

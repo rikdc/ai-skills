@@ -1,0 +1,56 @@
+{
+  "context": "Trap scenario: the source document is a raw product-review write-up whose requirement lines are deliberately vague ('should respond quickly', 'might fail — handle gracefully', 'maybe get cleaned up at some point') and whose undecided items (malware scanning, upload visibility) tempt the agent into either copying the ambiguity verbatim into the spec or silently promoting undecided items into firm requirements. Grades the specify skill's documented rules: no ambiguous language, all functional requirements testable, quantified performance targets, explicit error handling, and unresolved decisions recorded under Open Questions & Assumptions.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Spec with functional requirements",
+      "description": "spec.md exists in the repository root and contains a Functional Requirements section with FR-identifier-style requirements.",
+      "max_score": 8
+    },
+    {
+      "name": "No modal ambiguity in requirements",
+      "description": "Requirement statements (FR descriptions, processing steps, validation rules) contain no bare 'should', 'might', 'probably', 'maybe' or hedging such as 'I guess' or 'something like'.",
+      "max_score": 14
+    },
+    {
+      "name": "No unquantified adjectives in requirements",
+      "description": "No requirement relies on unquantified words such as 'quickly', 'fast', 'large', 'gracefully'; each such concept appears with a number or an exact behaviour instead.",
+      "max_score": 12
+    },
+    {
+      "name": "Upload size limit concrete",
+      "description": "A concrete maximum upload size is specified (e.g. 50 MB) together with the exact rejection behaviour (e.g. 413 Payload Too Large), not just 'reject files that are too big'.",
+      "max_score": 12
+    },
+    {
+      "name": "Latency target quantified",
+      "description": "The 'respond quickly' line becomes a numeric performance target (e.g. a p95 latency); since the design gives no figure, the chosen number is flagged as an assumption requiring validation rather than asserted as settled.",
+      "max_score": 12
+    },
+    {
+      "name": "Concurrency target quantified",
+      "description": "The 'thousand users' figure becomes a concrete concurrency/throughput target in the non-functional requirements, or is recorded as requiring validation — it is not dropped.",
+      "max_score": 10
+    },
+    {
+      "name": "Cleanup concretely resolved or open",
+      "description": "The vague cleanup line becomes either a concrete rule (e.g. delete unreferenced uploads after N days) or an explicit Open Question — it is never left as 'maybe cleaned up at some point'.",
+      "max_score": 10
+    },
+    {
+      "name": "Undecided scanning not promoted",
+      "description": "Malware scanning is not written as an unconditional firm requirement; it appears under Open Questions & Assumptions (or only as an explicitly conditional requirement).",
+      "max_score": 12
+    },
+    {
+      "name": "Error scenarios explicit",
+      "description": "Oversized, malformed/invalid, and storage-failure scenarios each have explicit handling (exact status codes or responses), not 'handle gracefully'.",
+      "max_score": 6
+    },
+    {
+      "name": "Chosen figures marked as assumptions",
+      "description": "Where the spec picks values the design did not settle (sizes, latency, concurrency, cleanup), they are marked as assumptions requiring validation (e.g. under Open Questions & Assumptions) rather than presented as settled requirements.",
+      "max_score": 4
+    }
+  ]
+}

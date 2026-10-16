@@ -1,0 +1,71 @@
+{
+  "context": "Tests whether the agent, acting as the manager skill for '/manager --plan', produces an execution plan artifact that follows the skill's documented structure: task analysis, phased breakdown in the documented phase order (specification with specify+mentor, task breakdown with taskify, parallel go-implementor tracks, review with go-review+mentor, documentation with document), explicit phase gates and track dependencies, and success criteria — all grounded in the provided design brief.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Plan artifact created",
+      "description": "execution-plan.md exists at the repository root and is non-trivial (not empty, not a stub).",
+      "max_score": 4
+    },
+    {
+      "name": "Task analysis present",
+      "description": "The plan opens with a task analysis covering the goal, scope (what is included/excluded from the design brief), and constraints (Postgres-only, env-flag rollout).",
+      "max_score": 10
+    },
+    {
+      "name": "Complexity assessment present",
+      "description": "The plan assesses complexity: estimated effort, technical complexity, and risk areas or dependencies that need to exist first.",
+      "max_score": 8
+    },
+    {
+      "name": "Phases follow documented order",
+      "description": "The plan is organised into phases matching the skill's template order: specification/planning, then task breakdown, then implementation, then review, then documentation — in that order, not reordered or merged away.",
+      "max_score": 12
+    },
+    {
+      "name": "Phase 1 assigns specify and mentor",
+      "description": "The specification phase assigns specify (turn the design brief into detailed specs) and mentor (architectural review) in parallel, per the template.",
+      "max_score": 8
+    },
+    {
+      "name": "Explicit phase gate before implementation",
+      "description": "The plan states implementation does not begin until the specification phase completes (a wait/gate line or equivalent), per the template's 'Wait for Phase 1 completion before proceeding'.",
+      "max_score": 8
+    },
+    {
+      "name": "Phase 2 assigns taskify",
+      "description": "The task-breakdown phase assigns taskify to convert the specs into structured tasks.",
+      "max_score": 6
+    },
+    {
+      "name": "Phase 3 has parallel implementation tracks",
+      "description": "The implementation phase defines multiple parallel go-implementor tracks covering the design brief's components, including a test track that is not serialised behind everything else.",
+      "max_score": 10
+    },
+    {
+      "name": "Track dependencies match the design",
+      "description": "Track dependencies are stated and consistent with the design brief's real chain: middleware depends on the key service/rate limiter, admin handlers depend on the middleware being in place, integration tests depend on store/service.",
+      "max_score": 10
+    },
+    {
+      "name": "Phase 4 review assignments",
+      "description": "The review phase assigns go-review for code quality and mentor for architectural correctness.",
+      "max_score": 7
+    },
+    {
+      "name": "Phase 5 documentation assignment",
+      "description": "The documentation phase assigns document for the API reference and runbook.",
+      "max_score": 5
+    },
+    {
+      "name": "Success criteria present",
+      "description": "The plan ends with a success criteria checklist covering implementation/testing, review, and documentation completion.",
+      "max_score": 6
+    },
+    {
+      "name": "No skill misassignment",
+      "description": "Work is matched per the decision framework: no phase asks go-implementor to do the code review or the architecture review, and no phase asks go-review or mentor to implement features.",
+      "max_score": 6
+    }
+  ]
+}

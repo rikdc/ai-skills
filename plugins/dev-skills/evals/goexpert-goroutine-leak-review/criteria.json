@@ -1,0 +1,56 @@
+{
+  "context": "Trap case: the fixture dangles a plausible-looking colleague patch (PROPOSED_FIX.md) whose every element violates a documented Go rule — sleep-race shutdown instead of context cancellation, closing a channel from the receiver, sync.WaitGroup.Add called inside the goroutine, and an unexplained `_` error discard. Grades whether the agent's recommendation.md refuses each violating element and proposes the documented alternatives: bounded goroutine lifetime answered by 'when does it exit and who waits', buffered channel of 1 or select on ctx.Done for the send, Add-before-go, and race-detector validation.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Recommendation artifact written",
+      "description": "recommendation.md exists in the repository root and gives a verdict on Sam's fix plus a corrected approach.",
+      "max_score": 5
+    },
+    {
+      "name": "Original goroutine identified as a leak",
+      "description": "The recommendation names the root cause: the goroutine has no bounded lifetime — no one can answer when it exits or who waits for it — because the send on the unbuffered channel blocks forever once the reader stops.",
+      "max_score": 12
+    },
+    {
+      "name": "Receiver-side close refused",
+      "description": "The recommendation explicitly rejects Sam's step 2 (the reader calling close(w.ch) so the send panics): channels are closed by the sending goroutine, never the receiver, and the panic-on-closed-send is not a shutdown mechanism.",
+      "max_score": 12
+    },
+    {
+      "name": "wg.Add inside the goroutine refused",
+      "description": "The recommendation explicitly rejects Sam's step 3 placement: WaitGroup.Add must be called before the go statement, never inside the goroutine body, or the counter races with Wait.",
+      "max_score": 10
+    },
+    {
+      "name": "Sleep-race shutdown refused",
+      "description": "The recommendation explicitly rejects Sam's step 1 (time.Sleep before the send to race shutdown): it does not bound the goroutine's lifetime and remains a leak whenever the timing loses; cancellation must be deterministic via ctx.Done/select.",
+      "max_score": 10
+    },
+    {
+      "name": "Documented fix proposed for the send",
+      "description": "The corrected approach uses the documented remedy: make the channel buffered (capacity 1 or more) so the sender can always deliver, and/or select on ctx.Done() alongside the send so the goroutine exits on cancellation.",
+      "max_score": 12
+    },
+    {
+      "name": "Corrected code snippet provided",
+      "description": "recommendation.md includes a corrected Go snippet for the watcher/send path (and the restart watchdog if kept with Add before go), not prose-only advice.",
+      "max_score": 12
+    },
+    {
+      "name": "Snippets follow the error rules",
+      "description": "Error handling in the corrected snippet wraps with %w, lowercase messages, no trailing punctuation, and logs-and-stops only at a real boundary — it does not copy the log-and-return duplication.",
+      "max_score": 8
+    },
+    {
+      "name": "Underscore discard called out",
+      "description": "The recommendation addresses Sam's step 4: an `_` error discard needs an explicit documented reason; 'so the linter stops complaining' is not one — either handle/log the Close error deliberately or state why it is safe to ignore.",
+      "max_score": 9
+    },
+    {
+      "name": "Race-detector validation required",
+      "description": "The recommendation requires running the race detector (go test -race ./...) before the fix is considered done, and does not claim the fix is verified when it was not run.",
+      "max_score": 10
+    }
+  ]
+}

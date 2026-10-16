@@ -1,0 +1,61 @@
+{
+  "context": "Tests whether the agent authors an Architecture Decision Record following the documented ADR template (metadata, Context and Problem Statement, Decision Drivers, Decision Outcome, Consequences split positive and negative) grounded in repository facts, choosing the option consistent with the decision drivers rather than the superficially simplest one.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "ADR file created",
+      "description": "docs/adr/ADR-002-use-redis-for-session-cache.md exists (or an ADR-002 file exists under docs/adr/).",
+      "max_score": 10
+    },
+    {
+      "name": "Heading follows house format",
+      "description": "The file starts with a '# ADR-002: <decision>' heading naming the chosen decision.",
+      "max_score": 10
+    },
+    {
+      "name": "Status and Date metadata",
+      "description": "The record has **Status** (e.g. Accepted/Proposed) and **Date** metadata lines like ADR-001.",
+      "max_score": 8
+    },
+    {
+      "name": "Context section grounded in repository facts",
+      "description": "The Context and Problem Statement section describes the per-process dict cache and the multi-instance deployment (three instances behind a load balancer) from the fixture.",
+      "max_score": 10
+    },
+    {
+      "name": "Decision Drivers present",
+      "description": "A Decision Drivers list with at least three bullets, including session state being shared/consistent across instances.",
+      "max_score": 10
+    },
+    {
+      "name": "Decision Outcome names one memo option",
+      "description": "The Decision Outcome section names exactly one candidate option from notes/cache-options.md (Redis or the in-process LRU).",
+      "max_score": 10
+    },
+    {
+      "name": "Choice consistent with drivers",
+      "description": "The chosen option is Redis (the only candidate satisfying the cross-instance and restart-survival drivers); choosing the in-process LRU against those drivers scores 0.",
+      "max_score": 12
+    },
+    {
+      "name": "Positive consequences present and factual",
+      "description": "A Positive consequences list states real benefits of the chosen option (e.g. shared state across instances, survives restarts) without inventing capabilities.",
+      "max_score": 7
+    },
+    {
+      "name": "Negative consequences present with a genuine downside",
+      "description": "A Negative consequences list includes at least one genuine downside of the chosen option (e.g. new infrastructure to operate, extra latency on the cache hop); a record that lists only positives scores 0.",
+      "max_score": 13
+    },
+    {
+      "name": "References ADR-001",
+      "description": "The record links to or explicitly references docs/adr/ADR-001-use-postgres-for-primary-store.md as a related decision.",
+      "max_score": 5
+    },
+    {
+      "name": "No invented facts",
+      "description": "The record does not assert things the fixture contradicts (e.g. claiming Redis is already deployed, or claiming the current cache is shared across instances).",
+      "max_score": 5
+    }
+  ]
+}

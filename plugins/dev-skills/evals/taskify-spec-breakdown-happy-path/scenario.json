@@ -1,0 +1,1 @@
+{"description": "Decompose a seeded service spec into an atomic, dependency-annotated task breakdown following the taskify structured task file format","include":["./inputs"]}

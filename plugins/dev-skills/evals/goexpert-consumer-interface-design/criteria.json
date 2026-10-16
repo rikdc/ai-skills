@@ -1,0 +1,61 @@
+{
+  "context": "Tests whether the agent's written design advisory (design.md) applies the documented Go decision rules: interfaces defined at the consumer, small and discovered not invented, constructors that accept interfaces and return concrete types, goroutines with bounded lifetimes driven by context cancellation and errgroup-style waiting, context as the first parameter of blocking calls, %w error wrapping with lowercase punctuation-free messages, and explicit trade-off statements. The fixture deliberately dangles a fat seven-method producer-side interface proposal as the tempting answer.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Advisory artifact written",
+      "description": "design.md exists in the repository root and addresses both the interface decision and the FlushLoop design.",
+      "max_score": 5
+    },
+    {
+      "name": "Interface belongs to the consumer",
+      "description": "The advisory recommends defining the ledger interface in the consuming package (internal/audit), not in the producer package (internal/ledger) as TEAM_NOTES.md proposed.",
+      "max_score": 12
+    },
+    {
+      "name": "Fat interface rejected",
+      "description": "The advisory explicitly identifies the seven-method LedgerStore proposal as an invented abstraction and advises against defining all seven methods up front; the interface should be discovered from what the audit package actually uses.",
+      "max_score": 12
+    },
+    {
+      "name": "Interface is small and focused",
+      "description": "The proposed interface contains only the method(s) the audit flusher needs (AppendEntries, or AppendEntries plus at most one other), not the full ledger surface.",
+      "max_score": 10
+    },
+    {
+      "name": "Constructor accepts interface, returns concrete",
+      "description": "The advisory shows or states that Collector (or its constructor) should accept the small interface as a parameter while returning the concrete *Collector type, not an interface.",
+      "max_score": 10
+    },
+    {
+      "name": "Flush loop uses context cancellation",
+      "description": "The flush-loop design exits via context cancellation (select on ctx.Done alongside the queue drain), not via time.Sleep polling, an ignore channel, or an unbounded for loop.",
+      "max_score": 12
+    },
+    {
+      "name": "Goroutine lifetime is bounded and stated",
+      "description": "The advisory states explicitly when the flush goroutine exits and who knows when it is done (e.g. errgroup g.Wait or a WaitGroup waited on by the caller / graceful-shutdown path).",
+      "max_score": 10
+    },
+    {
+      "name": "Context is first parameter of blocking calls",
+      "description": "In the proposed design or snippets, blocking calls (queue drain, ledger writes, shutdown wait) take context.Context as their first parameter; FlushLoop without a context is flagged as needing one.",
+      "max_score": 8
+    },
+    {
+      "name": "Error handling in snippets follows the wrapping rules",
+      "description": "Any error handling shown wraps with %w and lowercase messages without trailing punctuation; no %v wrapping that breaks the chain for wrapped internal errors, and no log-and-return of the same error.",
+      "max_score": 8
+    },
+    {
+      "name": "Trade-offs stated with a choice",
+      "description": "The advisory names the alternatives considered (e.g. interface location, batching vs single writes, tick-based vs drain-on-signal) and states which it would choose and why, not just a list of options.",
+      "max_score": 8
+    },
+    {
+      "name": "Leads with code",
+      "description": "design.md contains at least one Go code snippet making a non-obvious recommendation concrete (the interface definition and/or the flush loop).",
+      "max_score": 5
+    }
+  ]
+}

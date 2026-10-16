@@ -1,0 +1,66 @@
+{
+  "context": "Tests whether the agent decomposes a seeded service specification into a structured task breakdown that obeys the taskify skill's documented rules: atomic 2-4 hour tasks with a single outcome, explicit task-ID dependencies that resolve, testable checkbox acceptance criteria, files to modify, per-phase testing tasks, parallel tracks, and a critical path. Grades the written task-breakdown.md artifact only; no network actions.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Breakdown artifact exists with header metadata",
+      "description": "task-breakdown.md exists and carries the structured-format header: a 'Project Task Breakdown' title for the search service, the source spec referenced (search-service-spec.md), and a total effort estimate.",
+      "max_score": 6
+    },
+    {
+      "name": "Phases present and ordered foundation-first",
+      "description": "Tasks are grouped into named phases and the ordering starts with foundation work (schema/data layer) before dependent work (search API, integrations), with testing/deployment tasks in a later phase, not first.",
+      "max_score": 8
+    },
+    {
+      "name": "No task exceeds 4 hours",
+      "description": "Every task's effort estimate is at most 4 hours (or equivalently at most 1 day); no task is estimated at 8 hours, a multi-day chunk, or left unestimated.",
+      "max_score": 12
+    },
+    {
+      "name": "Every task states dependencies explicitly",
+      "description": "Each task lists its dependencies in the Dependencies field — concrete task IDs, or the literal 'None' for genuinely independent tasks; no task omits the dependency line.",
+      "max_score": 12
+    },
+    {
+      "name": "Dependency references resolve",
+      "description": "Every task ID referenced as a dependency exists in the breakdown (no dangling references to tasks that were never defined), and no task depends on a task that appears in a later phase in a way that contradicts the stated ordering.",
+      "max_score": 6
+    },
+    {
+      "name": "Tasks are atomic with single responsibility",
+      "description": "No task bundles unrelated spec components (e.g. one task covering both the indexing pipeline and the REST search endpoints, or schema plus repository plus API in a single task); each task has one clear outcome drawn from a single spec component.",
+      "max_score": 14
+    },
+    {
+      "name": "Acceptance criteria are testable checkboxes",
+      "description": "Each task has acceptance criteria in checkbox form that name specific, measurable outcomes (e.g. 'migration applies cleanly', 'endpoint returns 200 with query param q'); none of the criteria are vague one-liners like 'works correctly' or 'everything done'.",
+      "max_score": 10
+    },
+    {
+      "name": "Files to modify specified per task",
+      "description": "Each implementation task names the concrete files or paths it creates/changes (e.g. migrations file, repository package path, handler file, docs path); tasks are not left without a file-level target.",
+      "max_score": 8
+    },
+    {
+      "name": "Testing tasks included",
+      "description": "The breakdown contains testing work as tasks (unit tests and integration/E2E tests), not merely a note; testing coverage appears for the components the spec calls out (indexing, search API, rate limiting).",
+      "max_score": 8
+    },
+    {
+      "name": "Parallel work opportunities identified",
+      "description": "The breakdown identifies at least two parallel tracks of tasks that can proceed simultaneously (e.g. schema vs configuration, or docs independent of implementation).",
+      "max_score": 6
+    },
+    {
+      "name": "Critical path analyzed",
+      "description": "A critical path is stated as an ordered chain of task IDs from an early task to the final deployment/testing task, with its total effort given.",
+      "max_score": 5
+    },
+    {
+      "name": "Priority and size labels assigned",
+      "description": "Every task carries a priority label (critical/high/medium/low) and a size or effort label consistent with its estimate (e.g. size:small/medium); no task is missing these labels.",
+      "max_score": 5
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "context": "Tests whether the agent answers a junior engineer's anxious 'just tell me what to do differently' request without falling into the mentor skill's documented anti-patterns (prescriptive lecturing, dismissiveness, empty courteous praise) and instead delivers its documented balanced-feedback structure: specific affirmation, evidence-backed critiques, explained consequences, guiding questions, and an actionable next step.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Feedback artifact exists",
+      "description": "feedback.md is present in the repository root.",
+      "max_score": 5
+    },
+    {
+      "name": "Affirmation is specific and grounded",
+      "description": "The reply acknowledges good work with a concrete observation from the committed change (e.g. the run-window anchor idea, the log line, the worker drain structure), not generic praise like 'looks great' or 'nice job'.",
+      "max_score": 10
+    },
+    {
+      "name": "Critiques cite code evidence",
+      "description": "Each area for improvement is backed by specific evidence from handler.go (e.g. spawnUnbounded goroutine per request in Export, the unsynchronised queue slice mutated by request goroutines and the worker, no context/shutdown propagation) rather than vague discomfort.",
+      "max_score": 15
+    },
+    {
+      "name": "Each critique explains the why",
+      "description": "Every critique states the concrete consequence of shipping it (unbounded memory growth / goroutine leaks under bursts, a data race on the shared slice, queued or in-flight work lost on deploy or crash).",
+      "max_score": 15
+    },
+    {
+      "name": "Guiding questions instead of orders",
+      "description": "The reply poses at least two open questions for Sam to think through (mirroring the skill's Socratic examples: what is the maximum concurrency, how are goroutines prevented from leaking, what happens to queued work during deployment, could a worker pool fit, how is backpressure handled), phrased as questions rather than instructions.",
+      "max_score": 12
+    },
+    {
+      "name": "No prescriptive lecturing",
+      "description": "The reply does not mandate one implementation ('do it this way', 'you must', 'just replace X with Y'); it respects Sam's request for guidance by offering considerations and trade-offs instead of directives.",
+      "max_score": 8
+    },
+    {
+      "name": "Not dismissive",
+      "description": "The reply engages with the design rather than dismissing it; it never says the approach 'won't work' flatly or treats the engineer as the problem, and it acknowledges why the current design is attractive before probing it.",
+      "max_score": 8
+    },
+    {
+      "name": "Not empty courtesy",
+      "description": "The reply is not vague politeness: it does not withhold the real issues just because Sam asked for reassurance, and praise is never used as a substitute for naming problems.",
+      "max_score": 10
+    },
+    {
+      "name": "Actionable next step",
+      "description": "The reply closes with a concrete next step for Sam before the PR (e.g. pick a concurrency bound and a queue strategy, add shutdown handling, run a load/race check locally) with reasoning, without prescribing a single mandated change.",
+      "max_score": 12
+    },
+    {
+      "name": "No unverified claims",
+      "description": "The reply does not claim test runs, race-detector results, benchmarks, or other evidence the agent could not have produced in this sandbox; it stays grounded in the committed code.",
+      "max_score": 5
+    }
+  ]
+}
