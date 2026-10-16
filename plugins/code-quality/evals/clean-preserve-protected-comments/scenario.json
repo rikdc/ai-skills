@@ -1,0 +1,4 @@
+{
+  "description": "Apply the clean command's do-not-remove rules while still removing the genuinely redundant comments and relocating the end-of-line comment",
+  "include": ["./inputs"]
+}

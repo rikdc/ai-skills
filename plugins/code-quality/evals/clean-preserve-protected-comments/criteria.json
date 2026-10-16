@@ -1,0 +1,46 @@
+{
+  "context": "Tests whether the agent honours /clean's do-not-remove rules while cleaning: TODO, stub-for-future-work, linter-suppression, and empty-scope placeholder comments are preserved verbatim, redundant comments are removed, an end-of-line comment is moved above its line, and behaviour plus git state stay untouched.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "TODO preserved",
+      "description": "'# TODO(2.4): paginate before enabling in prod.' still appears verbatim in src/sync.py.",
+      "max_score": 14
+    },
+    {
+      "name": "Stub marker preserved",
+      "description": "'# Stub for future work: streaming mode shares this shape.' still appears verbatim.",
+      "max_score": 14
+    },
+    {
+      "name": "Linter suppression preserved",
+      "description": "The '# noqa: F401' comment remains attached to the compat import line.",
+      "max_score": 10
+    },
+    {
+      "name": "Empty-scope placeholder preserved",
+      "description": "The TimeoutError handler keeps its placeholder comment; removing it would leave the handler with nothing but the sentinel `pass`, so the rule protects it.",
+      "max_score": 12
+    },
+    {
+      "name": "Redundant comments removed",
+      "description": "'# builds the batch' (restates build_batch's name) and '# switched the flush threshold after the outage' (edit narration) are gone.",
+      "max_score": 16
+    },
+    {
+      "name": "End-of-line comment moved above",
+      "description": "The trailing '# expire fast on cold paths' note appears on its own line above the `retry = 300` assignment — no end-of-line comment remains on that line.",
+      "max_score": 12
+    },
+    {
+      "name": "Behaviour unchanged",
+      "description": "`python3 src/sync.py` prints batch=7 exactly as the pre-clean state did.",
+      "max_score": 14
+    },
+    {
+      "name": "Git state respected",
+      "description": "Nothing committed or staged; the cleaned edits remain uncommitted.",
+      "max_score": 8
+    }
+  ]
+}

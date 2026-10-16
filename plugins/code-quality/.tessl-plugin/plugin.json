@@ -1,0 +1,7 @@
+{
+  "name": "rikdc/code-quality",
+  "description": "Code quality analysis, review, and cleanup commands",
+  "version": "1.0.0",
+  "private": true,
+  "commands": "./commands/"
+}

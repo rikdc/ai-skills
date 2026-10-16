@@ -1,0 +1,4 @@
+{
+  "description": "Apply the clean command's removal rules to uncommitted edits: strip redundant comments, move an end-of-line comment above its line, preserve protected comments, keep behaviour identical",
+  "include": ["./inputs"]
+}

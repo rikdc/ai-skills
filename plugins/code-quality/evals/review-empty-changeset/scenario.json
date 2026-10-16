@@ -1,0 +1,4 @@
+{
+  "description": "Determine that the default review scope is empty, report it honestly in the structured format, and refuse to invent findings",
+  "include": ["./inputs"]
+}
