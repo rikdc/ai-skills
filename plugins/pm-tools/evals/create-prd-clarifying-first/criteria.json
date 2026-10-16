@@ -1,0 +1,51 @@
+{
+  "context": "Tests whether the agent follows the documented order of operations of the PRD rule: clarifying questions before document generation when the user has provided no answers. Grades the question set for coverage of the rule's listed areas, letter/number option formatting for easy selection, and absence of a premature PRD file under /tasks/.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "clarifying-questions.md exists",
+      "description": "The file clarifying-questions.md exists in the working directory and contains the questions asked.",
+      "max_score": 10
+    },
+    {
+      "name": "Covers problem/goal",
+      "description": "At least one question addresses the problem the feature solves or its main goal (e.g. why failed syncs happen, what retry changes).",
+      "max_score": 12
+    },
+    {
+      "name": "Covers target user",
+      "description": "At least one question identifies the primary user of the feature.",
+      "max_score": 10
+    },
+    {
+      "name": "Covers core functionality",
+      "description": "At least one question probes the key actions the feature must perform (e.g. retry policy, schedule, failure modes).",
+      "max_score": 12
+    },
+    {
+      "name": "Covers acceptance criteria",
+      "description": "At least one question asks how success will be measured or what counts as the feature working.",
+      "max_score": 10
+    },
+    {
+      "name": "Covers scope or edge cases",
+      "description": "At least one question asks about non-goals/scope boundaries or edge cases (e.g. partial syncs, repeated failures).",
+      "max_score": 10
+    },
+    {
+      "name": "Options use letter/number lists",
+      "description": "Questions offer options as lettered or numbered selections so the user can answer with a short choice, per the rule's formatting instruction.",
+      "max_score": 12
+    },
+    {
+      "name": "No PRD file created",
+      "description": "No file matching /tasks/prd-*.md exists anywhere in the working directory; the PRD was not drafted before answers arrived.",
+      "max_score": 16
+    },
+    {
+      "name": "No implementation attempted",
+      "description": "No source code or implementation artifacts were created; only the question artifact exists (plus unchanged fixture files).",
+      "max_score": 8
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+{"description": "Agent produces only Phase 1 parent tasks from a PRD and stops with the documented 'Go' confirmation question instead of generating sub-tasks", "include": ["./inputs"]}

@@ -1,0 +1,46 @@
+{
+  "context": "Tests whether the agent targets the PRD rule's stated audience: requirements that are explicit, unambiguous and free of filler jargon, with concrete testable statements rather than vague 'should' prose, and no implementation started.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "PRD at documented path and filename",
+      "description": "tasks/prd-error-rate-alerting.md exists.",
+      "max_score": 15
+    },
+    {
+      "name": "Required sections present",
+      "description": "The PRD includes Introduction/Overview, Goals, User Stories, Functional Requirements, Non-Goals, Success Metrics and Open Questions.",
+      "max_score": 10
+    },
+    {
+      "name": "Requirements concrete not vague",
+      "description": "Functional requirements state exact behaviour with concrete numbers from the fixture (fifteen-minute sustained window, webhook delivery), not open-ended gestures like 'alerts when errors are high'.",
+      "max_score": 20
+    },
+    {
+      "name": "No weasel words",
+      "description": "The requirements contain none of: 'as appropriate', 'leverage', 'as needed', 'and so on', 'best-effort', without a defined fallback, 'should consider'.",
+      "max_score": 15
+    },
+    {
+      "name": "Each requirement single-verifiable",
+      "description": "Each functional requirement is a single testable statement; no requirement bundles three or more unrelated behaviours.",
+      "max_score": 12
+    },
+    {
+      "name": "Requirements answerable by junior dev",
+      "description": "The requirements avoid unexplained internal jargon; any necessary domain term is either defined inline or listed in a considerations section.",
+      "max_score": 10
+    },
+    {
+      "name": "Non-Goals manages scope",
+      "description": "Non-Goals explicitly excludes things adjacent to the feature (e.g. UI alerts, auto-remediation) per the fixture's scope answers.",
+      "max_score": 10
+    },
+    {
+      "name": "No implementation started",
+      "description": "No source code files were created or modified outside tasks/ .",
+      "max_score": 8
+    }
+  ]
+}

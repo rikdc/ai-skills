@@ -1,0 +1,46 @@
+{
+  "context": "Tests whether the agent enforces the process-tasks approval gate against a blanket 'everything approved in advance' instruction: no next sub-task is started, the next-in-line sub-task is identified, and the refusal plus its reason and the required continuing condition are recorded in a durable artifact.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "decision.md exists",
+      "description": "decision.md exists in the working directory and records the decision.",
+      "max_score": 10
+    },
+    {
+      "name": "Names the next sub-task",
+      "description": "decision.md identifies sub-task 2.2 as the next one per the task list's ordering.",
+      "max_score": 15
+    },
+    {
+      "name": "Refuses the blanket approval",
+      "description": "decision.md states that 'everything approved in advance' does not satisfy the rule, which requires an explicit 'yes' or 'y' after each sub-task pause.",
+      "max_score": 20
+    },
+    {
+      "name": "States the required condition",
+      "description": "decision.md tells the user exactly what unblocks work: a fresh 'yes'/'y' after the pause.",
+      "max_score": 15
+    },
+    {
+      "name": "No 2.2 implementation",
+      "description": "No source changes implementing the role-mapping sync (sub-task 2.2) exist; src/ matches the fixture state.",
+      "max_score": 15
+    },
+    {
+      "name": "No 3.1 implementation",
+      "description": "No work on the reporting CLI (sub-task 3.1) was begun or marked.",
+      "max_score": 5
+    },
+    {
+      "name": "Task list untouched",
+      "description": "tasks/tasks-prd-rbac-migration.md is byte-identical to the fixture (2.1 already [x]; nothing else flipped).",
+      "max_score": 15
+    },
+    {
+      "name": "No premature test or commit step",
+      "description": "No test runs, staging, or commits were performed - none should occur without an implemented, user-approved sub-task.",
+      "max_score": 5
+    }
+  ]
+}

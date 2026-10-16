@@ -1,0 +1,56 @@
+{
+  "context": "Tests whether the agent, with Go confirmation recorded, produces the final task list following the documented output format: Relevant Files section with per-file rationale, Notes section, and checkbox Tasks section with numbered parent tasks and nested sub-tasks derived from the PRD.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Final task list exists at documented filename",
+      "description": "tasks/tasks-prd-kyc-refresh.md exists (tasks- plus the PRD base name).",
+      "max_score": 10
+    },
+    {
+      "name": "Relevant Files section present",
+      "description": "A '## Relevant Files' section lists candidate files to create or modify.",
+      "max_score": 10
+    },
+    {
+      "name": "Each file has a rationale",
+      "description": "Every Relevant Files entry carries a one-line why-it-matters description (e.g. 'Contains the main component for this feature').",
+      "max_score": 10
+    },
+    {
+      "name": "Test files paired",
+      "description": "Files likely to need unit tests list a corresponding test file (or the Notes section explains where tests live).",
+      "max_score": 10
+    },
+    {
+      "name": "Notes section present",
+      "description": "A '### Notes' section exists, giving practical guidance (e.g. how to run the test suite).",
+      "max_score": 5
+    },
+    {
+      "name": "Tasks section checkbox format",
+      "description": "A '## Tasks' section uses '- [ ] 1.0 Parent' and nested '- [ ] 1.1' sub-task checkbox lines.",
+      "max_score": 15
+    },
+    {
+      "name": "Existing parents preserved",
+      "description": "The partial file's parent task titles/threading is kept or seamlessly refined, not discarded wholesale with unrelated restructuring.",
+      "max_score": 10
+    },
+    {
+      "name": "Sub-tasks cover the PRD",
+      "description": "Every parent task has actionable sub-tasks that trace to the PRD's requirements (document ingestion, watchlist refresh scheduling, status API, audit log).",
+      "max_score": 15
+    },
+    {
+      "name": "Sub-tasks sized for a junior dev",
+      "description": "Sub-tasks are concrete implementation steps small enough for a junior developer to execute, not reworded parent tasks.",
+      "max_score": 10
+    },
+    {
+      "name": "No code written",
+      "description": "No implementation files were created; the deliverable is the task list only.",
+      "max_score": 5
+    }
+  ]
+}

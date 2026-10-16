@@ -1,0 +1,61 @@
+{
+  "context": "Tests whether the agent generates the PRD file exactly at the documented location and filename, with every required section of the rule's PRD structure in place, numbered functional requirements that reflect the collected answers, a scope-managing Non-Goals section, measurable Success Metrics and an Open Questions section, without starting implementation.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "PRD at documented path and filename",
+      "description": "tasks/prd-expense-report-export.md exists (the prd- prefix plus the feature name, inside tasks/).",
+      "max_score": 10
+    },
+    {
+      "name": "Introduction/Overview present",
+      "description": "The PRD opens with an overview describing the feature and the problem it solves, stating the goal.",
+      "max_score": 8
+    },
+    {
+      "name": "Goals section present",
+      "description": "A Goals section lists specific, measurable objectives for the feature.",
+      "max_score": 10
+    },
+    {
+      "name": "User Stories present and grounded",
+      "description": "User Stories follow the 'As a [user], I want [action] so that [benefit]' narrative and match the answers fixture's target user.",
+      "max_score": 12
+    },
+    {
+      "name": "Functional Requirements numbered and explicit",
+      "description": "Functional Requirements are numbered and written as explicit must-statements in clear language a junior developer can follow.",
+      "max_score": 15
+    },
+    {
+      "name": "Requirements reflect the answers",
+      "description": "The requirements incorporate the fixture's answers (manager-facing CSV export, month selection) rather than inventing unrelated scope.",
+      "max_score": 10
+    },
+    {
+      "name": "Non-Goals section present",
+      "description": "A Non-Goals (Out of Scope) section states what the feature will not include, keeping the scope bounded.",
+      "max_score": 10
+    },
+    {
+      "name": "Success Metrics present and measurable",
+      "description": "A Success Metrics section states how success will be measured (targets not vague affirmations).",
+      "max_score": 8
+    },
+    {
+      "name": "Open Questions section present",
+      "description": "An Open Questions section lists remaining questions or areas needing clarification.",
+      "max_score": 5
+    },
+    {
+      "name": "Optional sections not faked",
+      "description": "Design Considerations / Technical Considerations are either substantively addressed (markdown/pdf rendering, file storage, date handling) or omitted entirely - not empty stub headings.",
+      "max_score": 5
+    },
+    {
+      "name": "No implementation started",
+      "description": "No source code files outside tasks/ were created or modified; the PRD documents the feature only.",
+      "max_score": 7
+    }
+  ]
+}

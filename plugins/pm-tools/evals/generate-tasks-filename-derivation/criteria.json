@@ -1,0 +1,46 @@
+{
+  "context": "Tests whether the agent derives the output filename exactly from the input PRD's base name per the generate-tasks rule, writes it in the /tasks directory even though the PRD itself is nested there, and does not disturb an unrelated stale planning file.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "Correct derived filename",
+      "description": "The output is saved as tasks/tasks-prd-spare-parts-tracker.md — 'tasks-' + the PRD base name including the prd- prefix.",
+      "max_score": 20
+    },
+    {
+      "name": "No invented filenames",
+      "description": "No output files named tasks-todo.md (modified), tasks-final.md, tasks-checklist.md or similar non-derived names were created.",
+      "max_score": 15
+    },
+    {
+      "name": "Output inside tasks/",
+      "description": "The task list is written inside the tasks/ directory, next to the PRD, not at the workspace root.",
+      "max_score": 10
+    },
+    {
+      "name": "Input PRD untouched",
+      "description": "tasks/prd-spare-parts-tracker.md is unchanged.",
+      "max_score": 10
+    },
+    {
+      "name": "Stale file untouched",
+      "description": "tasks/tasks-todo.md still contains its original content (a leftover list about thermostat firmware); it was not overwritten or deleted.",
+      "max_score": 15
+    },
+    {
+      "name": "Complete task list produced",
+      "description": "The generated file includes parent tasks with nested sub-tasks, a Relevant Files section, and a Notes section.",
+      "max_score": 15
+    },
+    {
+      "name": "Sub-tasks trace to the PRD",
+      "description": "The tasks cover the PRD's functional requirements: stock level sensors, reorder thresholds, low-stock alerts.",
+      "max_score": 10
+    },
+    {
+      "name": "No code written",
+      "description": "No implementation files were created outside tasks/.",
+      "max_score": 5
+    }
+  ]
+}
