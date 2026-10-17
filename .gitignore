@@ -10,6 +10,9 @@ tests/output/
 tests/**/test-results.log
 lint-report.txt
 
+# Eval run output (scripts/eval-run.sh)
+results/
+
 # claudelint cache
 .claudelint-cache/
 

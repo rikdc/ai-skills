@@ -87,3 +87,16 @@ CI:
 make lint          # ShellCheck, markdownlint, and claudelint
 make validate      # Plugin manifest, hook scripts, and dependencies
 ```
+
+## Checks That Need a Model
+
+Reviewing a scenario or skill with judgement, and running an eval, need a model,
+so they run on a contributor's machine rather than in CI:
+
+```bash
+scripts/eval-run.sh --selftest                 # runner plumbing, no model
+scripts/eval-run.sh --plugin <plugin> --scenario <scenario> --agent-cmd 'claude -p'
+```
+
+See `plugins/eval-workflow/skills/review-evals/SKILL.md` for how the pending
+criteria of a run get graded.

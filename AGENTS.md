@@ -34,6 +34,15 @@ make sync-codex-skills  # Regenerate .codex/skills/ after plugin skill changes
 
 `jq`, `grep`, `awk`, and `mktemp` are required for the security-hook tooling.
 
+Checks that need a model - reviewing a skill or scenario with judgement, and
+running an eval - happen on a contributor's machine, never in CI:
+
+```bash
+scripts/eval-run.sh --selftest     # exercise the runner with no model
+scripts/eval-run.sh --plugin <plugin> --scenario <scenario> --agent-cmd 'claude -p'
+tests/test-evals.sh --changes origin/main   # what a ref touched
+```
+
 ## Boundaries
 
 - Keep Claude plugin manifests and hooks unchanged unless the task explicitly
