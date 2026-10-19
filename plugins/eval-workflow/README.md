@@ -64,9 +64,15 @@ scripts/eval-run.sh --plugin code-quality --scenario review-empty-changeset \
 
 `skills/<name>` copies that skill directory, `commands/<name>` copies only
 that command file into the namespaced commands directory, and `hooks/<name>`
-installs nothing because hook scenarios invoke the hook themselves. An unknown
-unit, or a unit the plugin does not ship, fails before any run. Without
-`--unit`, the with-arm keeps installing every skill and command in the plugin.
+stages the plugin's current `hooks/` directory and patterns file for the
+fixture to copy; hook scenarios invoke the hook themselves. A scenario with
+`"mode": "functional"` (all current hook scenarios) runs only the with arm and
+reports an absolute score: it exercises the current plugin source directly and
+does not claim a with/without contribution. A comparison-mode hook scenario
+uses the current source in the with arm and a disabled no-op control in the
+without arm. An unknown unit, or a unit the plugin does not ship, fails before
+any run. Without `--unit`, the with-arm keeps installing every skill and
+command in the plugin.
 
 The workspace `HOME` starts empty, so tools that write to `$HOME` land in the
 workspace rather than your home directory. That redirection is not filesystem
@@ -163,9 +169,12 @@ Each suite writes one directory under `results/eval-suite/`:
 
 `--resume --out DIR` skips a scenario only when its result files exist **and**
 its fingerprint still matches. It also requires the same units, agent, arm,
-runs, timeout, skill directory and auth mode. The fingerprint covers the
-scenario and the plugin's skills, commands, hooks and manifest, so editing a
-unit reruns that plugin's scenarios.
+runs, timeout, skill directory, auth mode and judge command. The fingerprint
+covers the scenario and the plugin's skills, commands, hooks and manifest, so
+editing a unit reruns that plugin's scenarios. A different judge is refused:
+pass `--regrade` to replace the existing judgements with the new judge's.
+Each accepted judgement records its judge command and grader version, so stale
+grades cannot be attributed to the current judge.
 
 A mechanical score is not a verdict. By default the suite exits non-zero only
 when a scenario fails to run; `--strict` additionally fails when criteria are
@@ -307,6 +316,9 @@ scripts/eval-grade.sh --suite results/eval-suite/<id> \
 
 Grading can run later against any suite; re-running the suite with `--resume`
 folds accepted judgements into the percentages without rerunning the agent.
+`judge-result.json` records the judge command and grader version next to each
+accepted judgement. Reusing a grade with a different judge, or with a changed
+grader, is refused; pass `--regrade` to replace it.
 
 Usage (as agent skills): `generate-evals plugins/<name>` and
 `review-evals <pr-number>`; see `skills/*/SKILL.md`.

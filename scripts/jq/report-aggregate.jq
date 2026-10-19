@@ -81,10 +81,10 @@
     | [ $scenarios[] as $scenario
         | $scenario.criteria[]
         | . + {plugin: $scenario.plugin, scenario: $scenario.scenario} ] as $criteria
-    | (([$scenarios[].criteria_count] | add // 0) * $configured_runs
-       * (if $arm == "both" then 2 else 1 end)) as $expected_cells
+    | (([$scenarios[] | .criteria_count * $configured_runs * .arm_count] | add // 0)) as $expected_cells
     | ([ $scenarios[].runs[] | (.scored | length) ] | add // 0) as $scored_cells
     | ([ $scenarios[] | select(.status == "not-comparable") ] | length) as $not_comparable
+    | ([ $scenarios[] | select(.functional == true) ] | length) as $functional_count
     | ([ $scenarios[] | select(.status == "runner-failed") ] | length) as $failed_scenarios
     | ([ $scenarios[].runs[] | select(.status != "ok") ] | length) as $failed_runs
     | (($suite_json[0].counts.runner_failures // 0)) as $suite_failures
@@ -96,10 +96,12 @@
     | ([$criteria[] | select(.delta != null and (.delta | if . < 0 then -. else . end) <= eps)] | length) as $tied
     | ([$criteria[] | select(.delta != null and .delta < -eps)] | sort_by(.delta)) as $regressions
     | {
-        with: ([$scenarios[].arms.with.percent_mean] | mean_present),
-        without: ([$scenarios[].arms.without.percent_mean] | mean_present),
-        delta: ([$scenarios[].delta | select(. != null)] | mean),
+        with: ([$scenarios[] | select(.functional != true) | .arms.with.percent_mean] | mean_present),
+        without: ([$scenarios[] | select(.functional != true) | .arms.without.percent_mean] | mean_present),
+        delta: ([$scenarios[] | select(.functional != true) | .delta | select(. != null)] | mean),
         n: $configured_runs,
+        functional: $functional_count,
+        functional_with: ([$scenarios[] | select(.functional == true) | .arms.with.percent_mean] | mean_present),
         pending_points: ([$scenarios[].pending_points] | add // 0),
         pending_criteria: ([$scenarios[].pending_criteria] | add // 0),
         runner_failures: $runner_failures,
@@ -107,10 +109,10 @@
         failed_runs: $failed_runs,
         results_failures: $results_failures,
         not_comparable: $not_comparable,
-        with_min: ([$scenarios[] | select(.arms.with.percent_min != null) | .arms.with.percent_min] | min),
-        with_max: ([$scenarios[] | select(.arms.with.percent_max != null) | .arms.with.percent_max] | max),
-        without_min: ([$scenarios[] | select(.arms.without.percent_min != null) | .arms.without.percent_min] | min),
-        without_max: ([$scenarios[] | select(.arms.without.percent_max != null) | .arms.without.percent_max] | max),
+        with_min: ([$scenarios[] | select(.functional != true) | select(.arms.with.percent_min != null) | .arms.with.percent_min] | min),
+        with_max: ([$scenarios[] | select(.functional != true) | select(.arms.with.percent_max != null) | .arms.with.percent_max] | max),
+        without_min: ([$scenarios[] | select(.functional != true) | select(.arms.without.percent_min != null) | .arms.without.percent_min] | min),
+        without_max: ([$scenarios[] | select(.functional != true) | select(.arms.without.percent_max != null) | .arms.without.percent_max] | max),
         coverage_percent: (if $expected_cells > 0 then ($scored_cells * 100 / $expected_cells) else 0 end),
         scored_criteria_cells: $scored_cells,
         expected_criteria_cells: $expected_cells,
@@ -125,8 +127,18 @@
        and ($totals.with_min <= $totals.without_max)
        and ($totals.without_min <= $totals.with_max)) as $ranges_overlap
     | (if $totals.delta == null then
-           {state: "incomplete",
-            reason: "no scenario has a paired with/without result; both arms must run"}
+           (if $totals.functional > 0
+                and $totals.runner_failures == 0 and $totals.failed_runs == 0
+                and $totals.pending_points == 0 and $totals.not_comparable == 0
+            then {state: "functional",
+                  reason: "functional scenarios report absolute scores; there is no with/without delta"}
+            elif $totals.functional > 0 then
+                {state: "incomplete",
+                 reason: "functional scenarios still have failures or unjudged criteria"}
+            else
+                {state: "incomplete",
+                 reason: "no scenario has a paired with/without result; both arms must run"}
+            end)
        elif $totals.runner_failures > 0 or $totals.failed_runs > 0 or $totals.pending_points > 0 or $totals.not_comparable > 0 then
            {state: "incomplete",
             reason: "runner failures or unjudged criteria remain; a verdict would be made up"}
@@ -145,8 +157,9 @@
            {state: "inconclusive", reason: "positive mean but at least one criterion regressed"}
        end) as $verdict
     | ([$scenarios[].runs[]]) as $all_runs
-    | ([$all_runs[] | select(.arm == "with")]) as $with_runs
-    | ([$all_runs[] | select(.arm == "without")]) as $without_runs
+    | ([$scenarios[] | select(.functional != true) | .runs[]]) as $comparison_runs
+    | ([$comparison_runs[] | select(.arm == "with")]) as $with_runs
+    | ([$comparison_runs[] | select(.arm == "without")]) as $without_runs
     | ([$all_runs[].duration_seconds] | map(select(. != null)) | sum_present) as $agent_seconds
     | ([$all_runs[].judge_duration_seconds] | map(select(. != null)) | sum_present) as $judge_seconds
     | (cost_stats($with_runs)) as $cost_with

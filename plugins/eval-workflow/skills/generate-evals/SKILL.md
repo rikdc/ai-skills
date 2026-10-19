@@ -82,7 +82,10 @@ ones.
      exactly the selected units in its with-arm, so the mapping is what makes
      `make eval SKILL=<name>` or `UNIT=commands/<name>` a per-unit experiment.
      Every declared unit must exist in the plugin - `make test` fails
-     otherwise.
+     otherwise. A hook scenario that invokes the hook directly is a
+     functional test: add `"mode": "functional"` so the runner stages the
+     current plugin source and runs only the with arm. A hook scenario without
+     a mode compares the current source with a disabled no-op control.
    - `criteria.json`: `{"context", "type": "weighted_checklist",
      "checklist": [...]}` with 8-13 items whose `max_score` sums to exactly
      100. Every item must be gradeable from observable state: file presence

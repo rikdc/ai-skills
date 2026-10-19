@@ -71,6 +71,8 @@
         | {
             plugin: $plugin,
             scenario: $scenario,
+            mode: $mode,
+            functional: ($mode == "functional"),
             status: (if all($runs[]; .status == "ok") then "ok" else "runner-failed" end),
             runs: $runs,
             arms: {
@@ -80,7 +82,10 @@
             pending: ([$runs[].pending] | add // 0),
             judged: (([$runs[] | select(.judged != null)] | length) == ($runs | length)),
             delta: (
-                [($runs | arm_stats("with").percent), ($runs | arm_stats("without").percent)]
-                | if .[0] == null or .[1] == null then null else (.[0] - .[1]) end
+                if $mode == "functional" then null
+                else
+                    [($runs | arm_stats("with").percent), ($runs | arm_stats("without").percent)]
+                    | if .[0] == null or .[1] == null then null else (.[0] - .[1]) end
+                end
             )
         }

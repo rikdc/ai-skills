@@ -11,6 +11,10 @@
 # user's privileges, so it can read and write absolute host paths and reach
 # the network. Use a container or VM when a run must be isolated.
 #
+# A scenario with "mode": "functional" exercises the current plugin source
+# directly and runs only the with arm. Hook scenarios use this because they
+# invoke the hook themselves; they report an absolute score, not a delta.
+#
 # The rest of a rubric needs judgement, so runs stop there and leave a grading
 # request behind: the criteria a script did not cover, plus the evidence. The
 # review-evals skill, or you, does that part.
@@ -364,6 +368,22 @@ for required in "$TASK" "$CRITERIA" "$SCENARIO_JSON" "$SETUP"; do
     [[ -e "$required" ]] || die "scenario is incomplete: $required is missing"
 done
 
+# A functional scenario has no with/without comparison: it exercises the
+# current plugin source directly and reports an absolute score. A comparison
+# scenario runs both arms.
+MODE="$(jq -r '.mode // "comparison"' "$SCENARIO_JSON")"
+case "$MODE" in
+    comparison | functional) ;;
+    *) die "scenario mode must be comparison or functional: $MODE" ;;
+esac
+if [[ "$MODE" == "functional" ]]; then
+    case "$ARM" in
+        both) ARM=with ;;
+        without) die "functional scenarios have no without arm; use --arm with or --arm both" ;;
+        *) ;;
+    esac
+fi
+
 # A unit is what the with-arm installs. It must name something the plugin
 # actually ships, so a typo cannot silently turn an experiment back into an
 # install-everything run.
@@ -397,13 +417,57 @@ for unit in ${UNITS[@]+"${UNITS[@]}"}; do
 done
 UNITS=(${SEEN_UNITS[@]+"${SEEN_UNITS[@]}"})
 
+# Hook scenarios invoke the hook themselves, so the with-arm stages the
+# current plugin source for the fixture to copy. A declared hook unit is what
+# identifies the scenario, whether or not --unit was passed.
+HOOK_SCENARIO=0
+while IFS= read -r declared; do
+    [[ -n "$declared" ]] || continue
+    [[ "$declared" == hooks/* ]] || continue
+    unit_exists "$declared" ||
+        die "scenario declares unknown hook unit '$declared' for plugin '$PLUGIN'"
+    HOOK_SCENARIO=1
+done < <(jq -r '(.units // [.unit] // [])[] | select(. != null and . != "")' "$SCENARIO_JSON")
+
 echo "🧪 $PLUGIN/$SCENARIO"
-echo "   arms: $ARM   runs per arm: $RUNS   agent: $AGENT_CMD"
+echo "   mode: $MODE   arms: $ARM   runs per arm: $RUNS   agent: $AGENT_CMD"
 if ((${#UNITS[@]} > 0)); then
     echo "   units: ${UNITS[*]}"
 fi
 
 RESULTS=()
+
+# Stage the hook source the fixture will copy into its workspace. The with arm
+# gets the current plugin source, so an edit to a hook is exercised rather
+# than a stale fixture copy. The without arm of a comparison-mode hook
+# scenario gets a disabled control with the same filenames.
+stage_hook_source() {
+    local sandbox="$1" arm="$2"
+    local dest="$sandbox/.eval-plugin"
+    local hook name
+    rm -rf "$dest"
+    mkdir -p "$dest/hooks"
+    if [[ "$arm" == "with" ]]; then
+        if [[ -d "$PLUGIN_DIR/hooks" ]]; then
+            cp -R "$PLUGIN_DIR/hooks/." "$dest/hooks/"
+        fi
+    else
+        for hook in "$PLUGIN_DIR"/hooks/*; do
+            [[ -e "$hook" ]] || continue
+            name="$(basename "$hook")"
+            cat >"$dest/hooks/$name" <<'EOF'
+#!/usr/bin/env bash
+# Disabled control hook: accepts every call without scanning or deciding.
+cat >/dev/null
+exit 0
+EOF
+            chmod +x "$dest/hooks/$name"
+        done
+    fi
+    if [[ -f "$PLUGIN_DIR/security-patterns.conf" ]]; then
+        cp "$PLUGIN_DIR/security-patterns.conf" "$dest/security-patterns.conf"
+    fi
+}
 
 run_once() {
     local arm="$1" run="$2"
@@ -427,11 +491,26 @@ run_once() {
         cp -R "$SCENARIO_DIR/$include" "$sandbox/" || die "cannot stage $include"
     done <<<"$(jq -r '.include[]?' "$SCENARIO_JSON")"
 
+    # Hook fixtures copy their source from EVAL_HOOK_SOURCE. The with arm gets
+    # the current plugin source; a comparison-mode without arm gets a disabled
+    # control, so the delta measures the hook rather than two fixture copies.
+    local hook_source=""
+    if [[ "$HOOK_SCENARIO" == "1" ]]; then
+        hook_source="$sandbox/.eval-plugin"
+        stage_hook_source "$sandbox" "$arm"
+    fi
+
     # HOME is redirected for every step, so a fixture or an agent that writes
     # to ~ writes into the workspace - never into the contributor's home. The
     # staged script is invoked by absolute path: several fixtures cd to their
     # own directory, and a relative $0 would otherwise be resolved twice.
-    if ! (cd "$sandbox" && HOME="$sandbox/home" bash "$sandbox/inputs/setup.sh") >"$out/setup.log" 2>&1; then
+    # shellcheck disable=SC2030,SC2031  # HOME and hook source are subshell-local
+    if ! (
+        cd "$sandbox" || exit 1
+        export HOME="$sandbox/home"
+        [[ -n "$hook_source" ]] && export EVAL_HOOK_SOURCE="$hook_source"
+        bash "$sandbox/inputs/setup.sh"
+    ) >"$out/setup.log" 2>&1; then
         die "setup failed for $arm/run-$run - see $out/setup.log"
     fi
 
@@ -457,9 +536,9 @@ run_once() {
                         cp "$PLUGIN_DIR/commands/$name.md" "$sandbox/$command_dir/"
                         ;;
                     hooks)
-                        # The scenario invokes the hook itself; there is no
-                        # install location, but accepting the unit keeps unit
-                        # selection and the with-arm consistent.
+                        # The scenario invokes the hook itself; the current
+                        # source is staged separately and copied by the
+                        # fixture. The unit records what is under test.
                         ;;
                     *) ;;
                 esac
@@ -530,8 +609,10 @@ run_once() {
     if [[ -x "$SCENARIO_DIR/checks.sh" ]]; then
         if (
             cd "$sandbox" || exit 1
-            # shellcheck disable=SC2030  # the sandbox HOME is deliberately subshell-local
+            # shellcheck disable=SC2030,SC2031  # HOME and hook source are deliberately subshell-local
             export HOME="$sandbox/home" SANDBOX="$sandbox" SCENARIO_DIR CRITERIA
+            # shellcheck disable=SC2031  # deliberately subshell-local
+            [[ -n "$hook_source" ]] && export EVAL_HOOK_SOURCE="$hook_source"
             bash "$SCENARIO_DIR/checks.sh"
         ) >"$raw" 2>"$out/checks.log"; then
             if jq -e . "$raw" >/dev/null 2>&1 &&
@@ -575,12 +656,12 @@ run_once() {
     usage_json="$(jq -c '.' "$usage_file" 2>/dev/null)"
     [[ -n "$usage_json" ]] || usage_json='{"known":false,"source":"none"}'
 
-    jq -n --arg plugin "$PLUGIN" --arg scenario "$SCENARIO" --arg arm "$arm" --argjson run "$run" \
+    jq -n --arg plugin "$PLUGIN" --arg scenario "$SCENARIO" --arg arm "$arm" --arg mode "$MODE" --argjson run "$run" \
         --argjson exit "$rc" --argjson score "$score" --argjson max "$max" \
         --argjson timed_out "$timed_out" --argjson duration "$duration" \
         --argjson mechanical "${mechanical:-null}" --argjson usage "$usage_json" --arg evidence "$out" '
         {
-            plugin: $plugin, scenario: $scenario, arm: $arm, run: $run,
+            plugin: $plugin, scenario: $scenario, arm: $arm, mode: $mode, run: $run,
             agent_exit: $exit,
             timed_out: $timed_out,
             duration_seconds: $duration,
@@ -617,8 +698,13 @@ summary_dir="$OUT_DIR/$PLUGIN/$SCENARIO"
 {
     echo "# $PLUGIN/$SCENARIO"
     echo
-    echo "Agent: \`$AGENT_CMD\`  ·  runs per arm: $RUNS"
+    echo "Agent: \`$AGENT_CMD\`  ·  mode: $MODE  ·  runs per arm: $RUNS"
     echo
+    if [[ "$MODE" == "functional" ]]; then
+        echo "Functional scenario: the with arm exercises the current plugin source;"
+        echo "there is no without baseline and no contribution delta."
+        echo
+    fi
     echo "| arm | run | agent exit | mechanical |"
     echo "| --- | --- | --- | --- |"
     for result in "${RESULTS[@]}"; do

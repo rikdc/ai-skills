@@ -22,13 +22,27 @@
 #   scripts/eval-grade.sh --suite results/eval-suite/<id> --judge-cmd '...'
 #
 # A judge that writes an invalid file is ignored: the criteria stay pending
-# and the run is not silently over-scored.
+# and the run is not silently over-scored. A valid judgement is reused only
+# when judge-result.json records the same judge command and grader version;
+# otherwise the caller must request --regrade.
 
 set -uo pipefail
 shopt -s nullglob
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EVAL_USAGE="$SCRIPT_DIR/eval-usage.sh"
+
+sha256_file() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    else
+        shasum -a 256 "$1" | awk '{print $1}'
+    fi
+}
+
+# Recorded with every accepted judgement so a later run can tell whether the
+# grade came from the same judge and the same validation rules.
+GRADER_VERSION="$(sha256_file "${BASH_SOURCE[0]}")"
 
 RUN_DIR=""
 SUITE_DIR=""
@@ -53,7 +67,8 @@ Options:
   --usage-cmd CMD    optional post-run hook that normalizes judge usage/tokens
                      (see scripts/eval-usage.sh)
   --timeout SECS     per-run deadline for the judge (default 600)
-  --regrade          overwrite an existing judgement.json
+  --regrade          overwrite an existing judgement.json, including one
+                     produced by a different judge or grader version
 EOF
 }
 
@@ -160,6 +175,19 @@ judgement_summary() {
     jq -r '"\([.[].score] | add // 0)/\([.[].max] | add // 0)"' "$1"
 }
 
+# A judgement without provenance, or one from another judge or grader
+# version, is not reusable. The caller must request an explicit regrade.
+judgement_provenance_valid() {
+    local dir="$1" judge="$2" version="$3"
+    local metadata="$dir/judge-result.json"
+    [[ -f "$metadata" ]] || return 1
+    jq -e --arg judge "$judge" --arg version "$version" '
+        (.judge_cmd // "") == $judge
+        and (.grader // "") == "eval-grade.sh"
+        and (.grader_version // "") == $version
+    ' "$metadata" >/dev/null 2>&1
+}
+
 # Judge usage is diagnostic only: an unknown value or a failing usage hook
 # never turns a valid judgement into a grading failure.
 record_judge_usage() {
@@ -201,6 +229,11 @@ grade_one() {
     if [[ "$REGRADE" == "1" ]]; then
         rm -f "$judgement"
     elif judgement_valid "$judgement" "$request"; then
+        if ! judgement_provenance_valid "$dir" "$JUDGE_CMD" "$GRADER_VERSION"; then
+            echo "  judgement provenance differs (judge command or grader version): $dir" >&2
+            echo "  rerun with --regrade to replace it" >&2
+            return 2
+        fi
         if [[ ! -f "$dir/judge-usage.json" ]]; then
             record_judge_usage "$dir" 0
         fi
@@ -282,8 +315,16 @@ EOF
     duration=$((ended - started))
     [[ "$rc" == "124" || "$rc" == "143" ]] && timed_out=true
     jq -n --argjson exit "$rc" --argjson timed_out "$timed_out" \
-        --argjson duration "$duration" '
-        {exit_code: $exit, timed_out: $timed_out, duration_seconds: $duration}
+        --argjson duration "$duration" --arg judge "$JUDGE_CMD" \
+        --arg version "$GRADER_VERSION" '
+        {
+            exit_code: $exit,
+            timed_out: $timed_out,
+            duration_seconds: $duration,
+            judge_cmd: $judge,
+            grader: "eval-grade.sh",
+            grader_version: $version
+        }
     ' >"$dir/judge-result.json"
     record_judge_usage "$dir" "$rc"
 

@@ -105,10 +105,13 @@ new_suite() {
 
 add_scenario() {
     local dir="$1" plugin="$2" scenario="$3" criteria="$4" units_json="${5:-[]}"
+    local mode="${6:-comparison}"
     mkdir -p "$dir/criteria/$plugin" "$dir/runs/$plugin/$scenario"
     printf '%s\n' "$criteria" | jq '.' >"$dir/criteria/$plugin/$scenario.json"
     jq --arg plugin "$plugin" --arg scenario "$scenario" --argjson units "$units_json" \
-        '.scenarios += [{plugin: $plugin, scenario: $scenario, units: $units, fingerprint: "fp"}]' \
+        --arg mode "$mode" \
+        '.scenarios += [{plugin: $plugin, scenario: $scenario, units: $units,
+                         fingerprint: "fp", mode: $mode}]' \
         "$dir/manifest.json" >"$dir/manifest.json.tmp"
     mv "$dir/manifest.json.tmp" "$dir/manifest.json"
 }
@@ -152,7 +155,9 @@ finish_suite() {
     local dir="$1" runs
     runs="$(jq -r '.config.runs' "$dir/manifest.json")"
     jq --argjson runs "$runs" '
-        .counts.agent_invocations = ((.scenarios | length) * $runs * 2)' \
+        .counts.agent_invocations =
+            (([.scenarios[] | (if (.mode // "comparison") == "functional" then 1 else 2 end)]
+              | add // 0) * $runs)' \
         "$dir/suite.json" >"$dir/suite.json.tmp"
     mv "$dir/suite.json.tmp" "$dir/suite.json"
 }
@@ -591,6 +596,41 @@ if jq -e '
 else
     fail "a changed rubric was compared as if it were the same measurement"
 fi
+
+functional="$TMP/functional-suite"
+new_suite "$functional" 1 '["skills/fixture"]'
+add_scenario "$functional" demo functional-check \
+    '{"context":"x","type":"weighted_checklist","checklist":[{"name":"A","description":"d","max_score":100}]}' \
+    '["skills/fixture"]' functional
+add_run "$functional" demo functional-check with 1 '[{"name":"A","score":80,"max":100}]'
+finish_suite "$functional"
+run_report "$functional" "$TMP/functional.json" --format json
+run_report "$functional" "$TMP/functional.cli" --format cli
+run_report "$functional" "$TMP/functional.md" --format md
+run_report "$functional" "$TMP/functional.all" --format all >/dev/null 2>&1
+if jq -e '
+    .verdict.state == "functional"
+    and .totals.functional == 1
+    and .totals.with == null
+    and .totals.without == null
+    and .totals.delta == null
+    and .totals.functional_with == 80
+    and .totals.coverage_percent == 100
+    and .scenarios[0].mode == "functional"
+    and .scenarios[0].status == "functional"
+    and .scenarios[0].delta == null
+    and .scenarios[0].arms.without.runs == 0
+    and .scenarios[0].criteria[0].status == "scored"
+    and .scenarios[0].criteria[0].with == 80
+    and .scenarios[0].criteria[0].without == null
+' "$TMP/functional.json" >/dev/null; then
+    pass "a functional scenario reports an absolute score without a delta"
+else
+    fail "functional scenario reporting is wrong"
+fi
+assert_contains "$TMP/functional.cli" "functional" "CLI reports a functional verdict"
+assert_contains "$TMP/functional.md" "functional" "Markdown reports a functional verdict"
+assert_contains "$functional/report/report.html" "functional" "HTML reports a functional verdict"
 
 tiny="$TMP/tiny-cost"
 new_suite "$tiny" 1 '["skills/fixture"]'

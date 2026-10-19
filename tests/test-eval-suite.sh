@@ -80,6 +80,32 @@ else
     fail "fixture setup failed for:$fixture_failures"
 fi
 
+# A hook evaluation must exercise the plugin source in the checkout, not a
+# bundled fixture copy. Functional hook scenarios run the with arm only.
+hook_root="$TMP/hook-repo"
+mkdir -p "$hook_root/plugins"
+cp -R scripts "$hook_root/scripts"
+chmod +x "$hook_root/scripts/"*.sh
+cp -R plugins/security-hooks "$hook_root/plugins/security-hooks"
+printf '\n# hook source marker 7c1e\n' >>"$hook_root/plugins/security-hooks/hooks/mcp-security-scanner.sh"
+hook_out="$TMP/hook-source"
+hook_rc=0
+"$hook_root/scripts/eval-run.sh" --plugin security-hooks \
+    --scenario scanner-clean-payload-allowed --agent-cmd true --no-auth \
+    --arm both --out "$hook_out" >"$TMP/hook-source.log" 2>&1 || hook_rc=$?
+hook_run="$hook_out/security-hooks/scanner-clean-payload-allowed/with/run-1"
+if [[ "$hook_rc" -eq 0 ]] &&
+    [[ ! -d "$hook_out/security-hooks/scanner-clean-payload-allowed/without" ]] &&
+    jq -e '.mode == "functional"' "$hook_run/result.json" >/dev/null 2>&1 &&
+    tar -xOf "$hook_run/snapshot.tar" ./hooks/mcp-security-scanner.sh 2>/dev/null |
+        grep -q 'hook source marker 7c1e' &&
+    tar -xOf "$hook_run/snapshot.tar" ./security-patterns.conf 2>/dev/null |
+        cmp -s - "$hook_root/plugins/security-hooks/security-patterns.conf"; then
+    pass "a functional hook scenario stages the current plugin source and runs one arm"
+else
+    fail "a hook scenario did not stage the current plugin source" "$TMP/hook-source.log"
+fi
+
 # --- discovery ----------------------------------------------------------------
 
 expected="$(
@@ -112,12 +138,29 @@ else
 fi
 
 count="$(printf '%s\n' "$expected" | wc -l | tr -d ' ')"
+expected_invocations=0
+expected_functional=0
+while IFS= read -r pair; do
+    mode="$(jq -r '.mode // "comparison"' "plugins/${pair%%/*}/evals/${pair#*/}/scenario.json")"
+    if [[ "$mode" == "functional" ]]; then
+        expected_invocations=$((expected_invocations + 1))
+        expected_functional=$((expected_functional + 1))
+    else
+        expected_invocations=$((expected_invocations + 2))
+    fi
+done <<<"$expected"
 plan="$("$SUITE" --plan 2>&1)"
 if grep -q "Scenarios: $count$" <<<"$plan" &&
-    grep -q "Agent invocations: $((count * 2))$" <<<"$plan"; then
-    pass "--plan counts two arms per scenario"
+    grep -q "Agent invocations: $expected_invocations$" <<<"$plan"; then
+    pass "--plan counts one arm for functional scenarios and two otherwise"
 else
-    fail "--plan counts are wrong (expected $count scenarios, $((count * 2)) invocations)"
+    fail "--plan counts are wrong (expected $count scenarios, $expected_invocations invocations)"
+fi
+if ((expected_functional > 0)) &&
+    grep -q "Functional scenarios: $expected_functional (with arm only, no delta)" <<<"$plan"; then
+    pass "--plan identifies functional scenarios"
+else
+    fail "--plan did not report functional scenarios"
 fi
 if ((count > 1)) && grep -q "Tip: --jobs N runs N scenarios concurrently" <<<"$plan"; then
     pass "--plan suggests --jobs when scenarios would run sequentially"
@@ -380,9 +423,22 @@ if [[ "$regrade_ok" -eq 1 ]] &&
     printf 'stale\n' >"$regrade_run/stale-artifact"
     printf '# Changed task\n\nDo the changed thing instead.\n' >"$regrade_scenario/task.md"
 
+    # A different judge is not allowed to inherit the old grades.
+    judge_change_rc=0
     "$regrade_root/scripts/eval-suite.sh" --agent-cmd true --judge-cmd "$TMP/judge-second.sh" \
         --plugin fixture --scenario changed-task --arm with --runs 1 --no-auth \
-        --out "$regrade_suite" --resume >"$TMP/regrade-second.log" 2>&1
+        --out "$regrade_suite" --resume >"$TMP/regrade-refused.log" 2>&1 || judge_change_rc=$?
+    if [[ "$judge_change_rc" -ne 0 ]] &&
+        grep -q "graded with a different judge" "$TMP/regrade-refused.log" &&
+        [[ "$(jq -r '.[0].note' "$regrade_run/judgement.json" 2>/dev/null)" == "first" ]]; then
+        pass "a judge change is refused before any run is regraded"
+    else
+        fail "a judge change was accepted or altered the existing grade" "$TMP/regrade-refused.log"
+    fi
+
+    "$regrade_root/scripts/eval-suite.sh" --agent-cmd true --judge-cmd "$TMP/judge-second.sh" \
+        --plugin fixture --scenario changed-task --arm with --runs 1 --no-auth \
+        --out "$regrade_suite" --resume --regrade >"$TMP/regrade-second.log" 2>&1
     regrade_rc=$?
     if [[ "$regrade_rc" -eq 0 ]] &&
         [[ "$(jq -r '.counts.executed' "$regrade_suite/suite.json" 2>/dev/null)" == "1" ]] &&
@@ -390,10 +446,14 @@ if [[ "$regrade_ok" -eq 1 ]] &&
         [[ "$(jq -r '.[0].note' "$regrade_run/judgement.json" 2>/dev/null)" == "second" ]] &&
         [[ ! -e "$regrade_run/stale-artifact" ]] &&
         jq -e '.stale != true' "$regrade_run/usage.json" >/dev/null 2>&1 &&
-        jq -e '.stale != true' "$regrade_run/judge-result.json" >/dev/null 2>&1; then
-        pass "a changed task reruns and discards the previous grade, usage and timing"
+        jq -e '.stale != true' "$regrade_run/judge-result.json" >/dev/null 2>&1 &&
+        jq -e --arg judge "$TMP/judge-second.sh" \
+            '.judge_cmd == $judge and (.grader_version | type) == "string"' \
+            "$regrade_run/judge-result.json" >/dev/null 2>&1 &&
+        [[ "$(jq -r '.config.judge_cmd' "$regrade_suite/manifest.json")" == "$TMP/judge-second.sh" ]]; then
+        pass "a regrade reruns, discards stale artifacts and records the new judge"
     else
-        fail "a changed task kept the previous judgement or derived artifacts" "$TMP/regrade-second.log"
+        fail "a regrade kept the previous judgement or lost judge provenance" "$TMP/regrade-second.log"
     fi
 else
     fail "the regrade fixture did not produce an initial judgement" "$TMP/regrade-first.log"
@@ -507,6 +567,29 @@ if [[ -f "$with_dir/judge-prompt.md" ]] &&
     pass "the judge receives a prompt and its judgement is valid JSON"
 else
     fail "the judge prompt or judgement is missing"
+fi
+
+provenance_dir="$TMP/provenance-run"
+cp -R "$with_dir" "$provenance_dir"
+provenance_rc=0
+"$GRADE" --run-dir "$provenance_dir" --judge-cmd "$TMP/judge-second.sh" \
+    >"$TMP/provenance-refused.log" 2>&1 || provenance_rc=$?
+if [[ "$provenance_rc" -ne 0 ]] &&
+    grep -q -- "--regrade" "$TMP/provenance-refused.log" &&
+    [[ "$(jq -r '.[0].note' "$provenance_dir/judgement.json" 2>/dev/null)" == "stub" ]]; then
+    pass "a judgement is not reused under a different judge without --regrade"
+else
+    fail "a judgement was reused under a different judge" "$TMP/provenance-refused.log"
+fi
+if "$GRADE" --run-dir "$provenance_dir" --judge-cmd "$TMP/judge-second.sh" --regrade \
+    >"$TMP/provenance-regrade.log" 2>&1 &&
+    [[ "$(jq -r '.[0].note' "$provenance_dir/judgement.json" 2>/dev/null)" == "second" ]] &&
+    jq -e --arg judge "$TMP/judge-second.sh" \
+        '.judge_cmd == $judge and (.grader_version | type) == "string"' \
+        "$provenance_dir/judge-result.json" >/dev/null 2>&1; then
+    pass "--regrade replaces a judgement and records judge provenance"
+else
+    fail "--regrade did not replace the judgement with provenance" "$TMP/provenance-regrade.log"
 fi
 
 inline_dir="$TMP/inline-judge"

@@ -48,35 +48,57 @@
             | {run: $with_run.run, with: $with_run, without: $without_run} ] as $pairs
         | [ $rubric[] as $item
             | $item.name as $name
-            | [ $pairs[]
-                | select((.with.scored | has($name)) and (.without.scored | has($name)))
-                | {w: .with.scored[$name], o: .without.scored[$name]} ] as $values
-            | {
-                name: $name,
-                max: $item.max_score,
-                with: ([$values[].w] | mean),
-                without: ([$values[].o] | mean),
-                delta: (if ($values | length) > 0 then ([$values[] | .w - .o] | mean) else null end),
-                paired_runs: ($values | length),
-                status: (
-                    if any($runs[]; (.scored | has($name) | not)) then "pending"
-                    elif ($values | length) > 0 then "comparable"
-                    else "not comparable"
-                    end
-                )
-            } ] as $criteria
+            | (if $mode == "functional" then
+                   {
+                       name: $name,
+                       max: $item.max_score,
+                       with: ([$with_runs[] | .scored[$name]] | mean_present),
+                       without: null,
+                       delta: null,
+                       paired_runs: ($with_runs | length),
+                       status: (
+                           if any($with_runs[]; (.scored | has($name) | not)) then "pending"
+                           else "scored"
+                           end
+                       )
+                   }
+               else
+                   [ $pairs[]
+                       | select((.with.scored | has($name)) and (.without.scored | has($name)))
+                       | {w: .with.scored[$name], o: .without.scored[$name]} ] as $values
+                   | {
+                       name: $name,
+                       max: $item.max_score,
+                       with: ([$values[].w] | mean),
+                       without: ([$values[].o] | mean),
+                       delta: (if ($values | length) > 0 then ([$values[] | .w - .o] | mean) else null end),
+                       paired_runs: ($values | length),
+                       status: (
+                           if any($runs[]; (.scored | has($name) | not)) then "pending"
+                           elif ($values | length) > 0 then "comparable"
+                           else "not comparable"
+                           end
+                       )
+                   }
+               end)
+          ] as $criteria
         | (arm_stats($with_runs)) as $with_stats
         | (arm_stats($without_runs)) as $without_stats
-        | (if ($with_stats.runs > 0 and $without_stats.runs > 0)
+        | (if $mode == "functional" then null
+           elif ($with_stats.runs > 0 and $without_stats.runs > 0)
            then ($with_stats.percent_mean - $without_stats.percent_mean)
            else null end) as $delta
         | (if ([$runs[] | select(.status != "ok")] | length) > 0 then "runner-failed"
+           elif ($mode == "functional") then "functional"
            elif ($with_stats.runs == 0 or $without_stats.runs == 0) then "not-comparable"
            else "ok" end) as $status
         | {
             plugin: $plugin,
             scenario: $scenario,
             units: ($units | split(" ") | map(select(. != ""))),
+            mode: $mode,
+            functional: ($mode == "functional"),
+            arm_count: (if $mode == "functional" or $arm != "both" then 1 else 2 end),
             denominator: $denominator,
             criteria_count: ($rubric | length),
             configured_runs: $configured_runs,

@@ -3,5 +3,6 @@
   "include": [
     "./inputs"
   ],
-  "unit": "hooks/mcp-security-scanner"
+  "unit": "hooks/mcp-security-scanner",
+  "mode": "functional"
 }

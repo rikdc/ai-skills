@@ -51,6 +51,7 @@ SKILL_DIR=".claude/skills"
 OUT_DIR=""
 OUT_EXPLICIT=0
 RESUME=0
+REGRADE=0
 SHARD=""
 KEEP=0
 STRICT=0
@@ -91,6 +92,8 @@ Execution:
 Output:
   --out DIR           suite directory (default results/eval-suite/<stamp>-<sha>)
   --resume            skip scenarios already complete in --out (requires --out)
+  --regrade           with --resume, replace judgements produced by a
+                      different judge command or grader version
   --judge-cmd CMD     grade each executed run after it finishes
   --usage-cmd CMD     optional hook to normalize agent usage/tokens
   --judge-usage-cmd CMD
@@ -154,6 +157,10 @@ while [[ $# -gt 0 ]]; do
             RESUME=1
             shift
             ;;
+        --regrade)
+            REGRADE=1
+            shift
+            ;;
         --keep)
             KEEP=1
             shift
@@ -208,6 +215,8 @@ for unit in ${UNITS[@]+"${UNITS[@]}"}; do
         die "invalid --unit '$unit' (expected skills/<name>, commands/<name> or hooks/<name>)"
 done
 [[ "$RESUME" == "0" || "$OUT_EXPLICIT" == "1" ]] || die "--resume needs --out pointing at a previous suite"
+[[ "$REGRADE" == "0" || "$RESUME" == "1" ]] || die "--regrade needs --resume and --out"
+[[ "$REGRADE" == "0" || -n "$JUDGE_CMD" ]] || die "--regrade needs --judge-cmd"
 if [[ "$MODE" == "run" && "$SELFTEST" == "0" && -z "$AGENT_CMD" ]]; then
     die "--agent-cmd is required: pass the agent that should attempt each task.md, e.g. --agent-cmd 'claude -p'"
 fi
@@ -297,6 +306,26 @@ arm_count() {
         echo 2
     else
         echo 1
+    fi
+}
+
+# A functional scenario has no control arm. Everything else follows --arm.
+scenario_arms() {
+    local i="$1"
+    if [[ "${PLAN_MODE[$i]}" == "functional" ]]; then
+        echo "with"
+    else
+        arms
+    fi
+}
+
+# The runner takes a single --arm value, not the loop list above.
+scenario_arm_arg() {
+    local i="$1"
+    if [[ "${PLAN_MODE[$i]}" == "functional" ]]; then
+        echo "with"
+    else
+        echo "$ARM"
     fi
 }
 
@@ -418,6 +447,7 @@ PLAN_SCENARIO=()
 PLAN_FP=()
 PLAN_UNIT=()
 PLAN_DECLARED=()
+PLAN_MODE=()
 
 changed_scenarios=()
 changed_plugins=()
@@ -534,6 +564,15 @@ for scenario_dir in "$PROJECT_ROOT"/plugins/*/evals/*/; do
     done <<<"$(scenario_units "$scenario_dir/scenario.json")"
     declared_units="${declared_units# }"
 
+    mode="$(jq -r '.mode // "comparison"' "$scenario_dir/scenario.json" 2>/dev/null)"
+    case "$mode" in
+        comparison | functional) ;;
+        *) die "scenario $pair has invalid mode '$mode'" ;;
+    esac
+    if [[ "$mode" == "functional" && -z "$declared_units" ]]; then
+        die "functional scenario $pair must declare the unit it exercises"
+    fi
+
     selected_units=""
     if ((${#UNITS[@]} > 0)); then
         [[ -n "$declared_units" ]] ||
@@ -559,6 +598,7 @@ for scenario_dir in "$PROJECT_ROOT"/plugins/*/evals/*/; do
     PLAN_SCENARIO+=("$scenario")
     PLAN_UNIT+=("$selected_units")
     PLAN_DECLARED+=("$declared_units")
+    PLAN_MODE+=("$mode")
 done
 
 if [[ "$SELFTEST" == "1" && "${#PLAN_PLUGIN[@]}" -lt 3 ]]; then
@@ -572,7 +612,18 @@ if [[ "${#PLAN_PLUGIN[@]}" -eq 0 ]]; then
 fi
 
 SCENARIO_COUNT="${#PLAN_PLUGIN[@]}"
-INVOCATIONS=$((SCENARIO_COUNT * $(arm_count) * RUNS))
+COMPARISON_COUNT=0
+FUNCTIONAL_COUNT=0
+INVOCATIONS=0
+for i in "${!PLAN_PLUGIN[@]}"; do
+    if [[ "${PLAN_MODE[$i]}" == "functional" ]]; then
+        FUNCTIONAL_COUNT=$((FUNCTIONAL_COUNT + 1))
+        INVOCATIONS=$((INVOCATIONS + RUNS))
+    else
+        COMPARISON_COUNT=$((COMPARISON_COUNT + 1))
+        INVOCATIONS=$((INVOCATIONS + $(arm_count) * RUNS))
+    fi
+done
 
 if [[ "$MODE" == "list" ]]; then
     for i in "${!PLAN_PLUGIN[@]}"; do
@@ -595,6 +646,9 @@ if [[ "$MODE" == "plan" ]]; then
     echo
     echo "Scenarios: $SCENARIO_COUNT"
     echo "Arms: $ARM ($(arm_count))  ·  runs per arm: $RUNS"
+    if ((FUNCTIONAL_COUNT > 0)); then
+        echo "Functional scenarios: $FUNCTIONAL_COUNT (with arm only, no delta)"
+    fi
     echo "Agent invocations: $INVOCATIONS"
     if [[ -n "$JUDGE_CMD" ]]; then
         echo "Judge invocations: up to $INVOCATIONS"
@@ -687,14 +741,19 @@ scenarios_json="$(
     for i in "${!PLAN_PLUGIN[@]}"; do
         jq -nc --arg plugin "${PLAN_PLUGIN[$i]}" --arg scenario "${PLAN_SCENARIO[$i]}" \
             --arg fingerprint "${PLAN_FP[$i]}" --arg units "${PLAN_DECLARED[$i]}" \
+            --arg mode "${PLAN_MODE[$i]}" \
             '{plugin: $plugin, scenario: $scenario, fingerprint: $fingerprint,
-              units: ($units | split(" ") | map(select(. != "")))}'
+              units: ($units | split(" ") | map(select(. != ""))), mode: $mode}'
     done | jq -s '.'
 )"
 
 MANIFEST_NEEDS_REWRITE=0
 if [[ "$RESUME" == "1" ]]; then
     MANIFEST_NEEDS_REWRITE=1
+    previous_judge="$(jq -r '.config.judge_cmd // ""' "$OUT_DIR/manifest.json" 2>/dev/null)"
+    if [[ "$previous_judge" != "$JUDGE_CMD" && "$REGRADE" != "1" ]]; then
+        die "$OUT_DIR was graded with a different judge; pass --regrade to replace its judgements"
+    fi
     jq -e --arg agent "$AGENT_CMD" --arg arm "$ARM" --argjson runs "$RUNS" \
         --argjson timeout "$TIMEOUT" --arg skill "$SKILL_DIR" --argjson auth "$AUTH" \
         --argjson auth_paths "$auth_paths_json" --argjson units "$units_json" \
@@ -737,7 +796,7 @@ resume_complete() {
     ' "$OUT_DIR/manifest.json" 2>/dev/null)"
     [[ "$previous" == "${PLAN_FP[$i]}" ]] || return 1
 
-    for arm in $(arms); do
+    for arm in $(scenario_arms "$i"); do
         for run in $(seq 1 "$RUNS"); do
             [[ -f "$OUT_DIR/runs/$plugin/$scenario/$arm/run-$run/result.json" ]] || return 1
         done
@@ -796,7 +855,7 @@ start_job() {
     (
         rc=0
         "$RUN_ONE" --plugin "$plugin" --scenario "$scenario" \
-            --agent-cmd "$AGENT_CMD" --arm "$ARM" --runs "$RUNS" \
+            --agent-cmd "$AGENT_CMD" --arm "$(scenario_arm_arg "$i")" --runs "$RUNS" \
             --timeout "$TIMEOUT" --skill-dir "$SKILL_DIR" \
             --out "$OUT_DIR/runs" ${passthrough_args[@]+"${passthrough_args[@]}"} || rc=$?
 
@@ -808,6 +867,7 @@ start_job() {
                 grade_args=(--run-dir "$dir" --judge-cmd "$JUDGE_CMD" \
                     --timeout "$JUDGE_TIMEOUT")
                 [[ -n "$JUDGE_USAGE_CMD" ]] && grade_args+=(--usage-cmd "$JUDGE_USAGE_CMD")
+                [[ "$REGRADE" == "1" ]] && grade_args+=(--regrade)
                 "$GRADE_ONE" "${grade_args[@]}" || true
             done
         fi
@@ -943,8 +1003,14 @@ done
 # not part of this pass. Rewriting it after resume_complete has used the old
 # fingerprints keeps the manifest and suite.json in sync.
 if [[ "$MANIFEST_NEEDS_REWRITE" == "1" ]]; then
-    if ! jq --argjson scenarios "$scenarios_json" '.scenarios = $scenarios' \
-        "$OUT_DIR/manifest.json" >"$OUT_DIR/manifest.json.tmp"; then
+    if ! jq --argjson scenarios "$scenarios_json" \
+        --arg judge "$JUDGE_CMD" --arg judge_usage "$JUDGE_USAGE_CMD" \
+        --argjson judge_timeout "$JUDGE_TIMEOUT" '
+        .scenarios = $scenarios
+        | .config.judge_cmd = $judge
+        | .config.judge_usage_cmd = $judge_usage
+        | .config.judge_timeout = $judge_timeout
+    ' "$OUT_DIR/manifest.json" >"$OUT_DIR/manifest.json.tmp"; then
         die "cannot rewrite the resume manifest in $OUT_DIR"
     fi
     if ! mv "$OUT_DIR/manifest.json.tmp" "$OUT_DIR/manifest.json"; then
@@ -966,11 +1032,22 @@ if [[ -n "$JUDGE_CMD" ]]; then
         scenario="${PLAN_SCENARIO[$i]}"
         for dir in "$OUT_DIR/runs/$plugin/$scenario"/*/run-*; do
             [[ -f "$dir/grading-request.json" ]] || continue
-            judgement_valid "$dir/judgement.json" "$dir/grading-request.json" && continue
+            if [[ "$REGRADE" != "1" ]] &&
+                judgement_valid "$dir/judgement.json" "$dir/grading-request.json"; then
+                if ! jq -e --arg judge "$JUDGE_CMD" \
+                    '(.judge_cmd // "") == $judge' "$dir/judge-result.json" >/dev/null 2>&1; then
+                    die "$dir has no judgement provenance for the current judge; pass --regrade"
+                fi
+            fi
             grade_args=(--run-dir "$dir" --judge-cmd "$JUDGE_CMD" \
                 --timeout "$JUDGE_TIMEOUT")
             [[ -n "$JUDGE_USAGE_CMD" ]] && grade_args+=(--usage-cmd "$JUDGE_USAGE_CMD")
-            "$GRADE_ONE" "${grade_args[@]}" || true
+            [[ "$REGRADE" == "1" ]] && grade_args+=(--regrade)
+            grade_rc=0
+            "$GRADE_ONE" "${grade_args[@]}" || grade_rc=$?
+            if ((grade_rc == 2)); then
+                die "$dir was graded by a different judge or grader version; pass --regrade"
+            fi
         done
     done
 fi
@@ -1009,7 +1086,7 @@ backfill_usage() {
 for i in "${!PLAN_PLUGIN[@]}"; do
     plugin="${PLAN_PLUGIN[$i]}"
     scenario="${PLAN_SCENARIO[$i]}"
-    for arm in $(arms); do
+    for arm in $(scenario_arms "$i"); do
         for run in $(seq 1 "$RUNS"); do
             run_dir="$OUT_DIR/runs/$plugin/$scenario/$arm/run-$run"
             [[ -d "$run_dir" ]] || continue
@@ -1104,7 +1181,7 @@ summarise_run() {
 }
 
 summarise_scenario() {
-    local plugin="$1" scenario="$2"
+    local plugin="$1" scenario="$2" mode="$3"
     local runs=() arm run criteria denominator
     criteria="$OUT_DIR/criteria/$plugin/$scenario.json"
     [[ -f "$criteria" ]] ||
@@ -1116,19 +1193,25 @@ summarise_scenario() {
         denominator=0
     fi
 
-    for arm in $(arms); do
+    local -a scenario_arm_list=()
+    if [[ "$mode" == "functional" ]]; then
+        scenario_arm_list=(with)
+    else
+        read -r -a scenario_arm_list <<<"$(arms)"
+    fi
+    for arm in ${scenario_arm_list[@]+"${scenario_arm_list[@]}"}; do
         for run in $(seq 1 "$RUNS"); do
             runs+=("$(summarise_run "$OUT_DIR/runs/$plugin/$scenario/$arm/run-$run" "$arm" "$run" "$denominator")")
         done
     done
 
     printf '%s\n' "${runs[@]}" | jq -sc --arg plugin "$plugin" --arg scenario "$scenario" \
-        -f "$JQ_DIR/suite-scenario.jq"
+        --arg mode "$mode" -f "$JQ_DIR/suite-scenario.jq"
 }
 
 : >"$OUT_DIR/results.jsonl"
 for i in "${!PLAN_PLUGIN[@]}"; do
-    summarise_scenario "${PLAN_PLUGIN[$i]}" "${PLAN_SCENARIO[$i]}" >>"$OUT_DIR/results.jsonl"
+    summarise_scenario "${PLAN_PLUGIN[$i]}" "${PLAN_SCENARIO[$i]}" "${PLAN_MODE[$i]}" >>"$OUT_DIR/results.jsonl"
 done
 
 AGGREGATE_FAILURES="$(jq -s '[.[] | select(.status != "ok")] | length' "$OUT_DIR/results.jsonl")"
@@ -1148,6 +1231,7 @@ COST_KNOWN_RUNS="$(
     )] | length' "$OUT_DIR/results.jsonl"
 )"
 DURATION="$(( $(date +%s) - SUITE_START ))"
+ACTUAL_RUNS="$(jq -s '[.[].runs[]] | length' "$OUT_DIR/results.jsonl")"
 
 printf 'plugin\tscenario\tarm\trun\tpending\tevidence\n' >"$OUT_DIR/grading/index.tsv"
 jq -r '
@@ -1162,7 +1246,7 @@ jq -r '
 counts_json="$(jq -nc \
     --argjson planned "$SCENARIO_COUNT" --argjson executed "$EXECUTED" \
     --argjson skipped "$SKIPPED" --argjson runner_failures "$AGGREGATE_FAILURES" \
-    --argjson agent_invocations "$((EXECUTED * $(arm_count) * RUNS))" \
+    --argjson agent_invocations "$ACTUAL_RUNS" \
     --argjson judged_runs "$JUDGED_RUNS" --argjson pending_runs "$PENDING_RUNS" \
     --argjson covered_scenarios "$COVERED_SCENARIOS" --argjson duration "$DURATION" \
     --argjson agent_seconds "$AGENT_SECONDS" --argjson judge_seconds "$JUDGE_SECONDS" \
@@ -1178,6 +1262,9 @@ jq -s --argjson config "$config_json" --argjson counts "$counts_json" '
     echo "# Eval suite"
     echo
     echo "Agent: \`$AGENT_CMD\`  ·  arms: $ARM  ·  runs per arm: $RUNS  ·  jobs: $JOBS"
+    if ((FUNCTIONAL_COUNT > 0)); then
+        echo "Functional scenarios: $FUNCTIONAL_COUNT (with arm only; absolute scores, no delta)"
+    fi
     if ((${#UNITS[@]} > 0)); then
         echo "Units: $(printf '%s, ' "${UNITS[@]}" | sed 's/, $//')"
     fi
@@ -1191,7 +1278,7 @@ jq -s --argjson config "$config_json" --argjson counts "$counts_json" '
     echo
     echo "| Planned | Executed | Skipped | Runner failures | Agent invocations |"
     echo "| --- | --- | --- | --- | --- |"
-    echo "| $SCENARIO_COUNT | $EXECUTED | $SKIPPED | $AGGREGATE_FAILURES | $((EXECUTED * $(arm_count) * RUNS)) |"
+    echo "| $SCENARIO_COUNT | $EXECUTED | $SKIPPED | $AGGREGATE_FAILURES | $ACTUAL_RUNS |"
     echo
     if ((PENDING_RUNS > 0)); then
         echo "**$PENDING_RUNS run(s) still have pending criteria.** A mechanical score is"

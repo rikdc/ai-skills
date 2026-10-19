@@ -3,5 +3,6 @@
   "include": [
     "./inputs"
   ],
-  "unit": "hooks/protect-main-branch"
+  "unit": "hooks/protect-main-branch",
+  "mode": "functional"
 }

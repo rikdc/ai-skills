@@ -205,7 +205,7 @@ judgement_valid() {
 : >"$TMP/scenarios.jsonl"
 scenario_index=0
 
-while IFS=$'\t' read -r plugin scenario declared_units; do
+while IFS=$'\t' read -r plugin scenario declared_units mode; do
     [[ -n "$plugin" ]] || continue
     scenario_index=$((scenario_index + 1))
 
@@ -222,7 +222,11 @@ while IFS=$'\t' read -r plugin scenario declared_units; do
 
     : >"$TMP/runs.jsonl"
     for arm in with without; do
-        [[ "$ARM" == "both" || "$ARM" == "$arm" ]] || continue
+        if [[ "$mode" == "functional" ]]; then
+            [[ "$arm" == "with" ]] || continue
+        else
+            [[ "$ARM" == "both" || "$ARM" == "$arm" ]] || continue
+        fi
         for run in $(seq 1 "$RUNS"); do
             run_dir="$SUITE_DIR/runs/$plugin/$scenario/$arm/run-$run"
             result="$run_dir/result.json"
@@ -310,9 +314,10 @@ while IFS=$'\t' read -r plugin scenario declared_units; do
 
     jq -s --slurpfile crit "$criteria" \
         --arg plugin "$plugin" --arg scenario "$scenario" \
-        --arg units "$declared_units" --argjson configured_runs "$RUNS" \
+        --arg units "$declared_units" --arg mode "$mode" --arg arm "$ARM" \
+        --argjson configured_runs "$RUNS" \
         -f "$JQ_DIR/report-scenario.jq" "$TMP/runs.jsonl" >>"$TMP/scenarios.jsonl"
-done < <(jq -r '.scenarios[] | [.plugin, .scenario, ((.units // []) | join(" "))] | @tsv' \
+done < <(jq -r '.scenarios[] | [.plugin, .scenario, ((.units // []) | join(" ")), (.mode // "comparison")] | @tsv' \
     "$SUITE_DIR/manifest.json")
 
 ((scenario_index > 0)) || die "manifest.json lists no scenarios"

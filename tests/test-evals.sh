@@ -228,6 +228,18 @@ for scenario_dir in plugins/*/evals/*/; do
                     esac
                 done <<<"$declared_units"
             fi
+
+            scenario_mode="$(jq -r '.mode // "comparison"' "$scenario/scenario.json" 2>/dev/null)"
+            case "$scenario_mode" in
+                comparison) ;;
+                functional)
+                    grep -q '^hooks/' <<<"$declared_units" ||
+                        findings+="$scenario/scenario.json: functional mode requires a hook unit"$'\n'
+                    ;;
+                *)
+                    findings+="$scenario/scenario.json: mode must be comparison or functional"$'\n'
+                    ;;
+            esac
         fi
     fi
 
