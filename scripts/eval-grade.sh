@@ -273,9 +273,18 @@ Rules:
 EOF
 
     echo "  judging $dir" >&2
+    local started ended duration timed_out=false
+    started="$(date +%s)"
     (cd "$dir" && run_with_deadline "$TIMEOUT" bash -c "$JUDGE_CMD") \
         <"$dir/judge-prompt.md" >"$log" 2>&1
     local rc=$?
+    ended="$(date +%s)"
+    duration=$((ended - started))
+    [[ "$rc" == "124" || "$rc" == "143" ]] && timed_out=true
+    jq -n --argjson exit "$rc" --argjson timed_out "$timed_out" \
+        --argjson duration "$duration" '
+        {exit_code: $exit, timed_out: $timed_out, duration_seconds: $duration}
+    ' >"$dir/judge-result.json"
     record_judge_usage "$dir" "$rc"
 
     if [[ "$rc" -ne 0 ]]; then

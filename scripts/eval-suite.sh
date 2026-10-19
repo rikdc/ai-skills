@@ -600,6 +600,10 @@ if [[ "$MODE" == "plan" ]]; then
         echo "Judge invocations: up to $INVOCATIONS"
     fi
     echo "Jobs: $JOBS  ·  per-run timeout: ${TIMEOUT}s"
+    if ((JOBS == 1 && SCENARIO_COUNT > 1)); then
+        echo "Tip: --jobs N runs N scenarios concurrently (this plan has $SCENARIO_COUNT);"
+        echo "     each scenario still runs its arms and runs sequentially."
+    fi
     exit 0
 fi
 
@@ -904,6 +908,9 @@ trap 'abort_suite 143 TERM' TERM
 echo "🧪 Eval suite: $SCENARIO_COUNT scenarios, $ARM arms, $RUNS run(s), $JOBS job(s)"
 echo "   Agent: $AGENT_CMD"
 echo "   Out:   $OUT_DIR"
+if ((JOBS == 1 && SCENARIO_COUNT > 1)); then
+    echo "   Tip:   --jobs N runs N scenarios concurrently; each scenario's arms and runs stay sequential."
+fi
 
 next=0
 while ((next < SCENARIO_COUNT || ${#pids[@]} > 0)); do
@@ -1026,6 +1033,7 @@ summarise_run() {
             {
                 arm: $arm, run: $run, status: "missing",
                 agent_exit: null, timed_out: false,
+                duration_seconds: null, judge_duration_seconds: null,
                 mechanical: {score: 0, max: 0}, judged: null,
                 pending: 0, score: 0, max: 0, percent: null,
                 usage: $usage, judge_usage: $judge_usage,
@@ -1035,10 +1043,16 @@ summarise_run() {
     fi
 
     local mech_score mech_max agent_exit timed_out pending
+    local duration_seconds judge_duration_seconds
     mech_score="$(jq -r '.mechanical.score // 0' "$result")"
     mech_max="$(jq -r '.mechanical.max // 0' "$result")"
     agent_exit="$(jq -r '.agent_exit // 0' "$result")"
     timed_out="$(jq -r '.timed_out // false' "$result")"
+    duration_seconds="$(jq -r '.duration_seconds // null' "$result")"
+    judge_duration_seconds="null"
+    if [[ -f "$dir/judge-result.json" ]]; then
+        judge_duration_seconds="$(jq -r '.duration_seconds // null' "$dir/judge-result.json" 2>/dev/null || echo null)"
+    fi
     pending=0
     if [[ -f "$dir/grading-request.json" ]]; then
         pending="$(jq -r '.judgement_pending | length' "$dir/grading-request.json")"
@@ -1058,6 +1072,8 @@ summarise_run() {
     # integer arithmetic would fail silently, dropping the row.
     jq -nc --arg arm "$arm" --argjson run "$run" --arg evidence "$dir" \
         --argjson agent_exit "$agent_exit" --argjson timed_out "$timed_out" \
+        --argjson duration "$duration_seconds" \
+        --argjson judge_duration "$judge_duration_seconds" \
         --argjson mech_score "$mech_score" --argjson mech_max "$mech_max" \
         --argjson judged "$judged_json" --argjson judged_score "$judged_score" \
         --argjson judged_max "$judged_max" --argjson pending "$pending" \
@@ -1066,6 +1082,8 @@ summarise_run() {
         {
             arm: $arm, run: $run, status: "ok",
             agent_exit: $agent_exit, timed_out: $timed_out,
+            duration_seconds: $duration,
+            judge_duration_seconds: $judge_duration,
             mechanical: {score: $mech_score, max: $mech_max},
             judged: (if $judged == null then null
                      else {score: $judged_score, max: $judged_max, items: $judged} end),
@@ -1110,6 +1128,9 @@ PENDING_RUNS="$(jq -s '[.[].runs[] | select(.pending > 0)] | length' "$OUT_DIR/r
 COVERED_SCENARIOS="$(
     jq -s '[.[] | select((.runs | map(.mechanical.max) | add // 0) > 0)] | length' "$OUT_DIR/results.jsonl"
 )"
+AGENT_SECONDS="$(jq -s '[.[].runs[].duration_seconds | select(. != null)] | if length == 0 then null else add end' "$OUT_DIR/results.jsonl")"
+JUDGE_SECONDS="$(jq -s '[.[].runs[].judge_duration_seconds | select(. != null)] | if length == 0 then null else add end' "$OUT_DIR/results.jsonl")"
+TIMED_OUT_RUNS="$(jq -s '[.[].runs[] | select(.timed_out == true)] | length' "$OUT_DIR/results.jsonl")"
 COST_TOTAL_RUNS="$(jq -s '[.[].runs[]] | length' "$OUT_DIR/results.jsonl")"
 COST_KNOWN_RUNS="$(
     jq -s '[.[].runs[] | select(
@@ -1135,6 +1156,8 @@ counts_json="$(jq -nc \
     --argjson agent_invocations "$((EXECUTED * $(arm_count) * RUNS))" \
     --argjson judged_runs "$JUDGED_RUNS" --argjson pending_runs "$PENDING_RUNS" \
     --argjson covered_scenarios "$COVERED_SCENARIOS" --argjson duration "$DURATION" \
+    --argjson agent_seconds "$AGENT_SECONDS" --argjson judge_seconds "$JUDGE_SECONDS" \
+    --argjson timed_out_runs "$TIMED_OUT_RUNS" \
     --argjson cost_known "$COST_KNOWN_RUNS" --argjson cost_total "$COST_TOTAL_RUNS" \
     -f "$JQ_DIR/suite-counts.jq")"
 
@@ -1151,6 +1174,11 @@ jq -s --argjson config "$config_json" --argjson counts "$counts_json" '
     fi
     echo
     echo "Git: \`$(git_sha)\`$([[ "$(git_dirty)" == "true" ]] && echo ' (dirty tree)')  ·  duration: ${DURATION}s"
+    agent_time="${AGENT_SECONDS}s"
+    judge_time="${JUDGE_SECONDS}s"
+    [[ "$AGENT_SECONDS" == "null" ]] && agent_time="—"
+    [[ "$JUDGE_SECONDS" == "null" ]] && judge_time="—"
+    echo "Time: agent ${agent_time}  ·  judge ${judge_time}  ·  ${TIMED_OUT_RUNS} timed-out run(s)"
     echo
     echo "| Planned | Executed | Skipped | Runner failures | Agent invocations |"
     echo "| --- | --- | --- | --- | --- |"

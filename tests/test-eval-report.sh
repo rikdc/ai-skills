@@ -135,7 +135,10 @@ add_run() {
 
     jq -n --arg arm "$arm" --argjson run "$run" --arg evidence "$run_dir" '
         {plugin: "fixture", scenario: "fixture", arm: $arm, run: $run,
-         agent_exit: 0, timed_out: false, evidence: $evidence}' >"$run_dir/result.json"
+         agent_exit: 0, timed_out: false, duration_seconds: 10,
+         evidence: $evidence}' >"$run_dir/result.json"
+    jq -n '{exit_code: 0, timed_out: false, duration_seconds: 4}' \
+        >"$run_dir/judge-result.json"
 }
 
 add_usage() {
@@ -366,13 +369,13 @@ for run in 1 2; do
     add_run "$cost" demo cost with "$run" '[{"name":"A","score":100,"max":100}]'
     add_run "$cost" demo cost without "$run" '[{"name":"A","score":99,"max":100}]'
     add_usage "$cost" demo cost with "$run" usage \
-        '{"known":true,"source":"opencode-json","total_tokens":1000,"cost_usd":0.015,"currency":"USD"}'
+        '{"known":true,"source":"opencode-json","total_tokens":1000,"input_tokens":900,"output_tokens":100,"reasoning_tokens":0,"cache_read_tokens":0,"cost_usd":0.015,"currency":"USD"}'
     add_usage "$cost" demo cost without "$run" usage \
-        '{"known":true,"source":"opencode-json","total_tokens":900,"cost_usd":0.009,"currency":"USD"}'
+        '{"known":true,"source":"opencode-json","total_tokens":900,"input_tokens":800,"output_tokens":100,"reasoning_tokens":0,"cache_read_tokens":0,"cost_usd":0.009,"currency":"USD"}'
     add_usage "$cost" demo cost with "$run" judge-usage \
-        '{"known":true,"source":"claude-json","total_tokens":100,"cost_usd":0.003,"currency":"USD"}'
+        '{"known":true,"source":"claude-json","total_tokens":100,"input_tokens":80,"output_tokens":20,"reasoning_tokens":0,"cache_read_tokens":0,"cost_usd":0.003,"currency":"USD"}'
     add_usage "$cost" demo cost without "$run" judge-usage \
-        '{"known":true,"source":"claude-json","total_tokens":100,"cost_usd":0.001,"currency":"USD"}'
+        '{"known":true,"source":"claude-json","total_tokens":100,"input_tokens":80,"output_tokens":20,"reasoning_tokens":0,"cache_read_tokens":0,"cost_usd":0.001,"currency":"USD"}'
 done
 finish_suite "$cost"
 run_report "$cost" "$TMP/cost.json" --format json
@@ -391,6 +394,25 @@ if jq -e '
 else
     fail "JSON cost aggregation is wrong"
 fi
+if jq -e '
+    .cost.with.combined.tokens.input.total == 1960
+    and .cost.with.combined.tokens.output.total == 240
+    and .cost.with.combined.tokens.total == 2200
+    and .timing.agent_seconds == 40
+    and .timing.judge_seconds == 16
+    and .timing.runs == 4
+' "$TMP/cost.json" >/dev/null; then
+    pass "JSON splits input/output tokens and records agent/judge timing"
+else
+    fail "JSON token split or timing aggregation is wrong"
+fi
+assert_contains "$TMP/cost.cli" "input tokens" "CLI shows input tokens separately"
+assert_contains "$TMP/cost.cli" "output tokens" "CLI shows output tokens separately"
+assert_contains "$TMP/cost.cli" "Timing" "CLI renders a timing section"
+assert_contains "$TMP/cost.cli" "agent 40s" "CLI reports agent seconds"
+assert_contains "$TMP/cost.md" "input tokens" "Markdown shows input tokens separately"
+assert_contains "$TMP/cost.md" "output tokens" "Markdown shows output tokens separately"
+assert_contains "$TMP/cost.md" "## Timing" "Markdown renders a timing section"
 assert_contains "$TMP/cost.cli" "COST" "CLI renders a cost table"
 assert_contains "$TMP/cost.cli" "\$0.036" "CLI shows the with cost total"
 assert_contains "$TMP/cost.cli" "+\$0.016" \
@@ -413,11 +435,67 @@ if run_report "$cost" "$TMP/cost.all" --format all >/dev/null 2>&1 &&
         "HTML DELTA is the difference of the displayed totals"
     assert_contains "$cost/report/report.html" "Cost delta</div><div class=\"v pos\">+\$0.016" \
         "HTML cost delta card equals with minus without"
+    assert_contains "$cost/report/report.html" "input tokens" "HTML shows input tokens separately"
+    assert_contains "$cost/report/report.html" "output tokens" "HTML shows output tokens separately"
+    assert_contains "$cost/report/report.html" "Timing" "HTML renders a timing section"
     assert_not_contains "$cost/report/report.html" "/null" "HTML coverage never prints null"
     assert_contains "$cost/report/report.html" "2/2" "HTML coverage uses known/total"
 else
     fail "HTML cost rendering failed"
 fi
+
+base="$TMP/baseline-suite"
+cur="$TMP/current-suite"
+for dir in "$base" "$cur"; do
+    new_suite "$dir" 1 '["skills/fixture"]'
+    add_scenario "$dir" demo compare \
+        '{"context":"x","type":"weighted_checklist","checklist":[{"name":"A","description":"d","max_score":100}]}' \
+        '["skills/fixture"]'
+    add_run "$dir" demo compare with 1 '[{"name":"A","score":100,"max":100}]'
+done
+add_run "$base" demo compare without 1 '[{"name":"A","score":90,"max":100}]'
+add_run "$cur" demo compare without 1 '[{"name":"A","score":95,"max":100}]'
+finish_suite "$base"
+finish_suite "$cur"
+add_usage "$base" demo compare with 1 usage \
+    '{"known":true,"source":"opencode-json","total_tokens":1100,"input_tokens":1000,"output_tokens":100,"cost_usd":0.010,"currency":"USD"}'
+add_usage "$base" demo compare without 1 usage \
+    '{"known":true,"source":"opencode-json","total_tokens":1000,"input_tokens":900,"output_tokens":100,"cost_usd":0.008,"currency":"USD"}'
+add_usage "$base" demo compare with 1 judge-usage \
+    '{"known":true,"source":"claude-json","total_tokens":220,"input_tokens":200,"output_tokens":20,"cost_usd":0.002,"currency":"USD"}'
+add_usage "$base" demo compare without 1 judge-usage \
+    '{"known":true,"source":"claude-json","total_tokens":220,"input_tokens":200,"output_tokens":20,"cost_usd":0.002,"currency":"USD"}'
+add_usage "$cur" demo compare with 1 usage \
+    '{"known":true,"source":"opencode-json","total_tokens":1300,"input_tokens":1200,"output_tokens":100,"cost_usd":0.014,"currency":"USD"}'
+add_usage "$cur" demo compare without 1 usage \
+    '{"known":true,"source":"opencode-json","total_tokens":1100,"input_tokens":1000,"output_tokens":100,"cost_usd":0.010,"currency":"USD"}'
+add_usage "$cur" demo compare with 1 judge-usage \
+    '{"known":true,"source":"claude-json","total_tokens":220,"input_tokens":200,"output_tokens":20,"cost_usd":0.002,"currency":"USD"}'
+add_usage "$cur" demo compare without 1 judge-usage \
+    '{"known":true,"source":"claude-json","total_tokens":220,"input_tokens":200,"output_tokens":20,"cost_usd":0.002,"currency":"USD"}'
+
+run_report "$cur" "$TMP/compare.json" --format json --baseline "$base"
+run_report "$cur" "$TMP/compare.cli" --format cli --baseline "$base"
+run_report "$cur" "$TMP/compare.md" --format md --baseline "$base"
+run_report "$cur" "$TMP/compare.all" --format all --baseline "$base" >/dev/null 2>&1
+if jq -e '
+    .comparison.comparable_scenarios == 1
+    and ((.comparison.delta.with_cost_per_run - 0.004) | if . < 0 then -. else . end) < 0.0000001
+    and ((.comparison.delta.without_cost_per_run - 0.002) | if . < 0 then -. else . end) < 0.0000001
+    and .comparison.delta.effect == -5
+    and .comparison.delta.with_input_tokens_per_run == 200
+' "$TMP/compare.json" >/dev/null; then
+    pass "JSON compares per-run cost, effect and input tokens with a baseline"
+else
+    fail "baseline comparison JSON is wrong"
+fi
+assert_contains "$TMP/compare.cli" "Change since baseline" "CLI renders a baseline section"
+assert_contains "$TMP/compare.cli" "Cost with / run" "CLI shows per-run cost change"
+assert_contains "$TMP/compare.cli" "+\$0.004" "CLI shows the per-run cost delta"
+assert_contains "$TMP/compare.cli" "Input with / run" "CLI shows per-run input token change"
+assert_contains "$TMP/compare.md" "Change since baseline" "Markdown renders a baseline section"
+assert_contains "$cur/report/report.html" "Change since baseline" "HTML renders a baseline section"
+assert_contains "$cur/report/report.html" "+\$0.004" "HTML shows the per-run cost delta"
 
 tiny="$TMP/tiny-cost"
 new_suite "$tiny" 1 '["skills/fixture"]'

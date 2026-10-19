@@ -55,6 +55,12 @@
                 score: ([$rows[].score] | mean),
                 max: ([$rows[].max] | mean),
                 percent: ([$rows[].percent] | mean_present),
+                timing: {
+                    runs_total: ($rows | length),
+                    agent_seconds: ([$rows[].duration_seconds] | map(select(. != null)) | sum_present),
+                    judge_seconds: ([$rows[].judge_duration_seconds] | map(select(. != null)) | sum_present),
+                    timed_out_runs: ([$rows[] | select(.timed_out == true)] | length)
+                },
                 usage: {
                     agent: usage_stats($rows; "usage"),
                     judge: usage_stats($rows; "judge_usage"),

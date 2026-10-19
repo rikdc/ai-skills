@@ -16,6 +16,7 @@
 #   scripts/eval-report.sh results/eval-suite/<id>
 #   scripts/eval-report.sh results/eval-suite/<id> --format all
 #   scripts/eval-report.sh results/eval-suite/<id> --format json > report.json
+#   scripts/eval-report.sh results/eval-suite/<new> --baseline results/eval-suite/<old>
 #
 # Reports are written to <suite>/report/ by default.
 
@@ -29,6 +30,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 JQ_DIR="$SCRIPT_DIR/jq"
 
 SUITE_DIR=""
+BASELINE_DIR=""
 FORMAT="cli"
 OUT_DIR=""
 NO_COLOR_FLAG=0
@@ -44,6 +46,8 @@ Usage:
 Options:
   --format FORMAT   cli (default), json, md, html, or all
   --out DIR         report directory (default SUITE_DIR/report)
+  --baseline DIR    compare this suite with an earlier suite; adds
+                    per-run score, cost and token deltas
   --no-color        disable ANSI colour even on a terminal
   -h, --help        show this help
 
@@ -59,7 +63,7 @@ die() {
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --format | --out)
+        --format | --out | --baseline)
             if [[ $# -lt 2 || -z "$2" ]]; then
                 echo "eval-report: $1 needs a value" >&2
                 usage >&2
@@ -68,6 +72,7 @@ while [[ $# -gt 0 ]]; do
             case "$1" in
                 --format) FORMAT="$2" ;;
                 --out) OUT_DIR="$2" ;;
+                --baseline) BASELINE_DIR="$2" ;;
                 *) ;;
             esac
             shift 2
@@ -109,6 +114,18 @@ for required in manifest.json suite.json results.jsonl; do
 done
 jq -e . "$SUITE_DIR/manifest.json" >/dev/null 2>&1 || die "manifest.json is not valid JSON"
 jq -e . "$SUITE_DIR/suite.json" >/dev/null 2>&1 || die "suite.json is not valid JSON"
+if [[ -n "$BASELINE_DIR" ]]; then
+    [[ -d "$BASELINE_DIR" ]] || die "no such baseline suite directory: $BASELINE_DIR"
+    BASELINE_DIR="$(cd "$BASELINE_DIR" && pwd)"
+    for required in manifest.json suite.json results.jsonl; do
+        [[ -f "$BASELINE_DIR/$required" ]] ||
+            die "$BASELINE_DIR is not a suite directory: $required is missing"
+    done
+    jq -e . "$BASELINE_DIR/manifest.json" >/dev/null 2>&1 ||
+        die "baseline manifest.json is not valid JSON"
+    jq -e . "$BASELINE_DIR/suite.json" >/dev/null 2>&1 ||
+        die "baseline suite.json is not valid JSON"
+fi
 
 [[ -n "$OUT_DIR" ]] || OUT_DIR="$SUITE_DIR/report"
 if ! mkdir -p "$OUT_DIR"; then
@@ -217,6 +234,8 @@ while IFS=$'\t' read -r plugin scenario declared_units; do
             status="missing"
             agent_exit="null"
             timed_out="false"
+            duration_seconds="null"
+            judge_duration_seconds="null"
             mech_items="[]"
             judged_items="null"
             usage_json='{"known":false,"source":"none"}'
@@ -228,8 +247,13 @@ while IFS=$'\t' read -r plugin scenario declared_units; do
                     agent_exit="$(jq -r '.agent_exit // 0' "$result" 2>/dev/null)"
                     [[ "$agent_exit" =~ ^-?[0-9]+$ ]] || agent_exit="null"
                     timed_out="$(jq -r '.timed_out // false' "$result" 2>/dev/null)"
+                    duration_seconds="$(jq -r '.duration_seconds // null' "$result" 2>/dev/null)"
                 else
                     status="missing"
+                fi
+                if [[ -f "$run_dir/judge-result.json" ]]; then
+                    judge_duration_seconds="$(jq -r '.duration_seconds // null' \
+                        "$run_dir/judge-result.json" 2>/dev/null || echo null)"
                 fi
 
                 if [[ -f "$mechanical" ]]; then
@@ -261,6 +285,8 @@ while IFS=$'\t' read -r plugin scenario declared_units; do
 
             jq -nc --arg arm "$arm" --argjson run "$run" --arg status "$status" \
                 --argjson agent_exit "$agent_exit" --argjson timed_out "$timed_out" \
+                --argjson duration "$duration_seconds" \
+                --argjson judge_duration "$judge_duration_seconds" \
                 --argjson mech_items "$mech_items" --argjson judged_items "$judged_items" \
                 --argjson usage "$usage_json" --argjson judge_usage "$judge_usage_json" \
                 --arg evidence "$evidence" '
@@ -270,6 +296,8 @@ while IFS=$'\t' read -r plugin scenario declared_units; do
                     status: $status,
                     agent_exit: $agent_exit,
                     timed_out: $timed_out,
+                    duration_seconds: $duration,
+                    judge_duration_seconds: $judge_duration,
                     mechanical: {items: $mech_items},
                     judged: (if $judged_items == null then null
                              else {items: $judged_items} end),
@@ -302,6 +330,23 @@ jq -s --arg suite "$SUITE_DIR" --arg label "$UNIT_LABEL" \
 
 jq -e '.verdict.state' "$TMP/report.json" >/dev/null 2>&1 ||
     die "could not derive a verdict from the suite"
+
+# --- optional baseline comparison ---------------------------------------------
+
+if [[ -n "$BASELINE_DIR" ]]; then
+    mkdir -p "$TMP/baseline-report" || die "cannot create a temporary baseline report directory"
+    if ! "$SCRIPT_DIR/eval-report.sh" "$BASELINE_DIR" --format json --no-color \
+        --out "$TMP/baseline-report" >"$TMP/baseline.json" 2>"$TMP/baseline.err"; then
+        die "cannot build the baseline report: $(tail -n 1 "$TMP/baseline.err")"
+    fi
+    jq -e '.verdict.state' "$TMP/baseline.json" >/dev/null 2>&1 ||
+        die "could not derive a verdict from the baseline suite"
+    jq --slurpfile base "$TMP/baseline.json" \
+        -f "$JQ_DIR/compare-baseline.jq" "$TMP/report.json" \
+        >"$TMP/report.with-baseline.json" ||
+        die "could not compare the suite with $BASELINE_DIR"
+    mv "$TMP/report.with-baseline.json" "$TMP/report.json"
+fi
 
 # --- renderers ----------------------------------------------------------------
 
@@ -433,7 +478,19 @@ render_md() {
                   ("| total | " + ($m.cost.with.combined.cost.total | money) + " | "
                    + ($m.cost.without.combined.cost.total | money) + " | "
                    + (sum_delta($m.cost.with.combined.cost.total; $m.cost.without.combined.cost.total) | money_delta) + " |"),
-                  ("| tokens | " + ($m.cost.with.combined.tokens.total | tokens) + " | "
+                  ("| input tokens | " + ($m.cost.with.combined.tokens.input.total | tokens) + " | "
+                   + ($m.cost.without.combined.tokens.input.total | tokens) + " | "
+                   + (sum_delta($m.cost.with.combined.tokens.input.total; $m.cost.without.combined.tokens.input.total) | token_delta) + " |"),
+                  ("| output tokens | " + ($m.cost.with.combined.tokens.output.total | tokens) + " | "
+                   + ($m.cost.without.combined.tokens.output.total | tokens) + " | "
+                   + (sum_delta($m.cost.with.combined.tokens.output.total; $m.cost.without.combined.tokens.output.total) | token_delta) + " |"),
+                  ("| reasoning tokens | " + ($m.cost.with.combined.tokens.reasoning.total | tokens) + " | "
+                   + ($m.cost.without.combined.tokens.reasoning.total | tokens) + " | "
+                   + (sum_delta($m.cost.with.combined.tokens.reasoning.total; $m.cost.without.combined.tokens.reasoning.total) | token_delta) + " |"),
+                  ("| cache read | " + ($m.cost.with.combined.tokens.cache_read.total | tokens) + " | "
+                   + ($m.cost.without.combined.tokens.cache_read.total | tokens) + " | "
+                   + (sum_delta($m.cost.with.combined.tokens.cache_read.total; $m.cost.without.combined.tokens.cache_read.total) | token_delta) + " |"),
+                  ("| total tokens | " + ($m.cost.with.combined.tokens.total | tokens) + " | "
                    + ($m.cost.without.combined.tokens.total | tokens) + " | "
                    + (sum_delta($m.cost.with.combined.tokens.total; $m.cost.without.combined.tokens.total) | token_delta) + " |")
             ' "$TMP/report.json"
@@ -456,6 +513,19 @@ render_md() {
                 printf 'Efficiency: — (partial cost coverage or no positive score delta).\n'
             fi
         fi
+        if [[ -f "$TMP/comparison.md" ]]; then
+            cat "$TMP/comparison.md"
+        fi
+        printf '\n## Timing\n\n'
+        printf -- '- Wall clock: %s\n' \
+            "$(cli_seconds "$(jq -r '.timing.wall_seconds // "null"' "$TMP/report.json")")"
+        printf -- '- Agent: %s\n' \
+            "$(cli_seconds "$(jq -r '.timing.agent_seconds // "null"' "$TMP/report.json")")"
+        printf -- '- Judge: %s\n' \
+            "$(cli_seconds "$(jq -r '.timing.judge_seconds // "null"' "$TMP/report.json")")"
+        printf -- '- Runs: %s, timed out: %s\n' \
+            "$(jq -r '.timing.runs' "$TMP/report.json")" \
+            "$(jq -r '.timing.timed_out_runs' "$TMP/report.json")"
         printf "\nRaw JSON: \`report.json\`  ·  HTML: \`report.html\`\n"
     } >"$TMP/report.md"
 }
@@ -554,6 +624,10 @@ HTML
                         elif . >= 1000000 then (((. / 1000000) * 10 | round / 10) | tostring) + "M"
                         elif . >= 1000 then (((. / 1000) * 10 | round / 10) | tostring) + "k"
                         else (. | tostring) end;
+            def secs: if . == null then "—"
+                      elif . >= 3600 then (((. / 3600) * 10 | round / 10) | tostring) + "h"
+                      elif . >= 60 then (((. / 60) | round) | tostring) + "m"
+                      else ((. | round) | tostring) + "s" end;
             def token_delta: if . == null then "—"
                              elif . > 0 then "+" + (. | tokens)
                              elif . < 0 then "-" + ((. * -1) | tokens)
@@ -634,7 +708,11 @@ HTML
                   "<tr><td>agent</td><td class=\"num\">\($m.cost.with.agent.cost.total | money)</td><td class=\"num\">\($m.cost.without.agent.cost.total | money)</td><td class=\"num\">\(sum_delta($m.cost.with.agent.cost.total; $m.cost.without.agent.cost.total) | money_delta)</td><td>\(coverage($m.cost.with.agent.cost)) / \(coverage($m.cost.without.agent.cost))</td></tr>",
                   "<tr><td>judge</td><td class=\"num\">\($m.cost.with.judge.cost.total | money)</td><td class=\"num\">\($m.cost.without.judge.cost.total | money)</td><td class=\"num\">\(sum_delta($m.cost.with.judge.cost.total; $m.cost.without.judge.cost.total) | money_delta)</td><td>\(coverage($m.cost.with.judge.cost)) / \(coverage($m.cost.without.judge.cost))</td></tr>",
                   "<tr><td>total</td><td class=\"num\">\($m.cost.with.combined.cost.total | money)</td><td class=\"num\">\($m.cost.without.combined.cost.total | money)</td><td class=\"num\">\(sum_delta($m.cost.with.combined.cost.total; $m.cost.without.combined.cost.total) | money_delta)</td><td>\(coverage($m.cost.with.combined.cost)) / \(coverage($m.cost.without.combined.cost))</td></tr>",
-                  "<tr><td>tokens</td><td class=\"num\">\($m.cost.with.combined.tokens.total | tokens)</td><td class=\"num\">\($m.cost.without.combined.tokens.total | tokens)</td><td class=\"num\">\(sum_delta($m.cost.with.combined.tokens.total; $m.cost.without.combined.tokens.total) | token_delta)</td><td>\(coverage($m.cost.with.combined.tokens)) / \(coverage($m.cost.without.combined.tokens))</td></tr>",
+                  "<tr><td>input tokens</td><td class=\"num\">\($m.cost.with.combined.tokens.input.total | tokens)</td><td class=\"num\">\($m.cost.without.combined.tokens.input.total | tokens)</td><td class=\"num\">\(sum_delta($m.cost.with.combined.tokens.input.total; $m.cost.without.combined.tokens.input.total) | token_delta)</td><td>\(coverage($m.cost.with.combined.tokens.input)) / \(coverage($m.cost.without.combined.tokens.input))</td></tr>",
+                  "<tr><td>output tokens</td><td class=\"num\">\($m.cost.with.combined.tokens.output.total | tokens)</td><td class=\"num\">\($m.cost.without.combined.tokens.output.total | tokens)</td><td class=\"num\">\(sum_delta($m.cost.with.combined.tokens.output.total; $m.cost.without.combined.tokens.output.total) | token_delta)</td><td>\(coverage($m.cost.with.combined.tokens.output)) / \(coverage($m.cost.without.combined.tokens.output))</td></tr>",
+                  "<tr><td>reasoning tokens</td><td class=\"num\">\($m.cost.with.combined.tokens.reasoning.total | tokens)</td><td class=\"num\">\($m.cost.without.combined.tokens.reasoning.total | tokens)</td><td class=\"num\">\(sum_delta($m.cost.with.combined.tokens.reasoning.total; $m.cost.without.combined.tokens.reasoning.total) | token_delta)</td><td>\(coverage($m.cost.with.combined.tokens.reasoning)) / \(coverage($m.cost.without.combined.tokens.reasoning))</td></tr>",
+                  "<tr><td>cache read</td><td class=\"num\">\($m.cost.with.combined.tokens.cache_read.total | tokens)</td><td class=\"num\">\($m.cost.without.combined.tokens.cache_read.total | tokens)</td><td class=\"num\">\(sum_delta($m.cost.with.combined.tokens.cache_read.total; $m.cost.without.combined.tokens.cache_read.total) | token_delta)</td><td>\(coverage($m.cost.with.combined.tokens.cache_read)) / \(coverage($m.cost.without.combined.tokens.cache_read))</td></tr>",
+                  "<tr><td>total tokens</td><td class=\"num\">\($m.cost.with.combined.tokens.total | tokens)</td><td class=\"num\">\($m.cost.without.combined.tokens.total | tokens)</td><td class=\"num\">\(sum_delta($m.cost.with.combined.tokens.total; $m.cost.without.combined.tokens.total) | token_delta)</td><td>\(coverage($m.cost.with.combined.tokens)) / \(coverage($m.cost.without.combined.tokens))</td></tr>",
                   "</tbody></table>",
                   "<p class=\"note\">Unknown usage is never counted as zero. Coverage is known runs / total runs.</p>",
                   (if $m.cost.cost_per_delta_point != null then
@@ -643,6 +721,8 @@ HTML
                       "<p class=\"note\">Efficiency: — (partial cost coverage or no positive score delta).</p>"
                    end)
                end),
+              "<h2>Timing</h2>",
+              "<p class=\"note\">Wall \($m.timing.wall_seconds | secs) · agent \($m.timing.agent_seconds | secs) · judge \($m.timing.judge_seconds | secs) · \($m.timing.runs) run(s), \($m.timing.timed_out_runs) timed out.</p>",
               "<h2>Evidence</h2>",
               "<p class=\"note\">Relative links; open from the suite directory. The raw JSON is beside this file.</p>",
               "<ul class=\"links\">",
@@ -650,11 +730,120 @@ HTML
               "<li><a href=\"report.json\">report.json</a></li>",
               "</ul>"
         ' --arg cpp "$cpp_text" "$TMP/report.json"
+        if [[ -f "$TMP/comparison.html" ]]; then
+            cat "$TMP/comparison.html"
+        fi
         cat <<'HTML'
 </body>
 </html>
 HTML
     } >"$TMP/report.html"
+}
+
+# Build the baseline section once and reuse it in CLI, Markdown and HTML.
+# Values are preformatted here so all three formats show the same numbers.
+render_comparison_files() {
+    [[ -n "$BASELINE_DIR" ]] || return 0
+
+    local suite baseline comparable current_total baseline_total
+    suite="$(jq -r '.comparison.current.suite_dir' "$TMP/report.json")"
+    baseline="$(jq -r '.comparison.baseline.suite_dir' "$TMP/report.json")"
+    comparable="$(jq -r '.comparison.comparable_scenarios' "$TMP/report.json")"
+    current_total="$(jq -r '.comparison.current_scenarios' "$TMP/report.json")"
+    baseline_total="$(jq -r '.comparison.baseline_scenarios' "$TMP/report.json")"
+
+    jq -r '
+        .comparison as $c
+        | [
+            ["Score with", "score", $c.baseline.with, $c.current.with, $c.delta.with_score],
+            ["Score without", "score", $c.baseline.without, $c.current.without, $c.delta.without_score],
+            ["Score effect", "score", $c.baseline.delta, $c.current.delta, $c.delta.effect],
+            ["Cost with / run", "money", $c.baseline.cost.with_per_run, $c.current.cost.with_per_run, $c.delta.with_cost_per_run],
+            ["Cost without / run", "money", $c.baseline.cost.without_per_run, $c.current.cost.without_per_run, $c.delta.without_cost_per_run],
+            ["Cost pair / run", "money", $c.baseline.cost.pair_per_run, $c.current.cost.pair_per_run, $c.delta.pair_cost_per_run],
+            ["Agent cost / run", "money", $c.baseline.cost.agent_per_run, $c.current.cost.agent_per_run, $c.delta.agent_cost_per_run],
+            ["Judge cost / run", "money", $c.baseline.cost.judge_per_run, $c.current.cost.judge_per_run, $c.delta.judge_cost_per_run],
+            ["Input with / run", "tokens", $c.baseline.tokens.with_input_per_run, $c.current.tokens.with_input_per_run, $c.delta.with_input_tokens_per_run],
+            ["Output with / run", "tokens", $c.baseline.tokens.with_output_per_run, $c.current.tokens.with_output_per_run, $c.delta.with_output_tokens_per_run],
+            ["Input without / run", "tokens", $c.baseline.tokens.without_input_per_run, $c.current.tokens.without_input_per_run, $c.delta.without_input_tokens_per_run],
+            ["Output without / run", "tokens", $c.baseline.tokens.without_output_per_run, $c.current.tokens.without_output_per_run, $c.delta.without_output_tokens_per_run],
+            ["Total with / run", "tokens", $c.baseline.tokens.with_total_per_run, $c.current.tokens.with_total_per_run, $c.delta.with_total_tokens_per_run],
+            ["Total without / run", "tokens", $c.baseline.tokens.without_total_per_run, $c.current.tokens.without_total_per_run, $c.delta.without_total_tokens_per_run],
+            ["Wall time", "seconds", $c.baseline.timing.wall_seconds, $c.current.timing.wall_seconds, $c.delta.wall_seconds],
+            ["Agent time", "seconds", $c.baseline.timing.agent_seconds, $c.current.timing.agent_seconds, $c.delta.agent_seconds],
+            ["Judge time", "seconds", $c.baseline.timing.judge_seconds, $c.current.timing.judge_seconds, $c.delta.judge_seconds]
+        ][]
+        | map(if . == null then "null" else tostring end)
+        | @tsv
+    ' "$TMP/report.json" >"$TMP/comparison.tsv"
+
+    {
+        printf '\nChange since baseline\n'
+        printf '  Baseline: %s\n' "$baseline"
+        printf '  Comparable scenarios: %s of %s current / %s baseline\n' \
+            "$comparable" "$current_total" "$baseline_total"
+        printf '\n%-22s %12s %12s %12s\n' "METRIC" "BASELINE" "CURRENT" "DELTA"
+    } >"$TMP/comparison.cli"
+
+    {
+        printf '\n## Change since baseline\n\n'
+        # shellcheck disable=SC2016  # literal Markdown backticks
+        printf -- '- Baseline: `%s`\n' "$baseline"
+        # shellcheck disable=SC2016  # literal Markdown backticks
+        printf -- '- Current: `%s`\n' "$suite"
+        printf -- '- Comparable scenarios: %s of %s current / %s baseline\n\n' \
+            "$comparable" "$current_total" "$baseline_total"
+        printf '| Metric | Baseline | Current | Delta |\n| --- | --- | --- | --- |\n'
+    } >"$TMP/comparison.md"
+
+    {
+        printf '<h2>Change since baseline</h2>\n'
+        printf '<p class="note">Baseline: <code>%s</code> · Current: <code>%s</code> · Comparable scenarios: %s of %s current / %s baseline</p>\n' \
+            "$(jq -rn --arg s "$baseline" '$s | @html')" \
+            "$(jq -rn --arg s "$suite" '$s | @html')" \
+            "$comparable" "$current_total" "$baseline_total"
+        printf '<table><thead><tr><th>Metric</th><th>Baseline</th><th>Current</th><th>Delta</th></tr></thead><tbody>\n'
+    } >"$TMP/comparison.html"
+
+    local label kind base current delta baseline_v current_v delta_v
+    while IFS=$'\t' read -r label kind base current delta; do
+        [[ -n "$label" ]] || continue
+        case "$kind" in
+            score)
+                baseline_v="$(cli_num "$base")"
+                current_v="$(cli_num "$current")"
+                delta_v="$(cli_delta "$delta")"
+                ;;
+            money)
+                baseline_v="$(cli_money "$base")"
+                current_v="$(cli_money "$current")"
+                delta_v="$(cli_money_delta "$delta")"
+                ;;
+            tokens)
+                baseline_v="$(cli_tokens "$base")"
+                current_v="$(cli_tokens "$current")"
+                delta_v="$(cli_tokens_delta "$delta")"
+                ;;
+            seconds)
+                baseline_v="$(cli_seconds "$base")"
+                current_v="$(cli_seconds "$current")"
+                delta_v="$(cli_seconds_delta "$delta")"
+                ;;
+            *)
+                baseline_v="$base"
+                current_v="$current"
+                delta_v="$delta"
+                ;;
+        esac
+        printf '%-22s %12s %12s %12s\n' "$label" "$baseline_v" "$current_v" "$delta_v" \
+            >>"$TMP/comparison.cli"
+        printf '| %s | %s | %s | %s |\n' "$label" "$baseline_v" "$current_v" "$delta_v" \
+            >>"$TMP/comparison.md"
+        printf '<tr><td>%s</td><td class="num">%s</td><td class="num">%s</td><td class="num">%s</td></tr>\n' \
+            "$label" "$baseline_v" "$current_v" "$delta_v" >>"$TMP/comparison.html"
+    done <"$TMP/comparison.tsv"
+
+    printf '</tbody></table>\n' >>"$TMP/comparison.html"
 }
 
 cli_num() {
@@ -730,6 +919,34 @@ cli_tokens_delta() {
         if (n >= 1000000) printf "%s%.1fM", sign, n / 1000000
         else if (n >= 1000) printf "%s%.1fk", sign, n / 1000
         else printf "%s%.0f", sign, n
+    }'
+}
+
+cli_seconds() {
+    local value="$1"
+    if [[ "$value" == "null" || -z "$value" ]]; then
+        printf '—'
+        return
+    fi
+    awk -v n="$value" 'BEGIN {
+        if (n >= 3600) printf "%.1fh", n / 3600
+        else if (n >= 60) printf "%.0fm", n / 60
+        else printf "%.0fs", n
+    }'
+}
+
+cli_seconds_delta() {
+    local value="$1"
+    if [[ "$value" == "null" || -z "$value" ]]; then
+        printf '—'
+        return
+    fi
+    awk -v n="$value" 'BEGIN {
+        sign = (n > 0) ? "+" : ((n < 0) ? "-" : "")
+        if (n < 0) n = -n
+        if (n >= 3600) printf "%s%.1fh", sign, n / 3600
+        else if (n >= 60) printf "%s%.0fm", sign, n / 60
+        else printf "%s%.0fs", sign, n
     }'
 }
 
@@ -815,18 +1032,29 @@ render_cli() {
                  sum_delta(.cost.with.judge.cost.total; .cost.without.judge.cost.total)],
                 ["total", .cost.with.combined.cost.total, .cost.without.combined.cost.total,
                  sum_delta(.cost.with.combined.cost.total; .cost.without.combined.cost.total)],
-                ["tokens", .cost.with.combined.tokens.total, .cost.without.combined.tokens.total,
+                ["input tokens", .cost.with.combined.tokens.input.total, .cost.without.combined.tokens.input.total,
+                 sum_delta(.cost.with.combined.tokens.input.total; .cost.without.combined.tokens.input.total)],
+                ["output tokens", .cost.with.combined.tokens.output.total, .cost.without.combined.tokens.output.total,
+                 sum_delta(.cost.with.combined.tokens.output.total; .cost.without.combined.tokens.output.total)],
+                ["reasoning tokens", .cost.with.combined.tokens.reasoning.total, .cost.without.combined.tokens.reasoning.total,
+                 sum_delta(.cost.with.combined.tokens.reasoning.total; .cost.without.combined.tokens.reasoning.total)],
+                ["cache read", .cost.with.combined.tokens.cache_read.total, .cost.without.combined.tokens.cache_read.total,
+                 sum_delta(.cost.with.combined.tokens.cache_read.total; .cost.without.combined.tokens.cache_read.total)],
+                ["total tokens", .cost.with.combined.tokens.total, .cost.without.combined.tokens.total,
                  sum_delta(.cost.with.combined.tokens.total; .cost.without.combined.tokens.total)]
             ][] | map(v) | @tsv
         ' "$TMP/report.json" | while IFS=$'\t' read -r label w o d; do
-            if [[ "$label" == "tokens" ]]; then
-                printf '%-18s %12s %12s %12s\n' "$label" \
-                    "$(cli_tokens "$w")" "$(cli_tokens "$o")" \
-                    "$(cli_tokens_delta "$d")"
-            else
-                printf '%-18s %12s %12s %12s\n' "$label" \
-                    "$(cli_money "$w")" "$(cli_money "$o")" "$(cli_money_delta "$d")"
-            fi
+            case "$label" in
+                "input tokens" | "output tokens" | "reasoning tokens" | "cache read" | "total tokens")
+                    printf '%-18s %12s %12s %12s\n' "$label" \
+                        "$(cli_tokens "$w")" "$(cli_tokens "$o")" \
+                        "$(cli_tokens_delta "$d")"
+                    ;;
+                *)
+                    printf '%-18s %12s %12s %12s\n' "$label" \
+                        "$(cli_money "$w")" "$(cli_money "$o")" "$(cli_money_delta "$d")"
+                    ;;
+            esac
         done
         local total_known total_runs partial=""
         total_known=$((with_known + without_known))
@@ -849,6 +1077,18 @@ render_cli() {
             printf 'Efficiency: — (cost coverage or score delta does not support a per-point claim)\n'
         fi
     fi
+
+    if [[ -f "$TMP/comparison.cli" ]]; then
+        cat "$TMP/comparison.cli"
+    fi
+
+    printf '\n%s\n' "$(c '1' 'Timing')"
+    printf '  wall %s · agent %s · judge %s · %s run(s), %s timed out\n' \
+        "$(cli_seconds "$(jq -r '.timing.wall_seconds // "null"' "$TMP/report.json")")" \
+        "$(cli_seconds "$(jq -r '.timing.agent_seconds // "null"' "$TMP/report.json")")" \
+        "$(cli_seconds "$(jq -r '.timing.judge_seconds // "null"' "$TMP/report.json")")" \
+        "$(jq -r '.timing.runs' "$TMP/report.json")" \
+        "$(jq -r '.timing.timed_out_runs' "$TMP/report.json")"
 
     printf '\n%s\n' "$(c '1' 'Regressions')"
     if [[ "$(jq -r '.totals.regressions' "$TMP/report.json")" == "0" ]]; then
@@ -910,6 +1150,8 @@ render_cli() {
 }
 
 # --- write and print ----------------------------------------------------------
+
+render_comparison_files
 
 WROTE=()
 

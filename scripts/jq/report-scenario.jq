@@ -17,7 +17,12 @@
                 percent_min: (if ($percents | length) == 0 then null else ($percents | min) end),
                 percent_max: (if ($percents | length) == 0 then null else ($percents | max) end),
                 pending_points: ([$rows[].pending_points] | add // 0),
-                failures: ([$rows[] | select(.status != "ok")] | length)
+                failures: ([$rows[] | select(.status != "ok")] | length),
+                timing: {
+                    agent_seconds: ([$rows[].duration_seconds] | map(select(. != null)) | add // null),
+                    judge_seconds: ([$rows[].judge_duration_seconds] | map(select(. != null)) | add // null),
+                    timed_out_runs: ([$rows[] | select(.timed_out == true)] | length)
+                }
             };
         ($crit[0].checklist) as $rubric
         | ([$rubric[].max_score] | add // 0) as $denominator

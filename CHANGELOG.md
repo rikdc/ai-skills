@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   per-criterion pairing, n-run mean/min/max, scenario and overall aggregates,
   regression detection, conservative verdicts, and CLI/JSON/Markdown/HTML
   output (self-contained, escaped, colour only on a TTY)
+- Reports now split tokens into input, output, reasoning, cache-read and total,
+  show agent/judge/wall timing with timed-out-run counts, and accept
+  `--baseline DIR` to compare score, per-run cost and token deltas with an
+  earlier suite; `eval-grade.sh` records `judge-result.json` timing
 - Added `make eval` with `PLUGIN`, `SKILL`, `UNIT`, `RUNS`, `JOBS`, `AGENT`,
   `JUDGE`, `DRY` and `REPORT`; `DRY=1` prints the plan and report destination,
   and a real run captures its new suite directory and prints the CLI report

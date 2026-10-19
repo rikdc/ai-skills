@@ -132,6 +132,14 @@ being measured. A scenario without unit metadata is rejected when `--unit` is
 used. Execution is `--arm`, `--runs`, `--jobs`, and `--timeout`; staging and
 scoring still happen in `eval-run.sh`.
 
+`--jobs` parallelizes scenarios, not the arms or runs inside one scenario. A
+three-scenario, three-run, both-arm suite is 18 agent invocations plus up to 18
+judge invocations; with the default `--jobs 1` those model calls run one after
+another, so an hour-long suite is expected rather than a hang. `--plan` prints
+the invocation counts and suggests `--jobs N` when scenarios would run
+sequentially. Each run is also capped by `--timeout` (agent) and
+`--judge-timeout` (judge).
+
 Each suite writes one directory under `results/eval-suite/`:
 
 | Path | Contents |
@@ -180,7 +188,11 @@ picks the newest directory in `results/`), renders the report, and prints the
 CLI report plus the HTML path.
 
 `scripts/eval-report.sh SUITE_DIR [--format cli|json|md|html|all] [--no-color]
-[--out DIR]` is read-only. It never reruns an eval or calls a model. Every
+[--out DIR] [--baseline DIR]` is read-only. It never reruns an eval or calls a
+model. `--baseline` compares the suite with an earlier one: score, per-run
+cost, and input/output token deltas for the whole suite and for each scenario
+present in both. The comparison is in `report.json` under `comparison`, and in
+the CLI, Markdown and HTML reports. Every
 score uses the rubric's fixed `max_score` sum: a run with only 52 of 100
 points judged is `52/100 + 48 pending`, never renormalised to 100%. Criteria
 are paired by name across arms, and a criterion contributes a delta only when
@@ -206,9 +218,13 @@ relative evidence links. A report also treats a declared run whose directory is
 absent as a failed run, and the suite keeps the rubric's fixed denominator even
 when only part of a checklist is scored.
 
-The suite and report remain deliberately large Bash scripts with embedded jq;
-extracting named `.jq` programs is a maintenance follow-up, not a behavioral
-change. Both use `set -u`/`pipefail` to match the rest of the harness.
+The report's `timing` block separates wall clock, agent time and judge time,
+and counts timed-out runs. New runs record `judge-result.json` beside
+`result.json`, so the report can show where a slow suite spent its time.
+
+The largest jq programs live in `scripts/jq/` and load with `jq -f`; the shell
+scripts keep selection, staging and rendering. Both use `set -u`/`pipefail` to
+match the rest of the harness.
 
 ## Cost and tokens
 
@@ -245,10 +261,24 @@ used.
 
 Suites sum cost and tokens only over runs that reported them. `results.jsonl`
 and `suite.json` carry `usage`/`judge_usage`, per-arm totals and coverage, and
-`cost_known_runs`/`cost_total_runs`; `summary.md` gains a cost table. The
-report's CLI/Markdown/HTML show `partial` coverage and withhold a per-point
-efficiency claim unless both score and cost deltas are known for every run.
-Cost never changes the verdict.
+`cost_known_runs`/`cost_total_runs`; `summary.md` gains a cost table. Report
+token rows are split into input, output, reasoning, cache-read and total;
+`report.json` carries the same breakdown, plus per-run means and with/without
+deltas. Missing components are `null`, never zero. The report's
+CLI/Markdown/HTML show `partial` coverage and withhold a per-point efficiency
+claim unless both score and cost deltas are known for every run. Cost never
+changes the verdict.
+
+Compare a fresh run with a baseline to see what changed:
+
+```bash
+scripts/eval-report.sh results/eval-suite/<new> \
+    --baseline results/eval-suite/<old> --format all
+```
+
+The comparison uses per-run means, so suites with different `--runs` counts
+remain comparable. It reports score, cost and input/output token deltas; a
+scenario missing from either suite is excluded from the per-scenario table.
 
 ## Grading pending criteria
 

@@ -100,7 +100,8 @@ runs in CI:
 
 - the runner's and suite's own selftests
 - discovery matches `plugins/*/evals/*/` and ignores worktrees
-- `--plan` invocation counts, and shards that partition without overlap
+- `--plan` invocation counts, the `--jobs` hint, and shards that partition
+  without overlap
 - `--unit` selection: skills install only the named skill, commands only the
   named command, hooks are accepted without an install, and unknown units
   fail clearly
@@ -116,7 +117,7 @@ runs in CI:
 - parallel execution, `--resume`, and aggregation, with a partial rubric kept
   against the fixed 100-point denominator
 - usage capture: suite cost sums, partial coverage, unknown never summed as
-  zero, judge-usage backfill, and `--resume` usage backfill
+  zero, judge timing, judge-usage backfill, and `--resume` usage backfill
 - the judge adapter rejects invalid judgements and folds valid ones into
   per-arm percentages
 - `--strict` fails a suite that does not discriminate
@@ -140,6 +141,8 @@ suite directories and no model or network:
 - unwritable `--out` directories fail instead of printing success
 - cost/usage in CLI, Markdown, JSON and HTML, including unknown/partial states
   and the efficiency claim only when the data supports it
+- input/output/reasoning/cache token splits, agent/judge/wall timing, and
+  `--baseline` comparisons of score, per-run cost and token deltas
 - JSON, Markdown and self-contained HTML generation, including escaping of
   scenario and criterion text
 - `make eval` dry-run selection (`SKILL=`, `UNIT=`), the required-`AGENT`

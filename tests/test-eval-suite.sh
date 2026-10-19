@@ -95,6 +95,11 @@ if grep -q "Scenarios: $count$" <<<"$plan" &&
 else
     fail "--plan counts are wrong (expected $count scenarios, $((count * 2)) invocations)"
 fi
+if ((count > 1)) && grep -q "Tip: --jobs N runs N scenarios concurrently" <<<"$plan"; then
+    pass "--plan suggests --jobs when scenarios would run sequentially"
+else
+    fail "--plan did not suggest --jobs for $count sequential scenarios"
+fi
 
 # --- sharding -----------------------------------------------------------------
 
@@ -583,6 +588,9 @@ if [[ "$cost_rc" -eq 0 ]] &&
     jq -e '.arms.with.usage.combined.cost.total == 0.07 and
         .arms.without.usage.combined.cost.total == 0.07 and
         .arms.with.usage.combined.cost.runs_known == 1' <<<"$cost_row" >/dev/null &&
+    jq -e '.counts.agent_seconds >= 0 and .counts.judge_seconds >= 0
+        and .counts.timed_out_runs == 0' "$cost_dir/suite.json" >/dev/null &&
+    [[ -f "$cost_dir/runs/git-workflow/changelog-release-refused/with/run-1/judge-result.json" ]] &&
     grep -Fq "\$0.07" "$cost_dir/summary.md"; then
     pass "suite sums known agent and judge cost without renormalising"
 else
@@ -590,6 +598,12 @@ else
 fi
 
 cost_with_dir="$cost_dir/runs/git-workflow/changelog-release-refused/with/run-1"
+if jq -e '.duration_seconds >= 0 and (.timed_out | type) == "boolean"' \
+    "$cost_with_dir/judge-result.json" >/dev/null 2>&1; then
+    pass "eval-grade records judge duration and timeout state"
+else
+    fail "eval-grade did not record judge timing"
+fi
 rm -f "$cost_with_dir/judge-usage.json"
 "$GRADE" --run-dir "$cost_with_dir" --judge-cmd "$cost_judge" \
     >"$TMP/judge-usage-backfill.log" 2>&1

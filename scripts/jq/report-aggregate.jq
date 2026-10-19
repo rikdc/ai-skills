@@ -5,15 +5,22 @@
     def usage_cost($usage):
         if (($usage.known // false) == true) and (($usage.cost_usd | type) == "number")
         then $usage.cost_usd else null end;
-    def usage_tokens($usage):
-        if (($usage.known // false) == true) and (($usage.total_tokens | type) == "number")
-        then $usage.total_tokens else null end;
+    def usage_metric($usage; $key):
+        if (($usage.known // false) == true) and (($usage[$key] | type) == "number")
+        then $usage[$key] else null end;
+    def metric_stats($usages; $key):
+        [$usages[] | usage_metric(.; $key)] as $values
+        | ([$values[] | select(. != null)]) as $known
+        | {
+            total: ($known | sum_present),
+            runs_known: ($known | length),
+            runs_total: ($usages | length),
+            mean: mean_of($known)
+        };
     def field_stats($rows; $field):
         [$rows[] | (.[$field] // {known: false})] as $usages
         | [$usages[] | usage_cost(.)] as $costs
-        | [$usages[] | usage_tokens(.)] as $tokens
         | ([$costs[] | select(. != null)]) as $known_costs
-        | ([$tokens[] | select(. != null)]) as $known_tokens
         | {
             runs_known: ([$usages[] | select((.known // false) == true)] | length),
             runs_total: ($rows | length),
@@ -23,19 +30,27 @@
                 runs_total: ($rows | length),
                 mean: mean_of($known_costs)
             },
-            tokens: {
-                total: ($known_tokens | sum_present),
-                runs_known: ($known_tokens | length),
-                runs_total: ($rows | length),
-                mean: mean_of($known_tokens)
-            }
+            tokens: (metric_stats($usages; "total_tokens") + {
+                input: metric_stats($usages; "input_tokens"),
+                output: metric_stats($usages; "output_tokens"),
+                reasoning: metric_stats($usages; "reasoning_tokens"),
+                cache_read: metric_stats($usages; "cache_read_tokens"),
+                cache_write: metric_stats($usages; "cache_write_tokens")
+            })
+        };
+    def combined_metric($pairs; $key):
+        [$pairs[] | select(usage_metric(.a; $key) != null and usage_metric(.j; $key) != null)
+            | (usage_metric(.a; $key) + usage_metric(.j; $key))] as $values
+        | {
+            total: ($values | sum_present),
+            runs_known: ($values | length),
+            runs_total: ($pairs | length),
+            mean: mean_of($values)
         };
     def combined_stats($rows):
         [$rows[] | {a: .usage, j: .judge_usage}] as $pairs
         | [$pairs[] | select(usage_cost(.a) != null and usage_cost(.j) != null)
             | (usage_cost(.a) + usage_cost(.j))] as $costs
-        | [$pairs[] | select(usage_tokens(.a) != null and usage_tokens(.j) != null)
-            | (usage_tokens(.a) + usage_tokens(.j))] as $tokens
         | {
             runs_known: ($costs | length),
             runs_total: ($rows | length),
@@ -45,12 +60,13 @@
                 runs_total: ($rows | length),
                 mean: mean_of($costs)
             },
-            tokens: {
-                total: ($tokens | sum_present),
-                runs_known: ($tokens | length),
-                runs_total: ($rows | length),
-                mean: mean_of($tokens)
-            }
+            tokens: (combined_metric($pairs; "total_tokens") + {
+                input: combined_metric($pairs; "input_tokens"),
+                output: combined_metric($pairs; "output_tokens"),
+                reasoning: combined_metric($pairs; "reasoning_tokens"),
+                cache_read: combined_metric($pairs; "cache_read_tokens"),
+                cache_write: combined_metric($pairs; "cache_write_tokens")
+            })
         };
     def cost_stats($rows):
         {
@@ -131,6 +147,8 @@
     | ([$scenarios[].runs[]]) as $all_runs
     | ([$all_runs[] | select(.arm == "with")]) as $with_runs
     | ([$all_runs[] | select(.arm == "without")]) as $without_runs
+    | ([$all_runs[].duration_seconds] | map(select(. != null)) | sum_present) as $agent_seconds
+    | ([$all_runs[].judge_duration_seconds] | map(select(. != null)) | sum_present) as $judge_seconds
     | (cost_stats($with_runs)) as $cost_with
     | (cost_stats($without_runs)) as $cost_without
     | (diff($cost_with.combined.cost.mean; $cost_without.combined.cost.mean)) as $cost_delta
@@ -151,7 +169,19 @@
             combined_cost: $cost_delta,
             agent_tokens: diff($cost_with.agent.tokens.mean; $cost_without.agent.tokens.mean),
             judge_tokens: diff($cost_with.judge.tokens.mean; $cost_without.judge.tokens.mean),
-            combined_tokens: diff($cost_with.combined.tokens.mean; $cost_without.combined.tokens.mean)
+            combined_tokens: diff($cost_with.combined.tokens.mean; $cost_without.combined.tokens.mean),
+            agent_input_tokens: diff($cost_with.agent.tokens.input.mean; $cost_without.agent.tokens.input.mean),
+            agent_output_tokens: diff($cost_with.agent.tokens.output.mean; $cost_without.agent.tokens.output.mean),
+            agent_reasoning_tokens: diff($cost_with.agent.tokens.reasoning.mean; $cost_without.agent.tokens.reasoning.mean),
+            agent_cache_read_tokens: diff($cost_with.agent.tokens.cache_read.mean; $cost_without.agent.tokens.cache_read.mean),
+            judge_input_tokens: diff($cost_with.judge.tokens.input.mean; $cost_without.judge.tokens.input.mean),
+            judge_output_tokens: diff($cost_with.judge.tokens.output.mean; $cost_without.judge.tokens.output.mean),
+            judge_reasoning_tokens: diff($cost_with.judge.tokens.reasoning.mean; $cost_without.judge.tokens.reasoning.mean),
+            judge_cache_read_tokens: diff($cost_with.judge.tokens.cache_read.mean; $cost_without.judge.tokens.cache_read.mean),
+            combined_input_tokens: diff($cost_with.combined.tokens.input.mean; $cost_without.combined.tokens.input.mean),
+            combined_output_tokens: diff($cost_with.combined.tokens.output.mean; $cost_without.combined.tokens.output.mean),
+            combined_reasoning_tokens: diff($cost_with.combined.tokens.reasoning.mean; $cost_without.combined.tokens.reasoning.mean),
+            combined_cache_read_tokens: diff($cost_with.combined.tokens.cache_read.mean; $cost_without.combined.tokens.cache_read.mean)
         },
         cost_per_delta_point: $cost_per_delta_point
     }) as $cost
@@ -179,6 +209,13 @@
             counts: $suite_json[0].counts
         },
         totals: $totals,
+        timing: {
+            wall_seconds: ($suite_json[0].counts.duration_seconds // null),
+            agent_seconds: $agent_seconds,
+            judge_seconds: $judge_seconds,
+            runs: ($all_runs | length),
+            timed_out_runs: ([$all_runs[] | select(.timed_out == true)] | length)
+        },
         cost: $cost,
         usage: $usage,
         verdict: $verdict,
