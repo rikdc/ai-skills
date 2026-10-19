@@ -8,10 +8,8 @@ allowed-tools: Bash(git add:*), Bash(git status:*), Bash(git commit:*), Bash(git
 
 # Commit - Conventional Commit Messages
 
-Creates commits with short conventional commit messages. Runs pre-commit checks
-and suggests splitting when the staged changes cover more than one concern.
-
-## Usage
+Creates brief conventional-commit messages with pre-commit checks; proposes
+splitting when the diff mixes concerns.
 
 ```bash
 /git-workflow:commit [--no-verify] [--help]
@@ -19,9 +17,12 @@ and suggests splitting when the staged changes cover more than one concern.
 
 ## Workflow
 
-1. **Pre-commit checks** (unless `--no-verify`): run `make checks` if available.
+1. **Pre-commit checks** (unless `--no-verify`): run `make checks` if available;
+   otherwise run the project's test or lint command. If neither exists, proceed
+   with a warning.
 2. **Git analysis**: inspect staged files and `git diff` to identify the change.
 3. **Commit**: write the message, then commit.
+4. **Verify**: confirm the commit landed with `git log -1 --stat`.
 
 If nothing is staged, stage all modified files. If the diff covers distinct
 concerns, propose atomic commits before committing.
@@ -49,12 +50,10 @@ concerns, propose atomic commits before committing.
 - `feat`: new feature
 - `fix`: bug fix, security fix, warning fix
 - `docs`: documentation
-- `style`: formatting
 - `refactor`: restructuring without behaviour change
-- `perf`: performance
 - `test`: tests
 - `chore`: tooling, dependencies, configuration
-- `ci`: CI/CD
+- `style`, `perf`, `ci`: formatting, performance, CI/CD
 
 ## Splitting Criteria
 
