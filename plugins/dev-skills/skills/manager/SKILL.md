@@ -39,7 +39,7 @@ You can delegate work to these specialized skills:
 
 - **specify**: Converts designs into detailed technical specifications
 - **taskify**: Breaks specifications into atomic, implementable tasks
-- **go-implementor**: Expert Go developer for implementation work
+- **go-backend-implementor**: Expert Go developer for implementation work
 
 ### Quality Skills
 
@@ -89,7 +89,7 @@ When given a complex task, analyze it:
 
 1. **specify**: [If specs needed]
 2. **taskify**: [To break specs into tasks]
-3. **go-implementor**: [For implementation]
+3. **go-backend-implementor**: [For implementation]
 4. **go-review**: [For code review]
 5. **mentor**: [For architectural decisions]
 6. **document**: [For documentation]
@@ -160,7 +160,7 @@ Task 1 → Task 2 → Task 5 → Task 8 (20 hours total)
 
 ### Phase 3: Implementation (Parallel)
 
-**Skills**: go-implementor (multiple tracks)
+**Skills**: go-backend-implementor (multiple tracks)
 
 **Track 1**: Database & Repository (4h)
 **Track 2**: Service Layer (4h) [Depends on Track 1]
@@ -208,7 +208,7 @@ Task 1 → Task 2 → Task 5 → Task 8 (20 hours total)
 - Need to identify dependencies and parallel work
 - Creating GitHub issues or task lists
 
-**go-implementor**:
+**go-backend-implementor**:
 
 - Have clear task definition
 - Need Go code implementation
@@ -245,10 +245,10 @@ Task 1 → Task 2 → Task 5 → Task 8 (20 hours total)
    - Identify parallel work streams
 
 3. Implementation Phase (Parallel)
-   - go-implementor: Track 1 (Foundation)
-   - go-implementor: Track 2 (Business logic) [wait for Track 1]
-   - go-implementor: Track 3 (API layer) [wait for Track 2]
-   - go-implementor: Track 4 (Tests) [independent]
+   - go-backend-implementor: Track 1 (Foundation)
+   - go-backend-implementor: Track 2 (Business logic) [wait for Track 1]
+   - go-backend-implementor: Track 3 (API layer) [wait for Track 2]
+   - go-backend-implementor: Track 4 (Tests) [independent]
 
 4. Review Phase
    - go-review: Code quality review
@@ -263,7 +263,7 @@ Task 1 → Task 2 → Task 5 → Task 8 (20 hours total)
    - mentor: Root cause analysis
 
 2. Implementation
-   - go-implementor: Implement fix with tests
+   - go-backend-implementor: Implement fix with tests
 
 3. Review
    - go-review: Ensure fix is correct
@@ -277,7 +277,7 @@ Task 1 → Task 2 → Task 5 → Task 8 (20 hours total)
    - mentor: Assess severity, recommend mitigation
 
 2. Hotfix (if needed)
-   - go-implementor: Rapid fix implementation
+   - go-backend-implementor: Rapid fix implementation
    - go-review: Fast-track review
 
 3. Root Cause Analysis

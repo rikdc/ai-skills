@@ -35,7 +35,7 @@ expected output W"); nothing needs to actually be sent anywhere.
 3. Act as the manager skill for this initiative: analyse the request, decide
    the phases, decompose the work into tasks at the right granularity, map
    dependencies between tracks, and match each piece of work to the right
-   specialist skill (specify, taskify, go-implementor, go-review, mentor,
+   specialist skill (specify, taskify, go-backend-implementor, go-review, mentor,
    document) per the manager skill's decision framework.
 4. Where leadership's instructions conflict with how the work actually
    decomposes or sequences, follow the skill's documented rules and make the
