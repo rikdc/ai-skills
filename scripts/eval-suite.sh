@@ -867,7 +867,6 @@ start_job() {
                 grade_args=(--run-dir "$dir" --judge-cmd "$JUDGE_CMD" \
                     --timeout "$JUDGE_TIMEOUT")
                 [[ -n "$JUDGE_USAGE_CMD" ]] && grade_args+=(--usage-cmd "$JUDGE_USAGE_CMD")
-                [[ "$REGRADE" == "1" ]] && grade_args+=(--regrade)
                 "$GRADE_ONE" "${grade_args[@]}" || true
             done
         fi
@@ -981,6 +980,21 @@ if ((JOBS == 1 && SCENARIO_COUNT > 1)); then
     echo "   Tip:   --jobs N runs N scenarios concurrently; each scenario's arms and runs stay sequential."
 fi
 
+# A forced regrade invalidates old judgements once, before execution. Both the
+# inline and final grading passes then run the judge at most once per run and
+# reuse the judgement produced in this pass.
+if [[ "$REGRADE" == "1" ]]; then
+    for i in "${!PLAN_PLUGIN[@]}"; do
+        plugin="${PLAN_PLUGIN[$i]}"
+        scenario="${PLAN_SCENARIO[$i]}"
+        for arm in $(scenario_arms "$i"); do
+            for run in $(seq 1 "$RUNS"); do
+                rm -f "$OUT_DIR/runs/$plugin/$scenario/$arm/run-$run/judgement.json"
+            done
+        done
+    done
+fi
+
 next=0
 while ((next < SCENARIO_COUNT || ${#pids[@]} > 0)); do
     while ((${#pids[@]} < JOBS && next < SCENARIO_COUNT)); do
@@ -1042,7 +1056,6 @@ if [[ -n "$JUDGE_CMD" ]]; then
             grade_args=(--run-dir "$dir" --judge-cmd "$JUDGE_CMD" \
                 --timeout "$JUDGE_TIMEOUT")
             [[ -n "$JUDGE_USAGE_CMD" ]] && grade_args+=(--usage-cmd "$JUDGE_USAGE_CMD")
-            [[ "$REGRADE" == "1" ]] && grade_args+=(--regrade)
             grade_rc=0
             "$GRADE_ONE" "${grade_args[@]}" || grade_rc=$?
             if ((grade_rc == 2)); then

@@ -282,7 +282,9 @@ and `suite.json` carry `usage`/`judge_usage`, per-arm totals and coverage, and
 `cost_known_runs`/`cost_total_runs`; `summary.md` gains a cost table. Report
 token rows are split into input, output, reasoning, cache-read and total;
 `report.json` carries the same breakdown, plus per-run means and with/without
-deltas. Missing components are `null`, never zero. The report's
+deltas. Missing components are `null`, never zero. Report expenditure totals
+include functional runs; with/without cost deltas, efficiency and baseline
+comparisons use only scenarios with both arms. The report's
 CLI/Markdown/HTML show `partial` coverage and withhold a per-point efficiency
 claim unless both score and cost deltas are known for every run. Cost never
 changes the verdict.

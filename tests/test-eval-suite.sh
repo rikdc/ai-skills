@@ -405,6 +405,9 @@ EOF
 cat >"$TMP/judge-second.sh" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
+if [[ -n "${JUDGE_COUNTS:-}" ]]; then
+    printf 'judge\n' >>"$JUDGE_COUNTS"
+fi
 jq '[.judgement_pending[] | {name: .name, score: 0, max: .max_score, note: "second"}]' \
     grading-request.json > judgement.json
 EOF
@@ -436,11 +439,14 @@ if [[ "$regrade_ok" -eq 1 ]] &&
         fail "a judge change was accepted or altered the existing grade" "$TMP/regrade-refused.log"
     fi
 
-    "$regrade_root/scripts/eval-suite.sh" --agent-cmd true --judge-cmd "$TMP/judge-second.sh" \
+    rm -f "$TMP/judge-counts"
+    JUDGE_COUNTS="$TMP/judge-counts" \
+        "$regrade_root/scripts/eval-suite.sh" --agent-cmd true --judge-cmd "$TMP/judge-second.sh" \
         --plugin fixture --scenario changed-task --arm with --runs 1 --no-auth \
         --out "$regrade_suite" --resume --regrade >"$TMP/regrade-second.log" 2>&1
     regrade_rc=$?
     if [[ "$regrade_rc" -eq 0 ]] &&
+        [[ "$(wc -l <"$TMP/judge-counts" | tr -d ' ')" == "1" ]] &&
         [[ "$(jq -r '.counts.executed' "$regrade_suite/suite.json" 2>/dev/null)" == "1" ]] &&
         [[ "$(jq -r '.counts.skipped' "$regrade_suite/suite.json" 2>/dev/null)" == "0" ]] &&
         [[ "$(jq -r '.[0].note' "$regrade_run/judgement.json" 2>/dev/null)" == "second" ]] &&

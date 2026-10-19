@@ -158,16 +158,22 @@
        end) as $verdict
     | ([$scenarios[].runs[]]) as $all_runs
     | ([$scenarios[] | select(.functional != true) | .runs[]]) as $comparison_runs
-    | ([$comparison_runs[] | select(.arm == "with")]) as $with_runs
-    | ([$comparison_runs[] | select(.arm == "without")]) as $without_runs
+    | ([$all_runs[] | select(.arm == "with")]) as $all_with_runs
+    | ([$all_runs[] | select(.arm == "without")]) as $all_without_runs
+    | ([$comparison_runs[] | select(.arm == "with")]) as $comparison_with_runs
+    | ([$comparison_runs[] | select(.arm == "without")]) as $comparison_without_runs
     | ([$all_runs[].duration_seconds] | map(select(. != null)) | sum_present) as $agent_seconds
     | ([$all_runs[].judge_duration_seconds] | map(select(. != null)) | sum_present) as $judge_seconds
-    | (cost_stats($with_runs)) as $cost_with
-    | (cost_stats($without_runs)) as $cost_without
-    | (diff($cost_with.combined.cost.mean; $cost_without.combined.cost.mean)) as $cost_delta
-    | (if ($cost_with.combined.cost.runs_known == $cost_with.runs_total)
-          and ($cost_without.combined.cost.runs_known == $cost_without.runs_total)
-          and $cost_with.runs_total > 0 and $cost_without.runs_total > 0
+    # Expenditure totals include functional runs. Contribution deltas and
+    # efficiency use only scenarios with both arms.
+    | (cost_stats($all_with_runs)) as $cost_with
+    | (cost_stats($all_without_runs)) as $cost_without
+    | (cost_stats($comparison_with_runs)) as $comparison_cost_with
+    | (cost_stats($comparison_without_runs)) as $comparison_cost_without
+    | (diff($comparison_cost_with.combined.cost.mean; $comparison_cost_without.combined.cost.mean)) as $cost_delta
+    | (if ($comparison_cost_with.combined.cost.runs_known == $comparison_cost_with.runs_total)
+          and ($comparison_cost_without.combined.cost.runs_known == $comparison_cost_without.runs_total)
+          and $comparison_cost_with.runs_total > 0 and $comparison_cost_without.runs_total > 0
           and $totals.delta != null and $totals.delta > eps
           and $cost_delta != null and $cost_delta > 0
        then ($cost_delta / $totals.delta)
@@ -176,25 +182,39 @@
         currency: "USD",
         with: $cost_with,
         without: $cost_without,
+        comparison: {
+            with: $comparison_cost_with,
+            without: $comparison_cost_without
+        },
+        delta_totals: {
+            agent_cost: diff($comparison_cost_with.agent.cost.total; $comparison_cost_without.agent.cost.total),
+            judge_cost: diff($comparison_cost_with.judge.cost.total; $comparison_cost_without.judge.cost.total),
+            combined_cost: diff($comparison_cost_with.combined.cost.total; $comparison_cost_without.combined.cost.total),
+            combined_input_tokens: diff($comparison_cost_with.combined.tokens.input.total; $comparison_cost_without.combined.tokens.input.total),
+            combined_output_tokens: diff($comparison_cost_with.combined.tokens.output.total; $comparison_cost_without.combined.tokens.output.total),
+            combined_reasoning_tokens: diff($comparison_cost_with.combined.tokens.reasoning.total; $comparison_cost_without.combined.tokens.reasoning.total),
+            combined_cache_read_tokens: diff($comparison_cost_with.combined.tokens.cache_read.total; $comparison_cost_without.combined.tokens.cache_read.total),
+            combined_tokens: diff($comparison_cost_with.combined.tokens.total; $comparison_cost_without.combined.tokens.total)
+        },
         delta: {
-            agent_cost: diff($cost_with.agent.cost.mean; $cost_without.agent.cost.mean),
-            judge_cost: diff($cost_with.judge.cost.mean; $cost_without.judge.cost.mean),
+            agent_cost: diff($comparison_cost_with.agent.cost.mean; $comparison_cost_without.agent.cost.mean),
+            judge_cost: diff($comparison_cost_with.judge.cost.mean; $comparison_cost_without.judge.cost.mean),
             combined_cost: $cost_delta,
-            agent_tokens: diff($cost_with.agent.tokens.mean; $cost_without.agent.tokens.mean),
-            judge_tokens: diff($cost_with.judge.tokens.mean; $cost_without.judge.tokens.mean),
-            combined_tokens: diff($cost_with.combined.tokens.mean; $cost_without.combined.tokens.mean),
-            agent_input_tokens: diff($cost_with.agent.tokens.input.mean; $cost_without.agent.tokens.input.mean),
-            agent_output_tokens: diff($cost_with.agent.tokens.output.mean; $cost_without.agent.tokens.output.mean),
-            agent_reasoning_tokens: diff($cost_with.agent.tokens.reasoning.mean; $cost_without.agent.tokens.reasoning.mean),
-            agent_cache_read_tokens: diff($cost_with.agent.tokens.cache_read.mean; $cost_without.agent.tokens.cache_read.mean),
-            judge_input_tokens: diff($cost_with.judge.tokens.input.mean; $cost_without.judge.tokens.input.mean),
-            judge_output_tokens: diff($cost_with.judge.tokens.output.mean; $cost_without.judge.tokens.output.mean),
-            judge_reasoning_tokens: diff($cost_with.judge.tokens.reasoning.mean; $cost_without.judge.tokens.reasoning.mean),
-            judge_cache_read_tokens: diff($cost_with.judge.tokens.cache_read.mean; $cost_without.judge.tokens.cache_read.mean),
-            combined_input_tokens: diff($cost_with.combined.tokens.input.mean; $cost_without.combined.tokens.input.mean),
-            combined_output_tokens: diff($cost_with.combined.tokens.output.mean; $cost_without.combined.tokens.output.mean),
-            combined_reasoning_tokens: diff($cost_with.combined.tokens.reasoning.mean; $cost_without.combined.tokens.reasoning.mean),
-            combined_cache_read_tokens: diff($cost_with.combined.tokens.cache_read.mean; $cost_without.combined.tokens.cache_read.mean)
+            agent_tokens: diff($comparison_cost_with.agent.tokens.mean; $comparison_cost_without.agent.tokens.mean),
+            judge_tokens: diff($comparison_cost_with.judge.tokens.mean; $comparison_cost_without.judge.tokens.mean),
+            combined_tokens: diff($comparison_cost_with.combined.tokens.mean; $comparison_cost_without.combined.tokens.mean),
+            agent_input_tokens: diff($comparison_cost_with.agent.tokens.input.mean; $comparison_cost_without.agent.tokens.input.mean),
+            agent_output_tokens: diff($comparison_cost_with.agent.tokens.output.mean; $comparison_cost_without.agent.tokens.output.mean),
+            agent_reasoning_tokens: diff($comparison_cost_with.agent.tokens.reasoning.mean; $comparison_cost_without.agent.tokens.reasoning.mean),
+            agent_cache_read_tokens: diff($comparison_cost_with.agent.tokens.cache_read.mean; $comparison_cost_without.agent.tokens.cache_read.mean),
+            judge_input_tokens: diff($comparison_cost_with.judge.tokens.input.mean; $comparison_cost_without.judge.tokens.input.mean),
+            judge_output_tokens: diff($comparison_cost_with.judge.tokens.output.mean; $comparison_cost_without.judge.tokens.output.mean),
+            judge_reasoning_tokens: diff($comparison_cost_with.judge.tokens.reasoning.mean; $comparison_cost_without.judge.tokens.reasoning.mean),
+            judge_cache_read_tokens: diff($comparison_cost_with.judge.tokens.cache_read.mean; $comparison_cost_without.judge.tokens.cache_read.mean),
+            combined_input_tokens: diff($comparison_cost_with.combined.tokens.input.mean; $comparison_cost_without.combined.tokens.input.mean),
+            combined_output_tokens: diff($comparison_cost_with.combined.tokens.output.mean; $comparison_cost_without.combined.tokens.output.mean),
+            combined_reasoning_tokens: diff($comparison_cost_with.combined.tokens.reasoning.mean; $comparison_cost_without.combined.tokens.reasoning.mean),
+            combined_cache_read_tokens: diff($comparison_cost_with.combined.tokens.cache_read.mean; $comparison_cost_without.combined.tokens.cache_read.mean)
         },
         cost_per_delta_point: $cost_per_delta_point
     }) as $cost

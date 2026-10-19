@@ -603,6 +603,10 @@ add_scenario "$functional" demo functional-check \
     '{"context":"x","type":"weighted_checklist","checklist":[{"name":"A","description":"d","max_score":100}]}' \
     '["skills/fixture"]' functional
 add_run "$functional" demo functional-check with 1 '[{"name":"A","score":80,"max":100}]'
+add_usage "$functional" demo functional-check with 1 usage \
+    '{"known":true,"source":"opencode-json","total_tokens":1000,"input_tokens":900,"output_tokens":100,"cost_usd":0.10,"currency":"USD"}'
+add_usage "$functional" demo functional-check with 1 judge-usage \
+    '{"known":true,"source":"claude-json","total_tokens":200,"input_tokens":150,"output_tokens":50,"cost_usd":0.20,"currency":"USD"}'
 finish_suite "$functional"
 run_report "$functional" "$TMP/functional.json" --format json
 run_report "$functional" "$TMP/functional.cli" --format cli
@@ -623,14 +627,62 @@ if jq -e '
     and .scenarios[0].criteria[0].status == "scored"
     and .scenarios[0].criteria[0].with == 80
     and .scenarios[0].criteria[0].without == null
+    and ((.cost.with.combined.cost.total - 0.30) | if . < 0 then -. else . end) < 0.0000001
+    and .cost.with.combined.cost.runs_known == 1
+    and .cost.without.combined.cost.runs_known == 0
+    and .cost.with.combined.tokens.total == 1200
+    and .cost.delta_totals.combined_cost == null
+    and .cost.delta.combined_cost == null
+    and .cost.cost_per_delta_point == null
+    and ((.usage.with.combined.cost.total - 0.30) | if . < 0 then -. else . end) < 0.0000001
 ' "$TMP/functional.json" >/dev/null; then
-    pass "a functional scenario reports an absolute score without a delta"
+    pass "a functional scenario reports absolute score and expenditure without a delta"
 else
     fail "functional scenario reporting is wrong"
 fi
 assert_contains "$TMP/functional.cli" "functional" "CLI reports a functional verdict"
+assert_contains "$TMP/functional.cli" "Cost totals include functional runs" \
+    "CLI notes that expenditure includes functional runs"
 assert_contains "$TMP/functional.md" "functional" "Markdown reports a functional verdict"
 assert_contains "$functional/report/report.html" "functional" "HTML reports a functional verdict"
+
+mixed="$TMP/mixed-suite"
+new_suite "$mixed" 1 '["skills/fixture"]'
+add_scenario "$mixed" demo compare \
+    '{"context":"x","type":"weighted_checklist","checklist":[{"name":"A","description":"d","max_score":100}]}' \
+    '["skills/fixture"]'
+add_run "$mixed" demo compare with 1 '[{"name":"A","score":100,"max":100}]'
+add_run "$mixed" demo compare without 1 '[{"name":"A","score":90,"max":100}]'
+add_usage "$mixed" demo compare with 1 usage \
+    '{"known":true,"source":"opencode-json","total_tokens":1000,"input_tokens":900,"output_tokens":100,"cost_usd":0.010,"currency":"USD"}'
+add_usage "$mixed" demo compare without 1 usage \
+    '{"known":true,"source":"opencode-json","total_tokens":900,"input_tokens":800,"output_tokens":100,"cost_usd":0.005,"currency":"USD"}'
+add_usage "$mixed" demo compare with 1 judge-usage \
+    '{"known":true,"source":"claude-json","total_tokens":200,"input_tokens":150,"output_tokens":50,"cost_usd":0.010,"currency":"USD"}'
+add_usage "$mixed" demo compare without 1 judge-usage \
+    '{"known":true,"source":"claude-json","total_tokens":200,"input_tokens":150,"output_tokens":50,"cost_usd":0.005,"currency":"USD"}'
+add_scenario "$mixed" demo functional-check \
+    '{"context":"x","type":"weighted_checklist","checklist":[{"name":"A","description":"d","max_score":100}]}' \
+    '["skills/fixture"]' functional
+add_run "$mixed" demo functional-check with 1 '[{"name":"A","score":80,"max":100}]'
+add_usage "$mixed" demo functional-check with 1 usage \
+    '{"known":true,"source":"opencode-json","total_tokens":1000,"input_tokens":900,"output_tokens":100,"cost_usd":0.10,"currency":"USD"}'
+add_usage "$mixed" demo functional-check with 1 judge-usage \
+    '{"known":true,"source":"claude-json","total_tokens":200,"input_tokens":150,"output_tokens":50,"cost_usd":0.20,"currency":"USD"}'
+finish_suite "$mixed"
+run_report "$mixed" "$TMP/mixed.json" --format json
+if jq -e '
+    .totals.functional == 1
+    and ((.cost.with.combined.cost.total - 0.32) | if . < 0 then -. else . end) < 0.0000001
+    and ((.cost.without.combined.cost.total - 0.01) | if . < 0 then -. else . end) < 0.0000001
+    and ((.cost.delta_totals.combined_cost - 0.01) | if . < 0 then -. else . end) < 0.0000001
+    and ((.cost.delta.combined_cost - 0.01) | if . < 0 then -. else . end) < 0.0000001
+    and ((.usage.with.combined.cost.total - 0.32) | if . < 0 then -. else . end) < 0.0000001
+' "$TMP/mixed.json" >/dev/null; then
+    pass "mixed suites include functional expenditure but compare only paired scenarios"
+else
+    fail "mixed-suite cost aggregation is wrong"
+fi
 
 tiny="$TMP/tiny-cost"
 new_suite "$tiny" 1 '["skills/fixture"]'

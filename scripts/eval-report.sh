@@ -472,32 +472,31 @@ render_md() {
                                  elif . > 0 then "+" + (. | tokens)
                                  elif . < 0 then "-" + ((. * -1) | tokens)
                                  else "0" end;
-                def sum_delta($w; $o): if $w == null or $o == null then null else ($w - $o) end;
                 . as $m
                 | ("| agent | " + ($m.cost.with.agent.cost.total | money) + " | "
                    + ($m.cost.without.agent.cost.total | money) + " | "
-                   + (sum_delta($m.cost.with.agent.cost.total; $m.cost.without.agent.cost.total) | money_delta) + " |"),
+                   + ($m.cost.delta_totals.agent_cost | money_delta) + " |"),
                   ("| judge | " + ($m.cost.with.judge.cost.total | money) + " | "
                    + ($m.cost.without.judge.cost.total | money) + " | "
-                   + (sum_delta($m.cost.with.judge.cost.total; $m.cost.without.judge.cost.total) | money_delta) + " |"),
+                   + ($m.cost.delta_totals.judge_cost | money_delta) + " |"),
                   ("| total | " + ($m.cost.with.combined.cost.total | money) + " | "
                    + ($m.cost.without.combined.cost.total | money) + " | "
-                   + (sum_delta($m.cost.with.combined.cost.total; $m.cost.without.combined.cost.total) | money_delta) + " |"),
+                   + ($m.cost.delta_totals.combined_cost | money_delta) + " |"),
                   ("| input tokens | " + ($m.cost.with.combined.tokens.input.total | tokens) + " | "
                    + ($m.cost.without.combined.tokens.input.total | tokens) + " | "
-                   + (sum_delta($m.cost.with.combined.tokens.input.total; $m.cost.without.combined.tokens.input.total) | token_delta) + " |"),
+                   + ($m.cost.delta_totals.combined_input_tokens | token_delta) + " |"),
                   ("| output tokens | " + ($m.cost.with.combined.tokens.output.total | tokens) + " | "
                    + ($m.cost.without.combined.tokens.output.total | tokens) + " | "
-                   + (sum_delta($m.cost.with.combined.tokens.output.total; $m.cost.without.combined.tokens.output.total) | token_delta) + " |"),
+                   + ($m.cost.delta_totals.combined_output_tokens | token_delta) + " |"),
                   ("| reasoning tokens | " + ($m.cost.with.combined.tokens.reasoning.total | tokens) + " | "
                    + ($m.cost.without.combined.tokens.reasoning.total | tokens) + " | "
-                   + (sum_delta($m.cost.with.combined.tokens.reasoning.total; $m.cost.without.combined.tokens.reasoning.total) | token_delta) + " |"),
+                   + ($m.cost.delta_totals.combined_reasoning_tokens | token_delta) + " |"),
                   ("| cache read | " + ($m.cost.with.combined.tokens.cache_read.total | tokens) + " | "
                    + ($m.cost.without.combined.tokens.cache_read.total | tokens) + " | "
-                   + (sum_delta($m.cost.with.combined.tokens.cache_read.total; $m.cost.without.combined.tokens.cache_read.total) | token_delta) + " |"),
+                   + ($m.cost.delta_totals.combined_cache_read_tokens | token_delta) + " |"),
                   ("| total tokens | " + ($m.cost.with.combined.tokens.total | tokens) + " | "
                    + ($m.cost.without.combined.tokens.total | tokens) + " | "
-                   + (sum_delta($m.cost.with.combined.tokens.total; $m.cost.without.combined.tokens.total) | token_delta) + " |")
+                   + ($m.cost.delta_totals.combined_tokens | token_delta) + " |")
             ' "$TMP/report.json"
             agent_known=$(( $(jq -r '.cost.with.agent.cost.runs_known' "$TMP/report.json") + $(jq -r '.cost.without.agent.cost.runs_known' "$TMP/report.json") ))
             judge_known=$(( $(jq -r '.cost.with.judge.cost.runs_known' "$TMP/report.json") + $(jq -r '.cost.without.judge.cost.runs_known' "$TMP/report.json") ))
@@ -516,6 +515,9 @@ render_md() {
                     "$(cli_cost_per_point "$cpp")"
             else
                 printf 'Efficiency: — (partial cost coverage or no positive score delta).\n'
+            fi
+            if [[ "$(jq -r '.totals.functional' "$TMP/report.json")" != "0" ]]; then
+                printf '\nCost totals include functional runs; delta and efficiency use comparison scenarios only.\n'
             fi
         fi
         if [[ -f "$TMP/comparison.md" ]]; then
@@ -638,7 +640,6 @@ HTML
                              elif . < 0 then "-" + ((. * -1) | tokens)
                              else "0" end;
             def coverage($c): ($c.runs_known | tostring) + "/" + ($c.runs_total | tostring);
-            def sum_delta($w; $o): if $w == null or $o == null then null else ($w - $o) end;
             . as $m
             | "<h1>Eval report: \($m.metadata.label | e)</h1>",
               "<p class=\"meta\">Suite: <code>\($m.metadata.suite_dir | e)</code><br>"
@@ -667,7 +668,7 @@ HTML
               "<div class=\"card\"><div class=\"k\">Failures</div><div class=\"v\">\($m.totals.runner_failures)</div></div>",
               "<div class=\"card\"><div class=\"k\">Cost with</div><div class=\"v\">\($m.cost.with.combined.cost.total | money)</div><div class=\"note\">\(coverage($m.cost.with.combined.cost)) runs</div></div>",
               "<div class=\"card\"><div class=\"k\">Cost without</div><div class=\"v\">\($m.cost.without.combined.cost.total | money)</div><div class=\"note\">\(coverage($m.cost.without.combined.cost)) runs</div></div>",
-              "<div class=\"card\"><div class=\"k\">Cost delta</div><div class=\"v \(sum_delta($m.cost.with.combined.cost.total; $m.cost.without.combined.cost.total) | cls)\">\(sum_delta($m.cost.with.combined.cost.total; $m.cost.without.combined.cost.total) | money_delta)</div></div>",
+              "<div class=\"card\"><div class=\"k\">Cost delta</div><div class=\"v \($m.cost.delta_totals.combined_cost | cls)\">\($m.cost.delta_totals.combined_cost | money_delta)</div></div>",
               "<div class=\"card\"><div class=\"k\">Tokens</div><div class=\"v\">\($m.cost.with.combined.tokens.total | tokens) / \($m.cost.without.combined.tokens.total | tokens)</div><div class=\"note\">with / without</div></div>",
               "</div>",
               "<h2>Criteria</h2>",
@@ -710,16 +711,19 @@ HTML
                   + "or <code>--usage-cmd</code>.</p>"
                else
                   "<table><thead><tr><th>Cost</th><th>With</th><th>Without</th><th>Delta</th><th>Coverage</th></tr></thead><tbody>",
-                  "<tr><td>agent</td><td class=\"num\">\($m.cost.with.agent.cost.total | money)</td><td class=\"num\">\($m.cost.without.agent.cost.total | money)</td><td class=\"num\">\(sum_delta($m.cost.with.agent.cost.total; $m.cost.without.agent.cost.total) | money_delta)</td><td>\(coverage($m.cost.with.agent.cost)) / \(coverage($m.cost.without.agent.cost))</td></tr>",
-                  "<tr><td>judge</td><td class=\"num\">\($m.cost.with.judge.cost.total | money)</td><td class=\"num\">\($m.cost.without.judge.cost.total | money)</td><td class=\"num\">\(sum_delta($m.cost.with.judge.cost.total; $m.cost.without.judge.cost.total) | money_delta)</td><td>\(coverage($m.cost.with.judge.cost)) / \(coverage($m.cost.without.judge.cost))</td></tr>",
-                  "<tr><td>total</td><td class=\"num\">\($m.cost.with.combined.cost.total | money)</td><td class=\"num\">\($m.cost.without.combined.cost.total | money)</td><td class=\"num\">\(sum_delta($m.cost.with.combined.cost.total; $m.cost.without.combined.cost.total) | money_delta)</td><td>\(coverage($m.cost.with.combined.cost)) / \(coverage($m.cost.without.combined.cost))</td></tr>",
-                  "<tr><td>input tokens</td><td class=\"num\">\($m.cost.with.combined.tokens.input.total | tokens)</td><td class=\"num\">\($m.cost.without.combined.tokens.input.total | tokens)</td><td class=\"num\">\(sum_delta($m.cost.with.combined.tokens.input.total; $m.cost.without.combined.tokens.input.total) | token_delta)</td><td>\(coverage($m.cost.with.combined.tokens.input)) / \(coverage($m.cost.without.combined.tokens.input))</td></tr>",
-                  "<tr><td>output tokens</td><td class=\"num\">\($m.cost.with.combined.tokens.output.total | tokens)</td><td class=\"num\">\($m.cost.without.combined.tokens.output.total | tokens)</td><td class=\"num\">\(sum_delta($m.cost.with.combined.tokens.output.total; $m.cost.without.combined.tokens.output.total) | token_delta)</td><td>\(coverage($m.cost.with.combined.tokens.output)) / \(coverage($m.cost.without.combined.tokens.output))</td></tr>",
-                  "<tr><td>reasoning tokens</td><td class=\"num\">\($m.cost.with.combined.tokens.reasoning.total | tokens)</td><td class=\"num\">\($m.cost.without.combined.tokens.reasoning.total | tokens)</td><td class=\"num\">\(sum_delta($m.cost.with.combined.tokens.reasoning.total; $m.cost.without.combined.tokens.reasoning.total) | token_delta)</td><td>\(coverage($m.cost.with.combined.tokens.reasoning)) / \(coverage($m.cost.without.combined.tokens.reasoning))</td></tr>",
-                  "<tr><td>cache read</td><td class=\"num\">\($m.cost.with.combined.tokens.cache_read.total | tokens)</td><td class=\"num\">\($m.cost.without.combined.tokens.cache_read.total | tokens)</td><td class=\"num\">\(sum_delta($m.cost.with.combined.tokens.cache_read.total; $m.cost.without.combined.tokens.cache_read.total) | token_delta)</td><td>\(coverage($m.cost.with.combined.tokens.cache_read)) / \(coverage($m.cost.without.combined.tokens.cache_read))</td></tr>",
-                  "<tr><td>total tokens</td><td class=\"num\">\($m.cost.with.combined.tokens.total | tokens)</td><td class=\"num\">\($m.cost.without.combined.tokens.total | tokens)</td><td class=\"num\">\(sum_delta($m.cost.with.combined.tokens.total; $m.cost.without.combined.tokens.total) | token_delta)</td><td>\(coverage($m.cost.with.combined.tokens)) / \(coverage($m.cost.without.combined.tokens))</td></tr>",
+                  "<tr><td>agent</td><td class=\"num\">\($m.cost.with.agent.cost.total | money)</td><td class=\"num\">\($m.cost.without.agent.cost.total | money)</td><td class=\"num\">\($m.cost.delta_totals.agent_cost | money_delta)</td><td>\(coverage($m.cost.with.agent.cost)) / \(coverage($m.cost.without.agent.cost))</td></tr>",
+                  "<tr><td>judge</td><td class=\"num\">\($m.cost.with.judge.cost.total | money)</td><td class=\"num\">\($m.cost.without.judge.cost.total | money)</td><td class=\"num\">\($m.cost.delta_totals.judge_cost | money_delta)</td><td>\(coverage($m.cost.with.judge.cost)) / \(coverage($m.cost.without.judge.cost))</td></tr>",
+                  "<tr><td>total</td><td class=\"num\">\($m.cost.with.combined.cost.total | money)</td><td class=\"num\">\($m.cost.without.combined.cost.total | money)</td><td class=\"num\">\($m.cost.delta_totals.combined_cost | money_delta)</td><td>\(coverage($m.cost.with.combined.cost)) / \(coverage($m.cost.without.combined.cost))</td></tr>",
+                  "<tr><td>input tokens</td><td class=\"num\">\($m.cost.with.combined.tokens.input.total | tokens)</td><td class=\"num\">\($m.cost.without.combined.tokens.input.total | tokens)</td><td class=\"num\">\($m.cost.delta_totals.combined_input_tokens | token_delta)</td><td>\(coverage($m.cost.with.combined.tokens.input)) / \(coverage($m.cost.without.combined.tokens.input))</td></tr>",
+                  "<tr><td>output tokens</td><td class=\"num\">\($m.cost.with.combined.tokens.output.total | tokens)</td><td class=\"num\">\($m.cost.without.combined.tokens.output.total | tokens)</td><td class=\"num\">\($m.cost.delta_totals.combined_output_tokens | token_delta)</td><td>\(coverage($m.cost.with.combined.tokens.output)) / \(coverage($m.cost.without.combined.tokens.output))</td></tr>",
+                  "<tr><td>reasoning tokens</td><td class=\"num\">\($m.cost.with.combined.tokens.reasoning.total | tokens)</td><td class=\"num\">\($m.cost.without.combined.tokens.reasoning.total | tokens)</td><td class=\"num\">\($m.cost.delta_totals.combined_reasoning_tokens | token_delta)</td><td>\(coverage($m.cost.with.combined.tokens.reasoning)) / \(coverage($m.cost.without.combined.tokens.reasoning))</td></tr>",
+                  "<tr><td>cache read</td><td class=\"num\">\($m.cost.with.combined.tokens.cache_read.total | tokens)</td><td class=\"num\">\($m.cost.without.combined.tokens.cache_read.total | tokens)</td><td class=\"num\">\($m.cost.delta_totals.combined_cache_read_tokens | token_delta)</td><td>\(coverage($m.cost.with.combined.tokens.cache_read)) / \(coverage($m.cost.without.combined.tokens.cache_read))</td></tr>",
+                  "<tr><td>total tokens</td><td class=\"num\">\($m.cost.with.combined.tokens.total | tokens)</td><td class=\"num\">\($m.cost.without.combined.tokens.total | tokens)</td><td class=\"num\">\($m.cost.delta_totals.combined_tokens | token_delta)</td><td>\(coverage($m.cost.with.combined.tokens)) / \(coverage($m.cost.without.combined.tokens))</td></tr>",
                   "</tbody></table>",
                   "<p class=\"note\">Unknown usage is never counted as zero. Coverage is known runs / total runs.</p>",
+                  (if $m.totals.functional > 0 then
+                      "<p class=\"note\">Cost totals include functional runs; delta and efficiency use comparison scenarios only.</p>"
+                   else empty end),
                   (if $m.cost.cost_per_delta_point != null then
                       "<p class=\"note\">Efficiency: \($m.totals.delta | pfmt) pts for \($m.cost.delta.combined_cost | money_delta) per run (\($cpp | e) per point).</p>"
                    else
@@ -1068,25 +1072,23 @@ render_cli() {
         printf '\n%-18s %12s %12s %12s\n' "COST" "WITH" "WITHOUT" "DELTA"
         jq -r '
             def v: if . == null then "null" else tostring end;
-            def sum_delta($w; $o):
-                if $w == null or $o == null then null else ($w - $o) end;
             [
                 ["agent", .cost.with.agent.cost.total, .cost.without.agent.cost.total,
-                 sum_delta(.cost.with.agent.cost.total; .cost.without.agent.cost.total)],
+                 .cost.delta_totals.agent_cost],
                 ["judge", .cost.with.judge.cost.total, .cost.without.judge.cost.total,
-                 sum_delta(.cost.with.judge.cost.total; .cost.without.judge.cost.total)],
+                 .cost.delta_totals.judge_cost],
                 ["total", .cost.with.combined.cost.total, .cost.without.combined.cost.total,
-                 sum_delta(.cost.with.combined.cost.total; .cost.without.combined.cost.total)],
+                 .cost.delta_totals.combined_cost],
                 ["input tokens", .cost.with.combined.tokens.input.total, .cost.without.combined.tokens.input.total,
-                 sum_delta(.cost.with.combined.tokens.input.total; .cost.without.combined.tokens.input.total)],
+                 .cost.delta_totals.combined_input_tokens],
                 ["output tokens", .cost.with.combined.tokens.output.total, .cost.without.combined.tokens.output.total,
-                 sum_delta(.cost.with.combined.tokens.output.total; .cost.without.combined.tokens.output.total)],
+                 .cost.delta_totals.combined_output_tokens],
                 ["reasoning tokens", .cost.with.combined.tokens.reasoning.total, .cost.without.combined.tokens.reasoning.total,
-                 sum_delta(.cost.with.combined.tokens.reasoning.total; .cost.without.combined.tokens.reasoning.total)],
+                 .cost.delta_totals.combined_reasoning_tokens],
                 ["cache read", .cost.with.combined.tokens.cache_read.total, .cost.without.combined.tokens.cache_read.total,
-                 sum_delta(.cost.with.combined.tokens.cache_read.total; .cost.without.combined.tokens.cache_read.total)],
+                 .cost.delta_totals.combined_cache_read_tokens],
                 ["total tokens", .cost.with.combined.tokens.total, .cost.without.combined.tokens.total,
-                 sum_delta(.cost.with.combined.tokens.total; .cost.without.combined.tokens.total)]
+                 .cost.delta_totals.combined_tokens]
             ][] | map(v) | @tsv
         ' "$TMP/report.json" | while IFS=$'\t' read -r label w o d; do
             case "$label" in
@@ -1101,6 +1103,9 @@ render_cli() {
                     ;;
             esac
         done
+        if [[ "$(jq -r '.totals.functional' "$TMP/report.json")" != "0" ]]; then
+            printf '\nCost totals include functional runs; delta and efficiency use comparison scenarios only.\n'
+        fi
         local total_known total_runs partial=""
         total_known=$((with_known + without_known))
         total_runs=$((with_total + without_total))
