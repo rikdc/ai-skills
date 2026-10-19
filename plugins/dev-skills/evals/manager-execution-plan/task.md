@@ -31,7 +31,7 @@ actually be sent anywhere.
 2. Read `docs/design-api-keys.md` and skim the existing service code.
 3. Act as the manager skill for this initiative: analyze the task, break it
    into phases and tracks, map dependencies, and match each piece of work to
-   the right specialist skill (specify, taskify, go-implementor, go-review,
+   the right specialist skill (specify, taskify, go-backend-implementor, go-review,
    mentor, document).
 4. Write the resulting plan to `execution-plan.md` at the repository root,
    following the manager skill's execution plan structure: task analysis,

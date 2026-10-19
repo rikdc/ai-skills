@@ -39,7 +39,7 @@
     },
     {
       "name": "Documentation assigned to document",
-      "description": "WEB-4's docs work is assigned to document, not to go-implementor or left unassigned.",
+      "description": "WEB-4's docs work is assigned to document, not to go-backend-implementor or left unassigned.",
       "max_score": 5
     },
     {

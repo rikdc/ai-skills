@@ -67,7 +67,7 @@ Previous agent definitions have been migrated to skills:
 | Old Agent | New Skill |
 |-----------|-----------|
 | `document-agent.md` | `/document` |
-| `go-implementor-agent.md` | `/go-backend-implementor` |
+| `go-backend-implementor-agent.md` | `/go-backend-implementor` |
 | `go-review-agent.md` | `/go-review` |
 | `manager-agent.md` | `/manager` |
 | `specify-agent.md` | `/specify` |

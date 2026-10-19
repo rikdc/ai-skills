@@ -1,5 +1,5 @@
 {
-  "context": "Tests whether the agent, acting as the manager skill for '/manager --plan', produces an execution plan artifact that follows the skill's documented structure: task analysis, phased breakdown in the documented phase order (specification with specify+mentor, task breakdown with taskify, parallel go-implementor tracks, review with go-review+mentor, documentation with document), explicit phase gates and track dependencies, and success criteria — all grounded in the provided design brief.",
+  "context": "Tests whether the agent, acting as the manager skill for '/manager --plan', produces an execution plan artifact that follows the skill's documented structure: task analysis, phased breakdown in the documented phase order (specification with specify+mentor, task breakdown with taskify, parallel go-backend-implementor tracks, review with go-review+mentor, documentation with document), explicit phase gates and track dependencies, and success criteria — all grounded in the provided design brief.",
   "type": "weighted_checklist",
   "checklist": [
     {
@@ -39,7 +39,7 @@
     },
     {
       "name": "Phase 3 has parallel implementation tracks",
-      "description": "The implementation phase defines multiple parallel go-implementor tracks covering the design brief's components, including a test track that is not serialised behind everything else.",
+      "description": "The implementation phase defines multiple parallel go-backend-implementor tracks covering the design brief's components, including a test track that is not serialised behind everything else.",
       "max_score": 10
     },
     {
@@ -64,7 +64,7 @@
     },
     {
       "name": "No skill misassignment",
-      "description": "Work is matched per the decision framework: no phase asks go-implementor to do the code review or the architecture review, and no phase asks go-review or mentor to implement features.",
+      "description": "Work is matched per the decision framework: no phase asks go-backend-implementor to do the code review or the architecture review, and no phase asks go-review or mentor to implement features.",
       "max_score": 6
     }
   ]
