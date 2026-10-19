@@ -72,8 +72,20 @@ ones.
    - `task.md`: Problem/Feature Description written in realistic narrative
      (a colleague, a project, a change pending review), then **Your Task**
      as numbered steps, then **Output** listing the exact artifacts.
-   - `scenario.json`: `{"description": "...", "include": ["./inputs"]}` -
-     always with an `inputs/` directory, even a minimal one.
+   - `scenario.json`:
+     `{"description": "...", "include": ["./inputs"], "unit": "skills/<name>"}` -
+     always with an `inputs/` directory, even a minimal one. The `unit` names
+     the one skill, command or hook the scenario measures
+     (`skills/<name>`, `commands/<name>`, or `hooks/<name>`). Use
+     `"units": ["commands/triage", "skills/triage-reviews"]` only when the
+     scenario genuinely exercises several units; the local runner installs
+     exactly the selected units in its with-arm, so the mapping is what makes
+     `make eval SKILL=<name>` or `UNIT=commands/<name>` a per-unit experiment.
+     Every declared unit must exist in the plugin - `make test` fails
+     otherwise. A hook scenario that invokes the hook directly is a
+     functional test: add `"mode": "functional"` so the runner stages the
+     current plugin source and runs only the with arm. A hook scenario without
+     a mode compares the current source with a disabled no-op control.
    - `criteria.json`: `{"context", "type": "weighted_checklist",
      "checklist": [...]}` with 8-13 items whose `max_score` sums to exactly
      100. Every item must be gradeable from observable state: file presence
@@ -102,7 +114,9 @@ ones.
 
 ### 4. Make it gradeable offline
 
-Scenarios run in a sandbox without network or credentials.
+Scenarios run in a temporary workspace. The runner does not isolate them:
+fixtures must not need the network or credentials, but the agent still runs
+with the contributor's user privileges and can reach absolute host paths.
 
 1. `inputs/setup.sh` is POSIX bash: `#!/usr/bin/env bash`, `set -euo
    pipefail`, `git init -q` plus `git config user.email/user.name`, heredoc
@@ -113,9 +127,9 @@ Scenarios run in a sandbox without network or credentials.
    into the working directory - so the instruction survives either layout.
    Every checked-in fixture file is either written by the script or read by
    it, never both: a copy the script overwrites is dead weight that drifts
-   silently. The sandbox provides `python3` (the recording shims and at
-   least one Makefile depend on it) and the POSIX coreutils; state any
-   further tool a fixture needs in task.md.
+   silently. The workspace inherits the host environment, including `python3`
+   (the recording shims and at least one Makefile depend on it) and the POSIX
+   coreutils; state any further tool a fixture needs in task.md.
 2. Build recording shims for external CLIs the agent would call (a `gh`
    shim that writes `title`, `body`, `draft`, `base` and `head` to
    `pr-record.json`), so the graded call is observable. See the git-workflow

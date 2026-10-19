@@ -1,1 +1,8 @@
-{"description": "The PreToolUse protected-branch hook denies Task calls on a main checkout and Write calls on master, then allows the identical Task once ALLOW_PROTECTED_BRANCH_EDIT=1 reaches the hook process, logging a bypass warning instead of a violation", "include": ["./inputs"]}
+{
+  "description": "The PreToolUse protected-branch hook denies Task calls on a main checkout and Write calls on master, then allows the identical Task once ALLOW_PROTECTED_BRANCH_EDIT=1 reaches the hook process, logging a bypass warning instead of a violation",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "hooks/protect-main-branch",
+  "mode": "functional"
+}

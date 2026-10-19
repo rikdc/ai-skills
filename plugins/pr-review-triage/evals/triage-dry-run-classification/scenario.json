@@ -1,1 +1,7 @@
-{"description":"Classify and evaluate PR review comments in dry-run mode, correctly citing conventions for rejections and writing nothing back","include":["./inputs"]}
+{
+  "description": "Classify and evaluate PR review comments in dry-run mode, correctly citing conventions for rejections and writing nothing back",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "skills/triage-reviews"
+}

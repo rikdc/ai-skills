@@ -1,1 +1,7 @@
-{"description":"Cut a release from pending Unreleased entries","include":["./inputs"]}
+{
+  "description": "Cut a release from pending Unreleased entries",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "skills/changelog"
+}

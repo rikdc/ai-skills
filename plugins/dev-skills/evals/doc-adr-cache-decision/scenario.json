@@ -1,1 +1,7 @@
-{"description":"ADR authoring for the session cache decision following the house ADR template","include":["./inputs"]}
+{
+  "description": "ADR authoring for the session cache decision following the house ADR template",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "skills/document"
+}

@@ -10,7 +10,8 @@
 # not in public CI.
 #
 # What it checks, per unit:
-#   scenario  layout, naming, rubric arithmetic, fixture hygiene, dead fixtures
+#   scenario  layout, naming, unit metadata, rubric arithmetic, fixture
+#             hygiene, dead fixtures
 #   manifest  the tessl manifest matches the Claude manifest and the workspace
 #   skill     frontmatter, spec limits, allowed-tools breadth, dead pointers
 #   repo      evals stay at the plugin root, never at the repo root
@@ -161,6 +162,8 @@ echo "🚀 Eval scenarios and fixtures..."
 for scenario_dir in plugins/*/evals/*/; do
     scenario="${scenario_dir%/}"
     name="$(basename "$scenario")"
+    plugin="${scenario_dir#plugins/}"
+    plugin="${plugin%%/*}"
     findings=""
 
     # Naming: tessl's downloader owns canonical scenario-N names and overwrites
@@ -190,6 +193,53 @@ for scenario_dir in plugins/*/evals/*/; do
                 [[ -e "$scenario/$include" ]] ||
                     findings+="$scenario/scenario.json: include path does not exist: $include"$'\n'
             done <<<"$(jq -r '.include[]?' "$scenario/scenario.json")"
+
+            # Unit metadata ties a scenario to the skill, command or hook it
+            # measures. Without it --unit cannot select the scenario and the
+            # with-arm silently falls back to installing the whole plugin.
+            if [[ "$(jq -r 'has("unit") and has("units")' "$scenario/scenario.json" 2>/dev/null)" == "true" ]]; then
+                findings+="$scenario/scenario.json: use either 'unit' or 'units', not both"$'\n'
+            fi
+            declared_units="$(jq -r '(.units // [.unit] // [])[] | select(. != null and . != "")' \
+                "$scenario/scenario.json" 2>/dev/null)"
+            if [[ -z "$declared_units" ]]; then
+                findings+="$scenario/scenario.json: missing unit metadata (add 'unit' or 'units')"$'\n'
+            else
+                while IFS= read -r unit; do
+                    [[ -z "$unit" ]] && continue
+                    kind="${unit%%/*}"
+                    unit_name="${unit#*/}"
+                    case "$kind" in
+                        skills)
+                            [[ -d "plugins/$plugin/skills/$unit_name" ]] ||
+                                findings+="$scenario/scenario.json: unit '$unit' does not exist in plugins/$plugin/skills"$'\n'
+                            ;;
+                        commands)
+                            [[ -f "plugins/$plugin/commands/$unit_name.md" ]] ||
+                                findings+="$scenario/scenario.json: unit '$unit' does not exist in plugins/$plugin/commands"$'\n'
+                            ;;
+                        hooks)
+                            [[ -f "plugins/$plugin/hooks/$unit_name.sh" || -f "plugins/$plugin/hooks/$unit_name" ]] ||
+                                findings+="$scenario/scenario.json: unit '$unit' does not exist in plugins/$plugin/hooks"$'\n'
+                            ;;
+                        *)
+                            findings+="$scenario/scenario.json: unit '$unit' must use skills/<name>, commands/<name> or hooks/<name>"$'\n'
+                            ;;
+                    esac
+                done <<<"$declared_units"
+            fi
+
+            scenario_mode="$(jq -r '.mode // "comparison"' "$scenario/scenario.json" 2>/dev/null)"
+            case "$scenario_mode" in
+                comparison) ;;
+                functional)
+                    grep -q '^hooks/' <<<"$declared_units" ||
+                        findings+="$scenario/scenario.json: functional mode requires a hook unit"$'\n'
+                    ;;
+                *)
+                    findings+="$scenario/scenario.json: mode must be comparison or functional"$'\n'
+                    ;;
+            esac
         fi
     fi
 

@@ -1,1 +1,7 @@
-{"description":"Trap case: review of a script propped up by set -euo pipefail where the skill's documented stance (flag -e/-u presence, never recommend strict mode, treat unchecked critical commands as findings regardless of -e) must override the common praise-the-strict-header reaction. Genuine ShellCheck output catches only one defect, so the graded value is in the manual categories.","include":["./inputs"]}
+{
+  "description": "Trap case: review of a script propped up by set -euo pipefail where the skill's documented stance (flag -e/-u presence, never recommend strict mode, treat unchecked critical commands as findings regardless of -e) must override the common praise-the-strict-header reaction. Genuine ShellCheck output catches only one defect, so the graded value is in the manual categories.",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "skills/shell-script-reviewer"
+}

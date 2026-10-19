@@ -1,4 +1,7 @@
 {
   "description": "Fix hardcoded credential, eval of user input, and SQL injection in the payment module until the security checks pass",
-  "include": ["./inputs"]
+  "include": [
+    "./inputs"
+  ],
+  "unit": "commands/check"
 }

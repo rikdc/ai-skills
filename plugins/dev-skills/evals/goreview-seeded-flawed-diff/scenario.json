@@ -1,1 +1,7 @@
-{"description":"Comprehensive senior review of a staged Go change seeded with five documented defect classes (SQL injection, data race, unclosed file, N+1 queries, swallowed error), graded against the go-review skill's severity, location, and recommendation rules","include":["./inputs"]}
+{
+  "description": "Comprehensive senior review of a staged Go change seeded with five documented defect classes (SQL injection, data race, unclosed file, N+1 queries, swallowed error), graded against the go-review skill's severity, location, and recommendation rules",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "skills/go-review"
+}

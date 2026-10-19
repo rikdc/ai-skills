@@ -1,21 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd "$(dirname "$0")"
+# Fixtures are created at the workspace root, where the runner invokes
+# this script and where task.md expects them.
 
 # Snapshot the plugin hook exactly as shipped; patterns file beside hooks/
 # per the scanner's documented layout, log lands next to it.
 rm -rf hooks payloads
 mkdir -p payloads
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-if [[ -f "$SCRIPT_DIR/../../../hooks/mcp-security-scanner.sh" ]]; then
-    cp -R "$SCRIPT_DIR/../../../hooks" ./hooks
-    cp "$SCRIPT_DIR/../../../security-patterns.conf" ./security-patterns.conf
-else
-    cp -R "$SCRIPT_DIR/hook-src/hooks" ./hooks
-    cp "$SCRIPT_DIR/hook-src/security-patterns.conf" ./security-patterns.conf
+if [[ -z "${EVAL_HOOK_SOURCE:-}" || ! -f "$EVAL_HOOK_SOURCE/hooks/mcp-security-scanner.sh" ]]; then
+    echo "setup: EVAL_HOOK_SOURCE does not contain the plugin hook; run through scripts/eval-run.sh" >&2
+    exit 1
 fi
+cp -R "$EVAL_HOOK_SOURCE/hooks" ./hooks
+if [[ ! -f "$EVAL_HOOK_SOURCE/security-patterns.conf" ]]; then
+    echo "setup: EVAL_HOOK_SOURCE does not contain security-patterns.conf" >&2
+    exit 1
+fi
+cp "$EVAL_HOOK_SOURCE/security-patterns.conf" ./security-patterns.conf
 chmod +x hooks/*.sh
 
 # Benign Notion page creation: repo-local changelog deltas, no credential

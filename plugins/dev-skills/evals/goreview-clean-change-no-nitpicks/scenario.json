@@ -1,1 +1,7 @@
-{"description":"Edge case: senior review of a genuinely clean staged Go change, graded on an approving verdict, genuine positive observations, and refusal to invent Critical/Major nitpicks","include":["./inputs"]}
+{
+  "description": "Edge case: senior review of a genuinely clean staged Go change, graded on an approving verdict, genuine positive observations, and refusal to invent Critical/Major nitpicks",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "skills/go-review"
+}

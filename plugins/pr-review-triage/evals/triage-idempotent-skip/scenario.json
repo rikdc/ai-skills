@@ -1,1 +1,7 @@
-{"description":"Re-run triage over an already partially processed PR without duplicating reactions, replies, resolution or follow-up items","include":["./inputs"]}
+{
+  "description": "Re-run triage over an already partially processed PR without duplicating reactions, replies, resolution or follow-up items",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "skills/triage-reviews"
+}

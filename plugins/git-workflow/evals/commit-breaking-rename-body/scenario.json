@@ -1,1 +1,7 @@
-{"description": "Conventional commit with body for breaking rename", "include": ["./inputs"]}
+{
+  "description": "Conventional commit with body for breaking rename",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "skills/commit"
+}

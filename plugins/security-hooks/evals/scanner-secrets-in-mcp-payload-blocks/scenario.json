@@ -1,1 +1,8 @@
-{"description": "The PreToolUse MCP scanner exits 2 with a stderr block decision and logged violations for a payload containing hard-coded credentials", "include": ["./inputs"]}
+{
+  "description": "The PreToolUse MCP scanner exits 2 with a stderr block decision and logged violations for a payload containing hard-coded credentials",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "hooks/mcp-security-scanner",
+  "mode": "functional"
+}

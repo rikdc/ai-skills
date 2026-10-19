@@ -1,1 +1,7 @@
-{"description":"Promptify happy path: analyse a Go security-review request, choose a documented pattern, and author a complete ready-to-use prompt with explicit output format.","include":["./inputs"]}
+{
+  "description": "Promptify happy path: analyse a Go security-review request, choose a documented pattern, and author a complete ready-to-use prompt with explicit output format.",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "commands/promptify"
+}

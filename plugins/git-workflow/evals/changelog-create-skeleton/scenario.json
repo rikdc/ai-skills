@@ -1,1 +1,7 @@
-{"description":"Create a fresh changelog in Keep a Changelog format","include":["./inputs"]}
+{
+  "description": "Create a fresh changelog in Keep a Changelog format",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "skills/changelog"
+}

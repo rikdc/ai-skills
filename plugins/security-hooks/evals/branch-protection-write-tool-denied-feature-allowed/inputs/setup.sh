@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd "$(dirname "$0")"
+# Fixtures are created at the workspace root, where the runner invokes
+# this script and where task.md expects them.
 
 rm -rf hooks payloads repo repo-feature
 mkdir -p payloads .claude  # .claude receives the hook's log, as Claude Code would provide
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-if [[ -f "$SCRIPT_DIR/../../../hooks/mcp-security-scanner.sh" ]]; then
-    cp -R "$SCRIPT_DIR/../../../hooks" ./hooks
-else
-    cp -R "$SCRIPT_DIR/hook-src/hooks" ./hooks
+if [[ -z "${EVAL_HOOK_SOURCE:-}" || ! -f "$EVAL_HOOK_SOURCE/hooks/protect-main-branch.sh" ]]; then
+    echo "setup: EVAL_HOOK_SOURCE does not contain the plugin hook; run through scripts/eval-run.sh" >&2
+    exit 1
 fi
+cp -R "$EVAL_HOOK_SOURCE/hooks" ./hooks
 chmod +x hooks/*.sh
 
 make_repo() {

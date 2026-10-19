@@ -1,4 +1,7 @@
 {
   "description": "Fix the lint issues the gate reports while honestly recording the unfixable items (blocked ops-owned config) without faking success",
-  "include": ["./inputs"]
+  "include": [
+    "./inputs"
+  ],
+  "unit": "commands/check"
 }

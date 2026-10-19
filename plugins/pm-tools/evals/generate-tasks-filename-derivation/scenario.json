@@ -1,1 +1,7 @@
-{"description": "Agent derives the task-list output filename from the PRD base name (tasks-prd-spare-parts-tracker.md inside tasks/) and leaves an unrelated stale file untouched", "include": ["./inputs"]}
+{
+  "description": "Agent derives the task-list output filename from the PRD base name (tasks-prd-spare-parts-tracker.md inside tasks/) and leaves an unrelated stale file untouched",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "commands/generate-tasks"
+}

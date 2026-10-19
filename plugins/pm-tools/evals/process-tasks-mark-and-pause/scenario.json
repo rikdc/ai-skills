@@ -1,1 +1,7 @@
-{"description": "Agent marks exactly the finished sub-task [x], leaves siblings and the parent unchecked, and pauses awaiting permission per the process-tasks interaction rules", "include": ["./inputs"]}
+{
+  "description": "Agent marks exactly the finished sub-task [x], leaves siblings and the parent unchecked, and pauses awaiting permission per the process-tasks interaction rules",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "commands/process-tasks"
+}

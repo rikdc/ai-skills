@@ -1,4 +1,7 @@
 {
   "description": "Remote switch gated behind the testing ladder",
-  "include": ["./inputs"]
+  "include": [
+    "./inputs"
+  ],
+  "unit": "skills/nix-expert"
 }

@@ -1,1 +1,10 @@
-{"description":"Execute the /triage slash command with explicit arguments 42 --dry-run: argument-selected target PR, self-review and reply filtering, dry-run stop","include":["./inputs"]}
+{
+  "description": "Execute the /triage slash command with explicit arguments 42 --dry-run: argument-selected target PR, self-review and reply filtering, dry-run stop",
+  "include": [
+    "./inputs"
+  ],
+  "units": [
+    "commands/triage",
+    "skills/triage-reviews"
+  ]
+}

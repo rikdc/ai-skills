@@ -23,8 +23,33 @@ TEST_PROTECT_BRANCH_SCRIPT := $(TESTS_DIR)/test-protect-main-branch.sh
 TEST_MARKETPLACE_SCRIPT := $(TESTS_DIR)/test-marketplace.sh
 TEST_CODEX_SKILLS_SCRIPT := $(TESTS_DIR)/test-codex-skills.sh
 TEST_EVALS_SCRIPT := $(TESTS_DIR)/test-evals.sh
+TEST_EVAL_SUITE_SCRIPT := $(TESTS_DIR)/test-eval-suite.sh
+TEST_EVAL_REPORT_SCRIPT := $(TESTS_DIR)/test-eval-report.sh
+TEST_EVAL_USAGE_SCRIPT := $(TESTS_DIR)/test-eval-usage.sh
+EVAL_SUITE_SCRIPT := $(SCRIPTS_DIR)/eval-suite.sh
+EVAL_REPORT_SCRIPT := $(SCRIPTS_DIR)/eval-report.sh
 VALIDATE_SCRIPT := $(SCRIPTS_DIR)/validate-config.sh
 SYNC_CODEX_SKILLS_SCRIPT := $(SCRIPTS_DIR)/sync-codex-skills.sh
+
+# `make eval` selection (empty means all plugins/scenarios). Plain := rather
+# than ?= deliberately ignores ambient environment variables of the same name;
+# command-line assignments still override.
+PLUGIN :=
+SKILL :=
+UNIT :=
+RUNS := 1
+JOBS := 1
+AGENT :=
+JUDGE :=
+DRY :=
+REPORT := all
+USAGE_CMD :=
+JUDGE_USAGE_CMD :=
+
+# AGENT/JUDGE/USAGE_CMD may contain a shell substitution like $(cat). Export
+# them so the recipe can read the value as data instead of re-parsing it as
+# shell code.
+export AGENT JUDGE USAGE_CMD JUDGE_USAGE_CMD
 
 # Pinned tool versions
 CLAUDELINT_VERSION := 0.7.1
@@ -57,6 +82,77 @@ test: ## Run complete test suite
 	@echo
 	@echo -e "$(BLUE)🧪 Running eval and skill quality gate...$(NC)"
 	@$(TEST_EVALS_SCRIPT)
+	@echo
+	@echo -e "$(BLUE)🧪 Running eval harness tests...$(NC)"
+	@$(TEST_EVAL_SUITE_SCRIPT)
+	@echo
+	@echo -e "$(BLUE)🧪 Running eval usage tests...$(NC)"
+	@$(TEST_EVAL_USAGE_SCRIPT)
+	@echo
+	@echo -e "$(BLUE)🧪 Running eval report tests...$(NC)"
+	@$(TEST_EVAL_REPORT_SCRIPT)
+
+.PHONY: eval
+eval: ## Run eval scenarios with an agent and render the comparison report
+	@set -euo pipefail; \
+	unit=""; \
+	if [[ -n "$(SKILL)" && -n "$(UNIT)" ]]; then \
+		echo "make eval: pass SKILL or UNIT, not both" >&2; \
+		exit 2; \
+	fi; \
+	if [[ -n "$(SKILL)" ]]; then \
+		unit="skills/$(SKILL)"; \
+	elif [[ -n "$(UNIT)" ]]; then \
+		unit="$(UNIT)"; \
+	fi; \
+	suite_args=(); \
+	if [[ -n "$(PLUGIN)" ]]; then \
+		suite_args+=(--plugin "$(PLUGIN)"); \
+	fi; \
+	if [[ -n "$$unit" ]]; then \
+		suite_args+=(--unit "$$unit"); \
+	fi; \
+	suite_args+=(--runs "$(RUNS)" --jobs "$(JOBS)"); \
+	if [[ -n "$$USAGE_CMD" ]]; then \
+		suite_args+=(--usage-cmd "$$USAGE_CMD"); \
+	fi; \
+	if [[ -n "$$JUDGE_USAGE_CMD" ]]; then \
+		suite_args+=(--judge-usage-cmd "$$JUDGE_USAGE_CMD"); \
+	fi; \
+	stamp="$$(date -u +%Y%m%dT%H%M%SZ)-$$(git -C "$(PROJECT_ROOT)" rev-parse --short HEAD 2>/dev/null || echo nogit)-$$$$"; \
+	suite_dir="$(PROJECT_ROOT)/results/eval-suite/$$stamp"; \
+	if [[ "$(DRY)" == "1" ]]; then \
+		"$(EVAL_SUITE_SCRIPT)" --plan "$${suite_args[@]}"; \
+		echo; \
+		echo "Report destination: $$suite_dir/report"; \
+		exit 0; \
+	fi; \
+	if [[ -z "$$AGENT" ]]; then \
+		echo "make eval: AGENT is required for a real run" >&2; \
+		echo "  make eval PLUGIN=git-workflow SKILL=pr RUNS=3 AGENT='claude -p'" >&2; \
+		echo '  make eval PLUGIN=git-workflow UNIT=commands/review AGENT='"'"'opencode run --auto "$$$$(cat)"'"'"'' >&2; \
+		echo "Make consumes the substitution syntax itself. Use the double-dollar form shown in the second example so the shell receives the agent command intact." >&2; \
+		echo "Use DRY=1 to inspect the plan without running a model." >&2; \
+		exit 2; \
+	fi; \
+	judge="$$JUDGE"; \
+	if [[ -z "$$judge" ]]; then \
+		judge="$$AGENT"; \
+	fi; \
+	suite_args+=(--agent-cmd "$$AGENT" --judge-cmd "$$judge"); \
+	if [[ -z "$$USAGE_CMD" ]]; then \
+		if [[ "$$AGENT" == *opencode* && "$$AGENT" == *run* && "$$AGENT" != *"--format json"* ]]; then \
+			echo "make eval: warning: opencode is not using --format json, so cost will be unknown (set USAGE_CMD or add the flag)" >&2; \
+		elif [[ "$$AGENT" == *claude* && ( "$$AGENT" =~ (^|[[:space:]])-p([[:space:]]|$$) || "$$AGENT" =~ (^|[[:space:]])--print([[:space:]]|$$) ) && "$$AGENT" != *"--output-format json"* ]]; then \
+			echo "make eval: warning: claude is not using --output-format json, so cost will be unknown (set USAGE_CMD or add the flag)" >&2; \
+		fi; \
+	fi; \
+	mkdir -p "$$suite_dir"; \
+	"$(EVAL_SUITE_SCRIPT)" "$${suite_args[@]}" --out "$$suite_dir"; \
+	"$(EVAL_REPORT_SCRIPT)" "$$suite_dir" --format "$(REPORT)" --out "$$suite_dir/report"; \
+	if [[ -f "$$suite_dir/report/report.html" ]]; then \
+		echo "HTML report: $$suite_dir/report/report.html"; \
+	fi
 
 .PHONY: validate
 validate: ## Validate plugin manifest, hook scripts, and dependencies
@@ -181,6 +277,10 @@ help: ## Display this help
 	@echo "  make lint              # Run code quality checks"
 	@echo "  make install           # Make hook scripts executable"
 	@echo "  make sync-codex-skills # Sync .codex/skills symlinks with plugins/*/skills"
+	@echo "  make eval PLUGIN=git-workflow SKILL=pr RUNS=3 AGENT='claude -p --output-format json'"
+	@echo '  make eval PLUGIN=git-workflow UNIT=commands/review AGENT='"'"'opencode run --auto --format json "$$$$(cat)"'"'"''
+	@echo "  (cost needs structured output or USAGE_CMD; Make consumes \$$(...), so use the double-dollar form above)"
+	@echo "  make eval PLUGIN=git-workflow RUNS=1 DRY=1"
 	@echo "  make clean             # Clean up artifacts"
 	@echo
 

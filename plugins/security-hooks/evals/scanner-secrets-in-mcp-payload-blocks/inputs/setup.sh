@@ -1,22 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd "$(dirname "$0")"
+# Fixtures are created at the workspace root, where the runner invokes
+# this script and where task.md expects them.
 
 # Snapshot the plugin's hook script and its patterns file, laid out exactly
-# as the plugin ships them: <sandbox>/hooks/*.sh, config beside hooks/ so the
+# as the plugin ships them: <workspace>/hooks/*.sh, config beside hooks/ so the
 # scanner finds its CONFIG_FILE via its documented relative layout.
 rm -rf hooks payloads
 mkdir -p payloads
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-if [[ -f "$SCRIPT_DIR/../../../hooks/mcp-security-scanner.sh" ]]; then
-    cp -R "$SCRIPT_DIR/../../../hooks" ./hooks
-    cp "$SCRIPT_DIR/../../../security-patterns.conf" ./security-patterns.conf
-else
-    cp -R "$SCRIPT_DIR/hook-src/hooks" ./hooks
-    cp "$SCRIPT_DIR/hook-src/security-patterns.conf" ./security-patterns.conf
+if [[ -z "${EVAL_HOOK_SOURCE:-}" || ! -f "$EVAL_HOOK_SOURCE/hooks/mcp-security-scanner.sh" ]]; then
+    echo "setup: EVAL_HOOK_SOURCE does not contain the plugin hook; run through scripts/eval-run.sh" >&2
+    exit 1
 fi
+cp -R "$EVAL_HOOK_SOURCE/hooks" ./hooks
+if [[ ! -f "$EVAL_HOOK_SOURCE/security-patterns.conf" ]]; then
+    echo "setup: EVAL_HOOK_SOURCE does not contain security-patterns.conf" >&2
+    exit 1
+fi
+cp "$EVAL_HOOK_SOURCE/security-patterns.conf" ./security-patterns.conf
 chmod +x hooks/*.sh
 
 # The payload a developer is about to send through an MCP tool: a bug report

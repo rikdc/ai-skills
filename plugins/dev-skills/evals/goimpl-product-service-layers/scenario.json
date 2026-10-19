@@ -1,1 +1,7 @@
-{"description":"Implement the CreateProduct service and HTTP handler following the documented house Go patterns (constructor-returns-interface, context-first I/O, sentinel errors with %w wrapping, decode/encode-only handler, table-driven testify tests)","include":["./inputs"]}
+{
+  "description": "Implement the CreateProduct service and HTTP handler following the documented house Go patterns (constructor-returns-interface, context-first I/O, sentinel errors with %w wrapping, decode/encode-only handler, table-driven testify tests)",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "skills/go-backend-implementor"
+}
