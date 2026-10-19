@@ -5,7 +5,7 @@
 # scripts/eval-run.sh runs one scenario. This script runs the campaign around
 # it: discovery across every plugin, a deterministic plan, bounded parallelism,
 # resume, sharding, optional judging, and one aggregate report. Staging stays
-# in eval-run.sh - this script never reimplements the sandbox contract.
+# in eval-run.sh - this script never reimplements the workspace contract.
 #
 # Everything runs on the contributor's machine. The agent command is the only
 # thing that talks to a model, so a suite costs whatever that command costs;
@@ -79,13 +79,13 @@ Selection:
   --shard I/N         deterministic slice I of N (1-based)
 
 Execution:
-  --agent-cmd CMD     command that reads task.md on stdin, run in the sandbox
-                      (e.g. 'claude -p', 'codex exec -')
+  --agent-cmd CMD     command that reads task.md on stdin, run in the
+                      temporary workspace (e.g. 'claude -p', 'codex exec -')
   --arm ARM           both (default), with, or without
   --runs N            runs per arm (default 1)
   --jobs N            concurrent scenarios (default 1)
   --timeout SECS      per-run agent deadline (default 900)
-  --skill-dir DIR     sandbox dir for the with-arm's skills (default
+  --skill-dir DIR     workspace dir for the with-arm's skills (default
                       .claude/skills); commands go to the sibling commands/ dir
 
 Output:
@@ -96,8 +96,8 @@ Output:
   --judge-usage-cmd CMD
                       optional hook to normalize judge usage/tokens
   --judge-timeout S   per-run judge deadline (default 600)
-  --keep              keep sandboxes (evidence bundles are always written)
-  --no-auth           do not copy the agent CLI's login state into sandboxes
+  --keep              keep workspaces (evidence bundles are always written)
+  --no-auth           do not copy the agent CLI's login state into workspaces
   --auth-path PATH    extra login/config file under your home to copy in
                       (repeatable; forwarded to every run)
   --strict            fail on runner errors, pending criteria, or delta <= 0
@@ -198,7 +198,7 @@ esac
 [[ "$JOBS" =~ ^[0-9]+$ && "$JOBS" -ge 1 ]] || die "--jobs must be a positive integer"
 [[ "$TIMEOUT" =~ ^[0-9]+$ && "$TIMEOUT" -ge 1 ]] || die "--timeout must be a positive integer"
 [[ "$JUDGE_TIMEOUT" =~ ^[0-9]+$ && "$JUDGE_TIMEOUT" -ge 1 ]] || die "--judge-timeout must be a positive integer"
-[[ "$SKILL_DIR" != /* ]] || die "--skill-dir must be relative to the sandbox"
+[[ "$SKILL_DIR" != /* ]] || die "--skill-dir must be relative to the workspace"
 for auth_path in ${AUTH_PATHS[@]+"${AUTH_PATHS[@]}"}; do
     [[ "$auth_path" != /* && "$auth_path" != *..* ]] ||
         die "--auth-path must be a relative path under \$HOME: $auth_path"
@@ -782,6 +782,15 @@ start_job() {
         die "cannot create log directory under $OUT_DIR"
     fi
     rm -f "$status"
+
+    # A scenario that reached this point is about to execute again: it is new,
+    # its fingerprint changed, or one of its runs is missing. Recreate its
+    # result directory rather than writing over the old one, so a grade,
+    # usage record or timing value from an earlier task cannot be paired with
+    # this run's evidence.
+    if ! rm -rf "$OUT_DIR/runs/$plugin/$scenario"; then
+        die "cannot reset results for $label under $OUT_DIR"
+    fi
     printf '▶ %s\n' "$label"
 
     (
@@ -871,8 +880,8 @@ job_tree() {
 
 # Non-interactive shells start asynchronous jobs with SIGINT ignored, so Ctrl-C
 # would otherwise kill the suite while paid agent jobs keep running until their
-# timeouts and sandbox credentials survive. TERM each tracked tree, give
-# eval-run.sh a moment to run its own sandbox cleanup, then KILL what ignored
+# timeouts and workspace credentials survive. TERM each tracked tree, give
+# eval-run.sh a moment to run its own workspace cleanup, then KILL what ignored
 # TERM.
 # shellcheck disable=SC2329  # invoked only by the INT/TERM trap strings
 abort_suite() {

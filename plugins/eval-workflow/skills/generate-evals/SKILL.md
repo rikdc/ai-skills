@@ -111,7 +111,9 @@ ones.
 
 ### 4. Make it gradeable offline
 
-Scenarios run in a sandbox without network or credentials.
+Scenarios run in a temporary workspace. The runner does not isolate them:
+fixtures must not need the network or credentials, but the agent still runs
+with the contributor's user privileges and can reach absolute host paths.
 
 1. `inputs/setup.sh` is POSIX bash: `#!/usr/bin/env bash`, `set -euo
    pipefail`, `git init -q` plus `git config user.email/user.name`, heredoc
@@ -122,9 +124,9 @@ Scenarios run in a sandbox without network or credentials.
    into the working directory - so the instruction survives either layout.
    Every checked-in fixture file is either written by the script or read by
    it, never both: a copy the script overwrites is dead weight that drifts
-   silently. The sandbox provides `python3` (the recording shims and at
-   least one Makefile depend on it) and the POSIX coreutils; state any
-   further tool a fixture needs in task.md.
+   silently. The workspace inherits the host environment, including `python3`
+   (the recording shims and at least one Makefile depend on it) and the POSIX
+   coreutils; state any further tool a fixture needs in task.md.
 2. Build recording shims for external CLIs the agent would call (a `gh`
    shim that writes `title`, `body`, `draft`, `base` and `head` to
    `pr-record.json`), so the graded call is observable. See the git-workflow

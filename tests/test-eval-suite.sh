@@ -56,6 +56,30 @@ else
     fail "eval-suite selftest" "$TMP/eval-suite.log"
 fi
 
+# Every fixture setup must run through the runner. A setup that changes into
+# its own directory before resolving $0 used to look for inputs/inputs when the
+# runner invoked it relatively.
+fixture_out="$TMP/fixture-setups"
+fixture_failures=""
+fixture_count=0
+while IFS= read -r setup; do
+    scenario_dir="${setup%/inputs/setup.sh}"
+    scenario="${scenario_dir##*/}"
+    plugin_dir="${scenario_dir%/evals/*}"
+    plugin="${plugin_dir##*/}"
+    fixture_count=$((fixture_count + 1))
+    if ! "$RUN_ONE" --plugin "$plugin" --scenario "$scenario" \
+        --agent-cmd true --arm with --no-auth --out "$fixture_out" \
+        >"$TMP/fixture-$plugin-$scenario.log" 2>&1; then
+        fixture_failures+=" $plugin/$scenario"$'\n'
+    fi
+done < <(find plugins -path '*/evals/*/inputs/setup.sh' | LC_ALL=C sort)
+if [[ -z "$fixture_failures" ]]; then
+    pass "every scenario fixture setup runs ($fixture_count fixtures)"
+else
+    fail "fixture setup failed for:$fixture_failures"
+fi
+
 # --- discovery ----------------------------------------------------------------
 
 expected="$(
@@ -304,6 +328,75 @@ if [[ "$(jq -r '.counts.executed' "$suite_dir/suite.json" 2>/dev/null)" == "0" ]
     pass "--resume skips complete scenarios without losing results"
 else
     fail "--resume reran or dropped completed scenarios" "$TMP/run-2.log"
+fi
+
+# A changed task invalidates the scenario even when the rubric is untouched.
+# The rerun must recreate the result directory, not grade the new evidence
+# with the judgement from the old task.
+regrade_root="$TMP/regrade-repo"
+regrade_scenario="$regrade_root/plugins/fixture/evals/changed-task"
+mkdir -p "$regrade_scenario/inputs" "$regrade_root/plugins/fixture/skills/demo"
+cp -R scripts "$regrade_root/scripts"
+chmod +x "$regrade_root/scripts/"*.sh
+printf '# Demo skill\n' >"$regrade_root/plugins/fixture/skills/demo/SKILL.md"
+cat >"$regrade_scenario/criteria.json" <<'EOF'
+{"context":"regrade fixture","type":"weighted_checklist","checklist":[{"name":"Task done","description":"The task is complete.","max_score":100}]}
+EOF
+cat >"$regrade_scenario/scenario.json" <<'EOF'
+{"description":"regrade fixture","include":["./inputs"],"unit":"skills/demo"}
+EOF
+printf '# Original task\n\nDo the original thing.\n' >"$regrade_scenario/task.md"
+cat >"$regrade_scenario/inputs/setup.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'fixture ready\n'
+EOF
+chmod +x "$regrade_scenario/inputs/setup.sh"
+
+cat >"$TMP/judge-first.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+jq '[.judgement_pending[] | {name: .name, score: .max_score, max: .max_score, note: "first"}]' \
+    grading-request.json > judgement.json
+EOF
+cat >"$TMP/judge-second.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+jq '[.judgement_pending[] | {name: .name, score: 0, max: .max_score, note: "second"}]' \
+    grading-request.json > judgement.json
+EOF
+chmod +x "$TMP/judge-first.sh" "$TMP/judge-second.sh"
+
+regrade_suite="$TMP/regrade-suite"
+regrade_ok=1
+"$regrade_root/scripts/eval-suite.sh" --agent-cmd true --judge-cmd "$TMP/judge-first.sh" \
+    --plugin fixture --scenario changed-task --arm with --runs 1 --no-auth \
+    --out "$regrade_suite" >"$TMP/regrade-first.log" 2>&1 || regrade_ok=0
+regrade_run="$regrade_suite/runs/fixture/changed-task/with/run-1"
+if [[ "$regrade_ok" -eq 1 ]] &&
+    [[ "$(jq -r '.[0].note' "$regrade_run/judgement.json" 2>/dev/null)" == "first" ]]; then
+    printf '{"stale":true}\n' >"$regrade_run/usage.json"
+    printf '{"stale":true}\n' >"$regrade_run/judge-result.json"
+    printf 'stale\n' >"$regrade_run/stale-artifact"
+    printf '# Changed task\n\nDo the changed thing instead.\n' >"$regrade_scenario/task.md"
+
+    "$regrade_root/scripts/eval-suite.sh" --agent-cmd true --judge-cmd "$TMP/judge-second.sh" \
+        --plugin fixture --scenario changed-task --arm with --runs 1 --no-auth \
+        --out "$regrade_suite" --resume >"$TMP/regrade-second.log" 2>&1
+    regrade_rc=$?
+    if [[ "$regrade_rc" -eq 0 ]] &&
+        [[ "$(jq -r '.counts.executed' "$regrade_suite/suite.json" 2>/dev/null)" == "1" ]] &&
+        [[ "$(jq -r '.counts.skipped' "$regrade_suite/suite.json" 2>/dev/null)" == "0" ]] &&
+        [[ "$(jq -r '.[0].note' "$regrade_run/judgement.json" 2>/dev/null)" == "second" ]] &&
+        [[ ! -e "$regrade_run/stale-artifact" ]] &&
+        jq -e '.stale != true' "$regrade_run/usage.json" >/dev/null 2>&1 &&
+        jq -e '.stale != true' "$regrade_run/judge-result.json" >/dev/null 2>&1; then
+        pass "a changed task reruns and discards the previous grade, usage and timing"
+    else
+        fail "a changed task kept the previous judgement or derived artifacts" "$TMP/regrade-second.log"
+    fi
+else
+    fail "the regrade fixture did not produce an initial judgement" "$TMP/regrade-first.log"
 fi
 
 # A non-zero agent is a recorded result, not a reason to abort the campaign.

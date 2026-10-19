@@ -32,13 +32,18 @@ scripts/eval-run.sh --plugin git-workflow --scenario pr-draft-read-replica \
     --agent-cmd 'claude -p'
 ```
 
-That stages the scenario in a throwaway sandbox with `HOME` redirected into it,
-runs the agent once without the plugin's unit and once with it, records what
-changed, scores the mechanical half of the rubric through the scenario's
-`checks.sh`, and leaves a grading request for the criteria that need judgement.
-The with-arm installs the plugin's skills and namespaced commands; the evidence
-bundle (`snapshot.tar`, logs, before/after state) is always written.
-Results land in the git-ignored `results/eval-run/`.
+That copies the scenario into a temporary workspace with `HOME` redirected
+into it, runs the agent once without the plugin's unit and once with it,
+records what changed, scores the mechanical half of the rubric through the
+scenario's `checks.sh`, and leaves a grading request for the criteria that
+need judgement. The with-arm installs the plugin's skills and namespaced
+commands; the evidence bundle (`snapshot.tar`, logs, before/after state) is
+always written. Results land in the git-ignored `results/eval-run/`.
+
+The workspace is a working directory, not a security boundary. The agent runs
+as your user with your user's privileges: it can read and write absolute host
+paths, and it can reach the network unless the command you pass prevents it.
+Use a container or VM when a scenario must actually be isolated.
 
 Every scenario declares the unit it measures in `scenario.json`:
 
@@ -63,19 +68,22 @@ installs nothing because hook scenarios invoke the hook themselves. An unknown
 unit, or a unit the plugin does not ship, fails before any run. Without
 `--unit`, the with-arm keeps installing every skill and command in the plugin.
 
-The sandbox `HOME` starts empty so fixtures and checks cannot touch your home
-directory. Immediately before the agent runs, login state for the common CLIs
+The workspace `HOME` starts empty, so tools that write to `$HOME` land in the
+workspace rather than your home directory. That redirection is not filesystem
+isolation: absolute paths still reach the host. Immediately before the agent
+runs, login state for the common CLIs
 (`~/.claude.json`, `~/.claude/.credentials.json`, `~/.codex/auth.json`,
 `~/.config/gh/hosts.yml`, `~/.local/share/opencode/auth.json`, and their
 settings) is copied in, and on macOS the login Keychains directory is linked
-into the sandbox because the CLI looks it up under `$HOME/Library`. That
-symlink grants the sandboxed agent full access to your keychains, so it is a
-deliberate tradeoff for authenticated runs; use `--no-auth` for a hermetic
-run. The copied files and link are deleted again as soon as the agent exits
-(or on interrupt), and `home/` is excluded from the evidence bundle. Pass
-`--auth-path PATH` (repeatable) for any other credential or config file under
-your home; a suite forwards every path. Pass `--no-auth` when the agent
-authenticates from the environment (for example an API key).
+into the workspace because the CLI looks it up under `$HOME/Library`. That
+symlink grants the agent full access to your keychains, so it is a deliberate
+tradeoff for authenticated runs. `--no-auth` skips the credential copying and
+the link; it does not isolate the process. The copied files and link are
+deleted again as soon as the agent exits (or on interrupt), and `home/` is
+excluded from the evidence bundle. Pass `--auth-path PATH` (repeatable) for
+any other credential or config file under your home; a suite forwards every
+path. Pass `--no-auth` when the agent authenticates from the environment (for
+example an API key).
 
 Any agent CLI works if it reads the task on **stdin**, does its work in the
 **current directory**, and runs **non-interactively**. For a CLI that takes the
@@ -90,10 +98,11 @@ the sibling `commands/<plugin>/`. The default `.claude/skills` is also
 discovered by opencode; use `--skill-dir .opencode/skills` for opencode's
 native layout, which puts commands under `.opencode/commands/`.
 
-Headless agents also need permission to use tools. The sandbox is the
-boundary, so pass the CLI's non-interactive flag - for Claude Code,
+Headless agents also need permission to use tools. The runner does not sandbox
+the agent, so these flags reduce prompting, not risk: pass Claude Code's
 `--dangerously-skip-permissions`, or `--permission-mode acceptEdits` when the
-scenario only needs file edits; for opencode, `--auto`.
+scenario only needs file edits; for opencode, `--auto`. Only use them in an
+environment you are willing to let the agent modify.
 
 ## Running a suite
 
@@ -277,8 +286,12 @@ scripts/eval-report.sh results/eval-suite/<new> \
 ```
 
 The comparison uses per-run means, so suites with different `--runs` counts
-remain comparable. It reports score, cost and input/output token deltas; a
-scenario missing from either suite is excluded from the per-scenario table.
+remain comparable. Deltas are calculated only over scenarios present in both
+suites with identical rubric criterion names and maxima; cost and token deltas
+use the same matched set. Every excluded scenario and its reason appears under
+`comparison.excluded` (and in each rendered report). When no scenario is
+compatible, the comparison reports `not comparable` and withholds every delta
+instead of subtracting different workloads.
 
 ## Grading pending criteria
 

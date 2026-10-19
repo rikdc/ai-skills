@@ -745,12 +745,13 @@ HTML
 render_comparison_files() {
     [[ -n "$BASELINE_DIR" ]] || return 0
 
-    local suite baseline comparable current_total baseline_total
+    local suite baseline comparable current_total baseline_total status
     suite="$(jq -r '.comparison.current.suite_dir' "$TMP/report.json")"
     baseline="$(jq -r '.comparison.baseline.suite_dir' "$TMP/report.json")"
     comparable="$(jq -r '.comparison.comparable_scenarios' "$TMP/report.json")"
     current_total="$(jq -r '.comparison.current_scenarios' "$TMP/report.json")"
     baseline_total="$(jq -r '.comparison.baseline_scenarios' "$TMP/report.json")"
+    status="$(jq -r '.comparison.status' "$TMP/report.json")"
 
     jq -r '
         .comparison as $c
@@ -782,7 +783,18 @@ render_comparison_files() {
         printf '  Baseline: %s\n' "$baseline"
         printf '  Comparable scenarios: %s of %s current / %s baseline\n' \
             "$comparable" "$current_total" "$baseline_total"
-        printf '\n%-22s %12s %12s %12s\n' "METRIC" "BASELINE" "CURRENT" "DELTA"
+        printf '  Status: %s\n' "$status"
+        if [[ "$status" != "comparable" ]]; then
+            printf '  No scenario with the same rubric ran in both suites; deltas are withheld.\n'
+        fi
+        if [[ "$(jq -r '.comparison.excluded_scenarios' "$TMP/report.json")" != "0" ]]; then
+            printf '  Excluded:\n'
+            jq -r '.comparison.excluded[]? | "    - \(.side): \(.plugin)/\(.scenario) — \(.reason)"' \
+                "$TMP/report.json"
+        fi
+        if [[ "$status" == "comparable" ]]; then
+            printf '\n%-22s %12s %12s %12s\n' "METRIC" "BASELINE" "CURRENT" "DELTA"
+        fi
     } >"$TMP/comparison.cli"
 
     {
@@ -791,23 +803,49 @@ render_comparison_files() {
         printf -- '- Baseline: `%s`\n' "$baseline"
         # shellcheck disable=SC2016  # literal Markdown backticks
         printf -- '- Current: `%s`\n' "$suite"
-        printf -- '- Comparable scenarios: %s of %s current / %s baseline\n\n' \
+        printf -- '- Comparable scenarios: %s of %s current / %s baseline\n' \
             "$comparable" "$current_total" "$baseline_total"
-        printf '| Metric | Baseline | Current | Delta |\n| --- | --- | --- | --- |\n'
+        printf -- '- Status: **%s**\n' "$status"
+        if [[ "$status" != "comparable" ]]; then
+            printf '\nNo scenario with the same rubric ran in both suites; deltas are withheld.\n'
+        fi
+        if [[ "$(jq -r '.comparison.excluded_scenarios' "$TMP/report.json")" != "0" ]]; then
+            printf '\nExcluded:\n\n'
+            jq -r '.comparison.excluded[]? | "- `\(.plugin)/\(.scenario)` (\(.side)) — \(.reason)"' \
+                "$TMP/report.json"
+        fi
+        if [[ "$status" == "comparable" ]]; then
+            printf '\n| Metric | Baseline | Current | Delta |\n| --- | --- | --- | --- |\n'
+        else
+            printf '\n'
+        fi
     } >"$TMP/comparison.md"
 
     {
         printf '<h2>Change since baseline</h2>\n'
-        printf '<p class="note">Baseline: <code>%s</code> · Current: <code>%s</code> · Comparable scenarios: %s of %s current / %s baseline</p>\n' \
+        printf '<p class="note">Baseline: <code>%s</code> · Current: <code>%s</code> · Comparable scenarios: %s of %s current / %s baseline · Status: <strong>%s</strong></p>\n' \
             "$(jq -rn --arg s "$baseline" '$s | @html')" \
             "$(jq -rn --arg s "$suite" '$s | @html')" \
-            "$comparable" "$current_total" "$baseline_total"
-        printf '<table><thead><tr><th>Metric</th><th>Baseline</th><th>Current</th><th>Delta</th></tr></thead><tbody>\n'
+            "$comparable" "$current_total" "$baseline_total" \
+            "$(jq -rn --arg s "$status" '$s | @html')"
+        if [[ "$status" != "comparable" ]]; then
+            printf '<p class="note">No scenario with the same rubric ran in both suites; deltas are withheld.</p>\n'
+        fi
+        if [[ "$(jq -r '.comparison.excluded_scenarios' "$TMP/report.json")" != "0" ]]; then
+            printf '<p class="note">Excluded:</p>\n<ul class="note">\n'
+            jq -r '.comparison.excluded[]? | "<li>\(.side | @html): \(.plugin | @html)/\(.scenario | @html) — \(.reason | @html)</li>"' \
+                "$TMP/report.json"
+            printf '</ul>\n'
+        fi
+        if [[ "$status" == "comparable" ]]; then
+            printf '<table><thead><tr><th>Metric</th><th>Baseline</th><th>Current</th><th>Delta</th></tr></thead><tbody>\n'
+        fi
     } >"$TMP/comparison.html"
 
     local label kind base current delta baseline_v current_v delta_v
     while IFS=$'\t' read -r label kind base current delta; do
         [[ -n "$label" ]] || continue
+        [[ "$status" == "comparable" ]] || continue
         case "$kind" in
             score)
                 baseline_v="$(cli_num "$base")"
@@ -843,7 +881,9 @@ render_comparison_files() {
             "$label" "$baseline_v" "$current_v" "$delta_v" >>"$TMP/comparison.html"
     done <"$TMP/comparison.tsv"
 
-    printf '</tbody></table>\n' >>"$TMP/comparison.html"
+    if [[ "$status" == "comparable" ]]; then
+        printf '</tbody></table>\n' >>"$TMP/comparison.html"
+    fi
 }
 
 cli_num() {

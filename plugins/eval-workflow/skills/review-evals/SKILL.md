@@ -50,7 +50,7 @@ exercise. Then ask, in this order:
    long and short flags, `--flag=value`, `-` for stdin, values that begin with
    `-` - and record what the tool would infer, not only what it receives.
 6. **Is the fixture honest?** Deterministic, prompt-free, executable, no
-   network, writes only inside the sandbox, and no checked-in file the script
+   network, writes only inside its workspace, and no checked-in file the script
    overwrites.
 
 ## Judge a skill

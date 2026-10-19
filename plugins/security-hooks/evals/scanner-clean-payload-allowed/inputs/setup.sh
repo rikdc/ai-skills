@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd "$(dirname "$0")"
+# Resolve the fixture directory before changing into it: the invocation path may be relative.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
 # Snapshot the plugin hook exactly as shipped; patterns file beside hooks/
 # per the scanner's documented layout, log lands next to it.
 rm -rf hooks payloads
 mkdir -p payloads
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 if [[ -f "$SCRIPT_DIR/../../../hooks/mcp-security-scanner.sh" ]]; then
     cp -R "$SCRIPT_DIR/../../../hooks" ./hooks
     cp "$SCRIPT_DIR/../../../security-patterns.conf" ./security-patterns.conf

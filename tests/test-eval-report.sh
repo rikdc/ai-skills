@@ -455,6 +455,12 @@ for dir in "$base" "$cur"; do
 done
 add_run "$base" demo compare without 1 '[{"name":"A","score":90,"max":100}]'
 add_run "$cur" demo compare without 1 '[{"name":"A","score":95,"max":100}]'
+# Current-only: the whole-suite totals would move, but the matched delta must not.
+add_scenario "$cur" demo extra-only \
+    '{"context":"x","type":"weighted_checklist","checklist":[{"name":"A","description":"d","max_score":100}]}' \
+    '["skills/fixture"]'
+add_run "$cur" demo extra-only with 1 '[{"name":"A","score":100,"max":100}]'
+add_run "$cur" demo extra-only without 1 '[{"name":"A","score":100,"max":100}]'
 finish_suite "$base"
 finish_suite "$cur"
 add_usage "$base" demo compare with 1 usage \
@@ -479,13 +485,19 @@ run_report "$cur" "$TMP/compare.cli" --format cli --baseline "$base"
 run_report "$cur" "$TMP/compare.md" --format md --baseline "$base"
 run_report "$cur" "$TMP/compare.all" --format all --baseline "$base" >/dev/null 2>&1
 if jq -e '
-    .comparison.comparable_scenarios == 1
+    .comparison.status == "comparable"
+    and .comparison.comparable_scenarios == 1
+    and .comparison.current_scenarios == 2
+    and .comparison.baseline_scenarios == 1
+    and (.comparison.excluded | length) == 1
+    and (.comparison.excluded[0] | .plugin == "demo" and .scenario == "extra-only"
+         and .reason == "missing from baseline")
     and ((.comparison.delta.with_cost_per_run - 0.004) | if . < 0 then -. else . end) < 0.0000001
     and ((.comparison.delta.without_cost_per_run - 0.002) | if . < 0 then -. else . end) < 0.0000001
     and .comparison.delta.effect == -5
     and .comparison.delta.with_input_tokens_per_run == 200
 ' "$TMP/compare.json" >/dev/null; then
-    pass "JSON compares per-run cost, effect and input tokens with a baseline"
+    pass "JSON compares only matched scenarios and lists the exclusion"
 else
     fail "baseline comparison JSON is wrong"
 fi
@@ -493,9 +505,92 @@ assert_contains "$TMP/compare.cli" "Change since baseline" "CLI renders a baseli
 assert_contains "$TMP/compare.cli" "Cost with / run" "CLI shows per-run cost change"
 assert_contains "$TMP/compare.cli" "+\$0.004" "CLI shows the per-run cost delta"
 assert_contains "$TMP/compare.cli" "Input with / run" "CLI shows per-run input token change"
+assert_contains "$TMP/compare.cli" "demo/extra-only" "CLI lists an excluded scenario"
+assert_contains "$TMP/compare.cli" "missing from baseline" "CLI shows the exclusion reason"
 assert_contains "$TMP/compare.md" "Change since baseline" "Markdown renders a baseline section"
+assert_contains "$TMP/compare.md" "demo/extra-only" "Markdown lists an excluded scenario"
+assert_contains "$TMP/compare.md" "missing from baseline" "Markdown shows the exclusion reason"
 assert_contains "$cur/report/report.html" "Change since baseline" "HTML renders a baseline section"
 assert_contains "$cur/report/report.html" "+\$0.004" "HTML shows the per-run cost delta"
+assert_contains "$cur/report/report.html" "demo/extra-only" "HTML lists an excluded scenario"
+assert_contains "$cur/report/report.html" "missing from baseline" "HTML shows the exclusion reason"
+
+# No scenario in common, or the same name with a different rubric, is not a
+# comparison: withhold every delta instead of subtracting different workloads.
+disjoint_base="$TMP/disjoint-base"
+disjoint_cur="$TMP/disjoint-cur"
+for dir in "$disjoint_base" "$disjoint_cur"; do
+    new_suite "$dir" 1 '["skills/fixture"]'
+done
+add_scenario "$disjoint_base" demo alpha \
+    '{"context":"x","type":"weighted_checklist","checklist":[{"name":"A","description":"d","max_score":100}]}' \
+    '["skills/fixture"]'
+add_run "$disjoint_base" demo alpha with 1 '[{"name":"A","score":100,"max":100}]'
+add_run "$disjoint_base" demo alpha without 1 '[{"name":"A","score":90,"max":100}]'
+add_scenario "$disjoint_cur" demo beta \
+    '{"context":"x","type":"weighted_checklist","checklist":[{"name":"A","description":"d","max_score":100}]}' \
+    '["skills/fixture"]'
+add_run "$disjoint_cur" demo beta with 1 '[{"name":"A","score":100,"max":100}]'
+add_run "$disjoint_cur" demo beta without 1 '[{"name":"A","score":100,"max":100}]'
+finish_suite "$disjoint_base"
+finish_suite "$disjoint_cur"
+run_report "$disjoint_cur" "$TMP/disjoint.json" --format json --baseline "$disjoint_base"
+run_report "$disjoint_cur" "$TMP/disjoint.cli" --format cli --baseline "$disjoint_base"
+run_report "$disjoint_cur" "$TMP/disjoint.md" --format md --baseline "$disjoint_base"
+run_report "$disjoint_cur" "$TMP/disjoint.all" --format all --baseline "$disjoint_base" >/dev/null 2>&1
+if jq -e '
+    .comparison.status == "not comparable"
+    and .comparison.comparable == false
+    and .comparison.comparable_scenarios == 0
+    and .comparison.delta.with_score == null
+    and .comparison.delta.effect == null
+    and .comparison.delta.pair_cost_per_run == null
+    and (.comparison.excluded | length) == 2
+    and ([.comparison.excluded[].reason] | sort)
+        == ["missing from baseline", "missing from current"]
+' "$TMP/disjoint.json" >/dev/null; then
+    pass "a baseline with no shared scenario reports not comparable and withholds deltas"
+else
+    fail "a disjoint baseline produced a delta"
+fi
+assert_contains "$TMP/disjoint.cli" "Status: not comparable" \
+    "CLI reports not comparable"
+assert_not_contains "$TMP/disjoint.cli" "Score effect" \
+    "CLI withholds the comparison table"
+assert_contains "$TMP/disjoint.md" "**not comparable**" \
+    "Markdown reports not comparable"
+assert_contains "$disjoint_cur/report/report.html" "<strong>not comparable</strong>" \
+    "HTML reports not comparable"
+
+rubric_base="$TMP/rubric-base"
+rubric_cur="$TMP/rubric-cur"
+for dir in "$rubric_base" "$rubric_cur"; do
+    new_suite "$dir" 1 '["skills/fixture"]'
+done
+add_scenario "$rubric_base" demo same-name \
+    '{"context":"x","type":"weighted_checklist","checklist":[{"name":"A","description":"d","max_score":100}]}' \
+    '["skills/fixture"]'
+add_run "$rubric_base" demo same-name with 1 '[{"name":"A","score":100,"max":100}]'
+add_run "$rubric_base" demo same-name without 1 '[{"name":"A","score":90,"max":100}]'
+add_scenario "$rubric_cur" demo same-name \
+    '{"context":"x","type":"weighted_checklist","checklist":[{"name":"B","description":"d","max_score":100}]}' \
+    '["skills/fixture"]'
+add_run "$rubric_cur" demo same-name with 1 '[{"name":"B","score":100,"max":100}]'
+add_run "$rubric_cur" demo same-name without 1 '[{"name":"B","score":100,"max":100}]'
+finish_suite "$rubric_base"
+finish_suite "$rubric_cur"
+run_report "$rubric_cur" "$TMP/rubric.json" --format json --baseline "$rubric_base"
+if jq -e '
+    .comparison.status == "not comparable"
+    and .comparison.comparable_scenarios == 0
+    and .comparison.delta.effect == null
+    and (.comparison.excluded | length) == 1
+    and .comparison.excluded[0].reason == "rubric changed"
+' "$TMP/rubric.json" >/dev/null; then
+    pass "a changed rubric is excluded even when the scenario name matches"
+else
+    fail "a changed rubric was compared as if it were the same measurement"
+fi
 
 tiny="$TMP/tiny-cost"
 new_suite "$tiny" 1 '["skills/fixture"]'

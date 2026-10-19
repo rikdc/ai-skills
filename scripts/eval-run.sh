@@ -2,10 +2,14 @@
 
 # Local eval runner
 #
-# Stages a scenario from plugins/<plugin>/evals/<scenario>/ in a throwaway
-# sandbox, runs an agent against its task.md - once with the plugin's skills
+# Stages a scenario from plugins/<plugin>/evals/<scenario>/ in a temporary
+# workspace, runs an agent against its task.md - once with the plugin's skills
 # installed and once without - records what changed, and scores the parts of
 # the rubric a script can score (a scenario's optional checks.sh).
+#
+# The workspace is not a security boundary. The agent runs with the invoking
+# user's privileges, so it can read and write absolute host paths and reach
+# the network. Use a container or VM when a run must be isolated.
 #
 # The rest of a rubric needs judgement, so runs stop there and leave a grading
 # request behind: the criteria a script did not cover, plus the evidence. The
@@ -68,8 +72,8 @@ Usage:
 Options:
   --plugin NAME       plugin under test, e.g. git-workflow
   --scenario NAME     scenario directory under plugins/<plugin>/evals/
-  --agent-cmd CMD     command that reads task.md on stdin, run in the sandbox
-                      (e.g. 'claude -p', 'codex exec -')
+  --agent-cmd CMD     command that reads task.md on stdin, run in the
+                      temporary workspace (e.g. 'claude -p', 'codex exec -')
   --arm ARM           both (default), with, or without
   --runs N            runs per arm (default 1)
   --usage-cmd CMD     optional post-run hook that normalizes usage/tokens
@@ -80,13 +84,12 @@ Options:
                       command the plugin ships.
   --timeout SECS      per-run deadline (default 900)
   --skill-dir DIR     where the 'with' arm installs the plugin's skills in the
-                      sandbox, relative to it (default .claude/skills).
+                      workspace, relative to it (default .claude/skills).
                       The plugin's commands go to the sibling commands/ dir.
   --out DIR           results directory (default results/eval-run)
-  --keep              keep sandboxes; evidence bundles are always written
-  --no-auth           do not copy the agent CLI's login state into the sandbox
-                      (also skips the macOS Keychain symlink; use this for a
-                      fully hermetic run)
+  --keep              keep workspaces; evidence bundles are always written
+  --no-auth           do not copy the agent CLI's login state into the
+                      workspace (also skips the macOS Keychain symlink)
   --auth-path PATH    extra file under your home to copy in for the agent
                       (repeatable; e.g. .local/share/opencode/auth.json)
   --selftest          run the plumbing against a no-op agent; no model needed
@@ -152,7 +155,7 @@ case "$ARM" in
 esac
 [[ "$RUNS" =~ ^[0-9]+$ && "$RUNS" -ge 1 ]] || die "--runs must be a positive integer"
 [[ "$TIMEOUT" =~ ^[0-9]+$ && "$TIMEOUT" -ge 1 ]] || die "--timeout must be a positive integer"
-[[ "$SKILL_DIR" != /* ]] || die "--skill-dir must be relative to the sandbox"
+[[ "$SKILL_DIR" != /* ]] || die "--skill-dir must be relative to the workspace"
 for auth_path in "${AUTH_PATHS[@]}"; do
     [[ "$auth_path" != /* && "$auth_path" != *..* ]] ||
         die "--auth-path must be a relative path under \$HOME: $auth_path"
@@ -190,12 +193,11 @@ run_with_deadline() {
 }
 
 # Give the agent's CLI its login state without letting it write to the real
-# home. Credential files are copied into the sandbox and excluded from the
+# home. Credential files are copied into the workspace and excluded from the
 # evidence bundle. On macOS the Keychains directory is exposed as a symlink
-# because the CLI looks it up under $HOME/Library; a symlink grants the
-# sandboxed agent full read/write access to the user's keychains. That is a
-# deliberate tradeoff for authenticated runs - pass --no-auth for a hermetic
-# run.
+# because the CLI looks it up under $HOME; a symlink grants the agent full
+# read/write access to the user's keychains. That is a deliberate tradeoff for
+# authenticated runs - pass --no-auth to skip credential copying.
 prepare_agent_home() {
     local home="$1"
     [[ "$AUTH" == "1" && -n "$REAL_HOME" ]] || return 0
@@ -211,7 +213,7 @@ prepare_agent_home() {
         # A failed copy would silently produce an unauthenticated run that
         # looks exactly like a valid one, so it is fatal.
         if ! cp -p "$src" "$dest"; then
-            die "cannot copy agent credentials from $src; rerun with --no-auth for a hermetic run, or pass --auth-path for the file your agent CLI actually uses"
+            die "cannot copy agent credentials from $src; rerun with --no-auth to skip credential copying, or pass --auth-path for the file your agent CLI actually uses"
         fi
     done
 
@@ -407,10 +409,13 @@ run_once() {
     local arm="$1" run="$2"
     local sandbox rc out
     sandbox="$(mktemp -d "${TMPDIR:-/tmp}/eval-run-$SCENARIO-XXXXXX")" ||
-        die "cannot create a sandbox for $arm/run-$run"
+        die "cannot create a workspace for $arm/run-$run"
     CURRENT_SANDBOX="$sandbox"
     out="$OUT_DIR/$PLUGIN/$SCENARIO/$arm/run-$run"
-    if ! mkdir -p "$out" "$sandbox/home"; then
+    # A run directory is recreated, not reused: anything left from an earlier
+    # execution (judgement, usage, judge timing) describes evidence that no
+    # longer exists.
+    if ! rm -rf "$out" || ! mkdir -p "$out" "$sandbox/home"; then
         die "cannot create result directory: $out"
     fi
     CURRENT_HOME="$sandbox/home"
@@ -423,8 +428,10 @@ run_once() {
     done <<<"$(jq -r '.include[]?' "$SCENARIO_JSON")"
 
     # HOME is redirected for every step, so a fixture or an agent that writes
-    # to ~ writes into the sandbox - never into the contributor's home.
-    if ! (cd "$sandbox" && HOME="$sandbox/home" bash inputs/setup.sh) >"$out/setup.log" 2>&1; then
+    # to ~ writes into the workspace - never into the contributor's home. The
+    # staged script is invoked by absolute path: several fixtures cd to their
+    # own directory, and a relative $0 would otherwise be resolved twice.
+    if ! (cd "$sandbox" && HOME="$sandbox/home" bash "$sandbox/inputs/setup.sh") >"$out/setup.log" 2>&1; then
         die "setup failed for $arm/run-$run - see $out/setup.log"
     fi
 

@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd "$(dirname "$0")"
+# Resolve the fixture directory before changing into it: the invocation path may be relative.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
 rm -rf hooks payloads repo-release repo-hotfix
 mkdir -p payloads .claude
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 if [[ -f "$SCRIPT_DIR/../../../hooks/mcp-security-scanner.sh" ]]; then
     cp -R "$SCRIPT_DIR/../../../hooks" ./hooks
 else
