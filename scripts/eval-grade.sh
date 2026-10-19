@@ -117,7 +117,14 @@ run_with_deadline() {
     "$@" &
     local pid=$! watcher
     (
-        sleep "$secs"
+        # Run the sleeper in the background so the TERM trap can kill it;
+        # otherwise a timed-out watcher leaves an orphan sleep behind on
+        # systems without GNU timeout.
+        sleeper=""
+        trap 'kill -TERM "$sleeper" 2>/dev/null' TERM INT
+        sleep "$secs" &
+        sleeper=$!
+        wait "$sleeper"
         kill -TERM "$pid" 2>/dev/null
     ) >/dev/null 2>&1 &
     watcher=$!

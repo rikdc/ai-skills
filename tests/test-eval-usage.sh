@@ -138,6 +138,22 @@ else
     fail "a failing hook did not warn"
 fi
 
+cat >"$TMP/hook-stderr.sh" <<'EOF'
+#!/usr/bin/env bash
+echo "hook-diagnostic-9f3d: cannot read vendor usage" >&2
+exit 2
+EOF
+chmod +x "$TMP/hook-stderr.sh"
+"$USAGE" --log "$TMP/opencode.log" --cmd "$TMP/hook-stderr.sh" \
+    --output "$TMP/hook-stderr.json" 2>"$TMP/hook-stderr.err"
+assert_jq "$TMP/hook-stderr.json" '.known == true and .source == "opencode-json"' \
+    "a hook that exits 2 still falls back to built-ins"
+if grep -q "hook-diagnostic-9f3d" "$TMP/hook-stderr.err"; then
+    pass "the hook's stderr reaches the caller's log"
+else
+    fail "the hook's stderr was discarded"
+fi
+
 cat >"$TMP/hook-bad.sh" <<'EOF'
 #!/usr/bin/env bash
 printf 'not json\n'

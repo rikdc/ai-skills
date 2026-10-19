@@ -76,8 +76,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rows, mechanical coverage uses the checks' own maxima, multiple `--unit`
   selections reach the runner as
   separate arguments, uncreatable suite/report outputs fail before or during
-  the run, a narrowed `--resume` rewrites the manifest, and an interrupted run
+  run, a narrowed `--resume` rewrites the manifest, and an interrupted run
   removes copied credentials and its sandbox
+- Hardened the eval harness against the shell review findings: an interrupted
+  suite now stops in-flight agent jobs and their descendants, an uncopyable
+  credential source fails the run instead of silently running unauthenticated,
+  an unresolvable `--changed` ref is reported by name, the usage hook's stderr
+  reaches the caller's log, an evidence `tar` failure fails the run, the
+  no-`timeout` watchdog reaps its sleeper, and the largest report/suite jq
+  programs live in `scripts/jq/`
 - Fixed protect-main-branch denying writes in linked worktrees: the branch is
   now read where the write lands (Edit/Write target path, Bash `cd` and
   `git -C`), not in the hook's own working directory

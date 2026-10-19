@@ -77,6 +77,16 @@ else
     pass "discovery ignores worktrees"
 fi
 
+bad_ref_rc=0
+"$SUITE" --changed does-not-exist --list >"$TMP/bad-ref.out" 2>"$TMP/bad-ref.err" ||
+    bad_ref_rc=$?
+if [[ "$bad_ref_rc" -ne 0 ]] &&
+    grep -q "cannot diff against 'does-not-exist'" "$TMP/bad-ref.err"; then
+    pass "--changed names an unresolvable ref instead of silently selecting all"
+else
+    fail "--changed did not surface the bad ref (exit $bad_ref_rc)" "$TMP/bad-ref.err"
+fi
+
 count="$(printf '%s\n' "$expected" | wc -l | tr -d ' ')"
 plan="$("$SUITE" --plan 2>&1)"
 if grep -q "Scenarios: $count$" <<<"$plan" &&
@@ -332,6 +342,34 @@ else
     fail "--auth-path did not reach the agent" "$TMP/custom-auth.log"
 fi
 
+if [[ "$(id -u)" -eq 0 ]]; then
+    echo "  - skipped the unreadable-credential test (running as root)"
+else
+    locked_home="$TMP/locked-home"
+    mkdir -p "$locked_home"
+    printf 'secret\n' >"$locked_home/.claude.json"
+    chmod 000 "$locked_home/.claude.json"
+    cred_tmp="$TMP/cred-tmp"
+    mkdir -p "$cred_tmp"
+    locked_rc=0
+    HOME="$locked_home" TMPDIR="$cred_tmp" "$RUN_ONE" --agent-cmd true \
+        --plugin git-workflow --scenario changelog-release-refused \
+        --arm with --out "$TMP/locked-auth" >"$TMP/locked-auth.log" 2>&1 || locked_rc=$?
+    if [[ "$locked_rc" -ne 0 ]] &&
+        grep -q "cannot copy agent credentials" "$TMP/locked-auth.log" &&
+        grep -q -- "--no-auth" "$TMP/locked-auth.log"; then
+        pass "an uncopyable credential source fails the run with a clear hint"
+    else
+        fail "an uncopyable credential source was ignored (exit $locked_rc)" "$TMP/locked-auth.log"
+    fi
+    if [[ -z "$(find "$cred_tmp" -mindepth 1 -print -quit)" ]]; then
+        pass "a credential-copy failure still cleans the sandbox"
+    else
+        fail "a credential-copy failure left a sandbox behind"
+    fi
+    chmod 600 "$locked_home/.claude.json"
+fi
+
 # --- judge adapter and judged aggregation -------------------------------------
 
 stub_judge="$TMP/judge.sh"
@@ -502,6 +540,24 @@ else
     fail "eval-run did not record agent usage" "$TMP/usage-run.log"
 fi
 
+stderr_hook="$TMP/stderr-hook.sh"
+cat >"$stderr_hook" <<'EOF'
+#!/usr/bin/env bash
+echo "usage-hook-diagnostic-7c1e" >&2
+exit 2
+EOF
+chmod +x "$stderr_hook"
+stderr_run_dir="$TMP/stderr-usage-run"
+"$RUN_ONE" --plugin git-workflow --scenario changelog-release-refused \
+    --agent-cmd true --usage-cmd "$stderr_hook" --out "$stderr_run_dir" --no-auth \
+    >"$TMP/stderr-usage-run.log" 2>&1
+if grep -q "usage-hook-diagnostic-7c1e" \
+    "$stderr_run_dir/git-workflow/changelog-release-refused/with/run-1/usage.log"; then
+    pass "a failing usage hook's stderr is preserved in the caller's usage.log"
+else
+    fail "the usage hook's stderr was discarded" "$TMP/stderr-usage-run.log"
+fi
+
 unknown_run_dir="$TMP/unknown-usage-run"
 "$RUN_ONE" --plugin git-workflow --scenario changelog-release-refused \
     --agent-cmd true --out "$unknown_run_dir" --no-auth \
@@ -580,6 +636,95 @@ if [[ "$(jq -r '.known' "$cost_dir/runs/git-workflow/changelog-release-refused/w
     pass "--resume backfills a missing usage.json from the existing log"
 else
     fail "resume did not backfill usage" "$TMP/cost-resume.log"
+fi
+
+# --- interrupts and evidence --------------------------------------------------
+
+slow_agent="$TMP/slow-agent.sh"
+cat >"$slow_agent" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$$" >"$STUB_PID_FILE"
+sleep 300
+EOF
+chmod +x "$slow_agent"
+
+stub_pid_file="$TMP/stub.pid"
+rm -f "$stub_pid_file"
+signal_dir="$TMP/signal-suite"
+STUB_PID_FILE="$stub_pid_file" "$SUITE" --agent-cmd "$slow_agent" --no-auth \
+    --plugin git-workflow --scenario changelog-release-refused \
+    --arm with --runs 1 --jobs 1 --out "$signal_dir" \
+    >"$TMP/signal.log" 2>&1 &
+signal_pid=$!
+stub_pid=""
+for _ in $(seq 1 150); do
+    if [[ -s "$stub_pid_file" ]]; then
+        stub_pid="$(cat "$stub_pid_file")"
+        break
+    fi
+    kill -0 "$signal_pid" 2>/dev/null || break
+    sleep 0.1
+done
+
+if [[ -z "$stub_pid" ]]; then
+    kill -TERM "$signal_pid" 2>/dev/null
+    for _ in $(seq 1 100); do
+        kill -0 "$signal_pid" 2>/dev/null || break
+        sleep 0.1
+    done
+    kill -KILL "$signal_pid" 2>/dev/null
+    wait "$signal_pid" 2>/dev/null
+    fail "the slow agent never started" "$TMP/signal.log"
+else
+    kill -TERM "$signal_pid" 2>/dev/null
+    for _ in $(seq 1 150); do
+        kill -0 "$signal_pid" 2>/dev/null || break
+        sleep 0.1
+    done
+    if kill -0 "$signal_pid" 2>/dev/null; then
+        kill -KILL "$signal_pid" 2>/dev/null
+        wait "$signal_pid" 2>/dev/null
+        fail "the suite ignored TERM and had to be killed" "$TMP/signal.log"
+    else
+        wait "$signal_pid" 2>/dev/null
+        signal_rc=$?
+        if [[ "$signal_rc" -eq 143 ]]; then
+            pass "TERM stops the suite with status 143"
+        else
+            fail "TERM exited with $signal_rc instead of 143" "$TMP/signal.log"
+        fi
+    fi
+    stub_alive=1
+    for _ in $(seq 1 50); do
+        if ! kill -0 "$stub_pid" 2>/dev/null; then
+            stub_alive=0
+            break
+        fi
+        sleep 0.1
+    done
+    if ((stub_alive)); then
+        kill -KILL "$stub_pid" 2>/dev/null
+        fail "TERM left the in-flight agent process $stub_pid running" "$TMP/signal.log"
+    else
+        pass "TERM kills the in-flight agent and its descendants"
+    fi
+fi
+
+mkdir -p "$TMP/fail-tar-bin"
+cat >"$TMP/fail-tar-bin/tar" <<'EOF'
+#!/usr/bin/env bash
+exit 1
+EOF
+chmod +x "$TMP/fail-tar-bin/tar"
+mkdir -p "$TMP/tar-tmp"
+tar_rc=0
+PATH="$TMP/fail-tar-bin:$PATH" TMPDIR="$TMP/tar-tmp" "$RUN_ONE" --agent-cmd true \
+    --plugin git-workflow --scenario changelog-release-refused --no-auth \
+    --arm with --out "$TMP/tar-fail" >"$TMP/tar-fail.log" 2>&1 || tar_rc=$?
+if [[ "$tar_rc" -ne 0 ]] && grep -q "cannot write the evidence bundle" "$TMP/tar-fail.log"; then
+    pass "a failed evidence tar fails the run instead of grading without evidence"
+else
+    fail "a failed evidence tar was ignored (exit $tar_rc)" "$TMP/tar-fail.log"
 fi
 
 # --- stock jq portability -----------------------------------------------------

@@ -172,7 +172,14 @@ run_with_deadline() {
     "$@" &
     local pid=$! watcher
     (
-        sleep "$secs"
+        # Run the sleeper in the background so the TERM trap can kill it;
+        # otherwise a timed-out watcher leaves an orphan sleep behind on
+        # systems without GNU timeout.
+        sleeper=""
+        trap 'kill -TERM "$sleeper" 2>/dev/null' TERM INT
+        sleep "$secs" &
+        sleeper=$!
+        wait "$sleeper"
         kill -TERM "$pid" 2>/dev/null
     ) >/dev/null 2>&1 &
     watcher=$!
@@ -198,8 +205,14 @@ prepare_agent_home() {
         src="$REAL_HOME/$rel"
         [[ -f "$src" ]] || continue
         dest="$home/$rel"
-        mkdir -p "$(dirname "$dest")"
-        cp -p "$src" "$dest" 2>/dev/null || true
+        if ! mkdir -p "$(dirname "$dest")"; then
+            die "cannot create the agent config directory for $src"
+        fi
+        # A failed copy would silently produce an unauthenticated run that
+        # looks exactly like a valid one, so it is fatal.
+        if ! cp -p "$src" "$dest"; then
+            die "cannot copy agent credentials from $src; rerun with --no-auth for a hermetic run, or pass --auth-path for the file your agent CLI actually uses"
+        fi
     done
 
     if [[ -d "$REAL_HOME/Library/Keychains" ]]; then
@@ -500,8 +513,8 @@ run_once() {
     # controls whether the sandbox directory itself survives.
     (
         cd "$sandbox" || exit 1
-        tar --exclude ./home -cf "$out/snapshot.tar" . 2>/dev/null
-    )
+        tar --exclude ./home -cf "$out/snapshot.tar" .
+    ) || die "cannot write the evidence bundle $out/snapshot.tar"
 
     # Mechanical checks: the scenario's own checks.sh, validated against the
     # rubric it claims to score. A checks.sh that disagrees with criteria.json

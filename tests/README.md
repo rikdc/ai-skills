@@ -86,7 +86,8 @@ logs and hook scripts only:
 - opencode JSONL `step_finish` summation and Claude result JSON
 - unknown and partial token-only usage, with invalid numbers ignored
 - hooks that write `USAGE_FILE` or print JSON
-- failing/invalid hook fallback to the built-in parser
+- failing/invalid hook fallback to the built-in parser, with the hook's own
+  stderr preserved for the caller's `usage.log`
 
 ```bash
 ./tests/test-eval-usage.sh
@@ -106,6 +107,12 @@ runs in CI:
 - manifest/config unit recording and `--resume` equality, including manifest
   rewriting for a narrowed resume and multiple units forwarded separately
 - an uncreatable `--out` fails before any job starts
+- a bad `--changed` ref fails by name instead of being masked
+- an uncopyable credential source fails the run, hints at `--no-auth`/
+  `--auth-path`, and still removes the sandbox
+- TERM stops the suite with status 143 and kills the in-flight agent and its
+  descendants
+- a failed evidence tar fails the run instead of grading without a snapshot
 - parallel execution, `--resume`, and aggregation, with a partial rubric kept
   against the fixed 100-point denominator
 - usage capture: suite cost sums, partial coverage, unknown never summed as

@@ -27,6 +27,9 @@ shopt -s nullglob
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# The largest jq programs live in scripts/jq/ and are loaded with jq -f, so
+# this script stays orchestration rather than embedded data manipulation.
+JQ_DIR="$SCRIPT_DIR/jq"
 RUN_ONE="$SCRIPT_DIR/eval-run.sh"
 GRADE_ONE="$SCRIPT_DIR/eval-grade.sh"
 EVAL_USAGE="$SCRIPT_DIR/eval-usage.sh"
@@ -421,12 +424,16 @@ changed_plugins=()
 if [[ -n "$CHANGED_REF" ]]; then
     git -C "$PROJECT_ROOT" rev-parse --git-dir >/dev/null 2>&1 ||
         die "--changed needs a git checkout"
-    changed_paths="$(
-        {
-            git -C "$PROJECT_ROOT" diff --name-only "$CHANGED_REF" -- plugins 2>/dev/null
-            git -C "$PROJECT_ROOT" ls-files --others --exclude-standard -- plugins 2>/dev/null
-        } | sort -u
-    )" || die "cannot diff against '$CHANGED_REF' (fetch it first)"
+    # Capture each command separately: the brace group's exit status is the
+    # last command, so a failed git diff was previously masked by a successful
+    # git ls-files and the bad ref never reached its error.
+    if ! changed_diff="$(git -C "$PROJECT_ROOT" diff --name-only "$CHANGED_REF" -- plugins 2>/dev/null)"; then
+        die "cannot diff against '$CHANGED_REF' (fetch it first)"
+    fi
+    if ! changed_untracked="$(git -C "$PROJECT_ROOT" ls-files --others --exclude-standard -- plugins 2>/dev/null)"; then
+        die "cannot list untracked files under plugins"
+    fi
+    changed_paths="$(printf '%s\n%s\n' "$changed_diff" "$changed_untracked" | sort -u)"
     while IFS= read -r path; do
         [[ "$path" == plugins/*/* ]] || continue
         rest="${path#plugins/}"
@@ -739,7 +746,6 @@ resume_complete() {
 SUITE_START="$(date +%s)"
 EXECUTED=0
 SKIPPED=0
-RUNNER_FAILURES=0
 
 pids=()
 job_labels=()
@@ -825,7 +831,6 @@ reap_jobs() {
 
         if ((finished)); then
             if ((rc != 0)); then
-                RUNNER_FAILURES=$((RUNNER_FAILURES + 1))
                 printf '✗ %s (runner exit %s; log: %s)\n' \
                     "${job_labels[$i]}" "$rc" "${job_logs[$i]}"
             else
@@ -846,6 +851,55 @@ reap_jobs() {
     job_started=(${alive_started[@]+"${alive_started[@]}"})
     job_status=(${alive_status[@]+"${alive_status[@]}"})
 }
+
+# Deepest-first PID list for one tracked job: the agent and its helpers come
+# before the shell that launched them. Only explicit PIDs are signalled - the
+# suite never signals its own process group.
+# shellcheck disable=SC2329  # invoked by abort_suite and by the signal trap
+job_tree() {
+    local parent="$1" child
+    while IFS= read -r child; do
+        [[ -n "$child" ]] || continue
+        job_tree "$child"
+    done < <(pgrep -P "$parent" 2>/dev/null)
+    printf '%s\n' "$parent"
+}
+
+# Non-interactive shells start asynchronous jobs with SIGINT ignored, so Ctrl-C
+# would otherwise kill the suite while paid agent jobs keep running until their
+# timeouts and sandbox credentials survive. TERM each tracked tree, give
+# eval-run.sh a moment to run its own sandbox cleanup, then KILL what ignored
+# TERM.
+# shellcheck disable=SC2329  # invoked only by the INT/TERM trap strings
+abort_suite() {
+    local status="$1" signal_name="$2" pid child
+    local -a trees=()
+    trap - INT TERM
+    trap '' INT TERM
+    printf 'eval-suite: %s; stopping %d job(s)\n' "$signal_name" "${#pids[@]}" >&2
+    for pid in ${pids[@]+"${pids[@]}"}; do
+        while IFS= read -r child; do
+            [[ -n "$child" ]] || continue
+            trees+=("$child")
+        done < <(job_tree "$pid")
+    done
+    for pid in ${trees[@]+"${trees[@]}"}; do
+        kill -TERM "$pid" 2>/dev/null || true
+    done
+    sleep 2
+    for pid in ${trees[@]+"${trees[@]}"}; do
+        if kill -0 "$pid" 2>/dev/null; then
+            kill -KILL "$pid" 2>/dev/null || true
+        fi
+    done
+    for pid in ${pids[@]+"${pids[@]}"}; do
+        wait "$pid" 2>/dev/null || true
+    done
+    exit "$status"
+}
+
+trap 'abort_suite 130 INT' INT
+trap 'abort_suite 143 TERM' TERM
 
 echo "🧪 Eval suite: $SCENARIO_COUNT scenarios, $ARM arms, $RUNS run(s), $JOBS job(s)"
 echo "   Agent: $AGENT_CMD"
@@ -1041,87 +1095,8 @@ summarise_scenario() {
         done
     done
 
-    printf '%s\n' "${runs[@]}" | jq -sc --arg plugin "$plugin" --arg scenario "$scenario" '
-        def mean: if length == 0 then null else (add / length) end;
-        def mean_present: map(select(. != null)) | mean;
-        def usage_cost($usage):
-            if (($usage.known // false) == true)
-               and (($usage.cost_usd | type) == "number")
-            then $usage.cost_usd else null end;
-        def usage_tokens($usage):
-            if (($usage.known // false) == true)
-               and (($usage.total_tokens | type) == "number")
-            then $usage.total_tokens else null end;
-        def sum_present: map(select(. != null)) | if length == 0 then null else add end;
-        def usage_stats($rows; $field):
-            [$rows[] | (.[$field] // {known: false})] as $usages
-            | [$usages[] | usage_cost(.)] as $costs
-            | [$usages[] | usage_tokens(.)] as $tokens
-            | ($costs | map(select(. != null)) | length) as $cost_runs
-            | ($tokens | map(select(. != null)) | length) as $token_runs
-            | {
-                runs_known: ([$usages[] | select((.known // false) == true)] | length),
-                runs_total: ($rows | length),
-                cost: {
-                    total: ([$costs[] | select(. != null)] | sum_present),
-                    runs_known: $cost_runs,
-                    mean: (if $cost_runs > 0 then (([$costs[] | select(. != null)] | add) / $cost_runs) else null end)
-                },
-                tokens: {
-                    total: ([$tokens[] | select(. != null)] | sum_present),
-                    runs_known: $token_runs,
-                    mean: (if $token_runs > 0 then (([$tokens[] | select(. != null)] | add) / $token_runs) else null end)
-                }
-            };
-        def combined_stats($rows):
-            [$rows[] | {a: .usage, j: .judge_usage}] as $pairs
-            | [$pairs[] | select(usage_cost(.a) != null and usage_cost(.j) != null)
-                | (usage_cost(.a) + usage_cost(.j))] as $costs
-            | [$pairs[] | select(usage_tokens(.a) != null and usage_tokens(.j) != null)
-                | (usage_tokens(.a) + usage_tokens(.j))] as $tokens
-            | {
-                runs_known: ($costs | length),
-                runs_total: ($rows | length),
-                cost: {
-                    total: ($costs | sum_present),
-                    runs_known: ($costs | length),
-                    mean: (if ($costs | length) > 0 then (($costs | add) / ($costs | length)) else null end)
-                },
-                tokens: {
-                    total: ($tokens | sum_present),
-                    runs_known: ($tokens | length),
-                    mean: (if ($tokens | length) > 0 then (($tokens | add) / ($tokens | length)) else null end)
-                }
-            };
-        def arm_stats($arm):
-            [.[] | select(.arm == $arm)] as $rows
-            | {
-                score: ([$rows[].score] | mean),
-                max: ([$rows[].max] | mean),
-                percent: ([$rows[].percent] | mean_present),
-                usage: {
-                    agent: usage_stats($rows; "usage"),
-                    judge: usage_stats($rows; "judge_usage"),
-                    combined: combined_stats($rows)
-                }
-            };
-        . as $runs
-        | {
-            plugin: $plugin,
-            scenario: $scenario,
-            status: (if all($runs[]; .status == "ok") then "ok" else "runner-failed" end),
-            runs: $runs,
-            arms: {
-                with: ($runs | arm_stats("with")),
-                without: ($runs | arm_stats("without"))
-            },
-            pending: ([$runs[].pending] | add // 0),
-            judged: (([$runs[] | select(.judged != null)] | length) == ($runs | length)),
-            delta: (
-                [($runs | arm_stats("with").percent), ($runs | arm_stats("without").percent)]
-                | if .[0] == null or .[1] == null then null else (.[0] - .[1]) end
-            )
-        }'
+    printf '%s\n' "${runs[@]}" | jq -sc --arg plugin "$plugin" --arg scenario "$scenario" \
+        -f "$JQ_DIR/suite-scenario.jq"
 }
 
 : >"$OUT_DIR/results.jsonl"
@@ -1160,20 +1135,8 @@ counts_json="$(jq -nc \
     --argjson agent_invocations "$((EXECUTED * $(arm_count) * RUNS))" \
     --argjson judged_runs "$JUDGED_RUNS" --argjson pending_runs "$PENDING_RUNS" \
     --argjson covered_scenarios "$COVERED_SCENARIOS" --argjson duration "$DURATION" \
-    --argjson cost_known "$COST_KNOWN_RUNS" --argjson cost_total "$COST_TOTAL_RUNS" '
-    {
-        planned: $planned,
-        executed: $executed,
-        skipped: $skipped,
-        runner_failures: $runner_failures,
-        agent_invocations: $agent_invocations,
-        judged_runs: $judged_runs,
-        pending_runs: $pending_runs,
-        scenarios_with_mechanical_checks: $covered_scenarios,
-        cost_known_runs: $cost_known,
-        cost_total_runs: $cost_total,
-        duration_seconds: $duration
-    }')"
+    --argjson cost_known "$COST_KNOWN_RUNS" --argjson cost_total "$COST_TOTAL_RUNS" \
+    -f "$JQ_DIR/suite-counts.jq")"
 
 jq -s --argjson config "$config_json" --argjson counts "$counts_json" '
     {config: $config, counts: $counts, scenarios: .}
@@ -1247,21 +1210,7 @@ jq -s --argjson config "$config_json" --argjson counts "$counts_json" '
     else
         echo "| Plugin | Scenario | Agent with | Agent without | Judge with | Judge without | Total with | Total without | Coverage |"
         echo "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"
-        jq -r '
-            def money: if . == null then "—"
-                       else "$" + (((. * 10000 | round) / 10000) | tostring) end;
-            def cov($u): ($u.runs_known | tostring) + "/" + ($u.runs_total | tostring);
-            [ .plugin, .scenario,
-              (.arms.with.usage.agent.cost.total | money),
-              (.arms.without.usage.agent.cost.total | money),
-              (.arms.with.usage.judge.cost.total | money),
-              (.arms.without.usage.judge.cost.total | money),
-              (.arms.with.usage.combined.cost.total | money),
-              (.arms.without.usage.combined.cost.total | money),
-              (cov(.arms.with.usage.combined) + " with, " +
-               cov(.arms.without.usage.combined) + " without") ]
-            | "| " + join(" | ") + " |"
-        ' "$OUT_DIR/results.jsonl"
+        jq -r -f "$JQ_DIR/suite-summary-cost.jq" "$OUT_DIR/results.jsonl"
         echo
         echo "Cost/tokens are sums over runs that reported them; unknown is never counted as zero."
     fi

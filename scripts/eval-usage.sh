@@ -31,7 +31,6 @@ ARM=""
 RUN=""
 AGENT_EXIT=""
 HOOK_FILE=""
-HOOK_ERR=""
 
 usage() {
     cat <<'EOF'
@@ -63,7 +62,6 @@ die() {
 
 cleanup() {
     [[ -n "$HOOK_FILE" ]] && rm -f "$HOOK_FILE"
-    [[ -n "$HOOK_ERR" ]] && rm -f "$HOOK_ERR"
 }
 
 trap cleanup EXIT
@@ -212,16 +210,15 @@ run_hook() {
         echo "eval-usage: cannot create a hook output file; falling back to built-ins" >&2
         return 1
     }
-    HOOK_ERR="$(mktemp "${TMPDIR:-/tmp}/eval-usage-hook-err-XXXXXX")" || {
-        echo "eval-usage: cannot create a hook error file; falling back to built-ins" >&2
-        return 1
-    }
 
+    # The hook's stderr is deliberately not redirected: callers capture it in
+    # usage.log/judge-usage.log, so a hook that explains its failure is visible
+    # instead of being discarded.
     local stdout rc
     stdout="$(cd "$cwd" 2>/dev/null &&
         USAGE_FILE="$HOOK_FILE" AGENT_LOG="$LOG" RUN_DIR="$RUN_DIR" \
             SANDBOX="$SANDBOX" ARM="$ARM" RUN="$RUN" AGENT_EXIT="$AGENT_EXIT" \
-            bash -c "$USAGE_CMD" 2>"$HOOK_ERR")"
+            bash -c "$USAGE_CMD")"
     rc=$?
     if ((rc != 0)); then
         echo "eval-usage: usage command failed (exit $rc); falling back to built-in extraction" >&2
