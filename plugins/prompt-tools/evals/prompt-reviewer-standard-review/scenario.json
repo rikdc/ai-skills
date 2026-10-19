@@ -1,1 +1,7 @@
-{"description":"Prompt-reviewer standard mode: review a flawed prompt file and record a prioritised report with a quality score, specific findings, and revised critical sections.","include":["./inputs"]}
+{
+  "description": "Prompt-reviewer standard mode: review a flawed prompt file and record a prioritised report with a quality score, specific findings, and revised critical sections.",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "commands/prompt-reviewer"
+}

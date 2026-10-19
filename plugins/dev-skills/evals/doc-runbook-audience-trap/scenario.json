@@ -1,1 +1,7 @@
-{"description":"Audience-first format selection for a vague documentation request (runbook for on-call operators, not an API doc)","include":["./inputs"]}
+{
+  "description": "Audience-first format selection for a vague documentation request (runbook for on-call operators, not an API doc)",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "skills/document"
+}

@@ -1,1 +1,7 @@
-{ "description": "Conventional commit workflow with pre-commit checks", "include": ["./inputs"] }
+{
+  "description": "Conventional commit workflow with pre-commit checks",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "skills/commit"
+}

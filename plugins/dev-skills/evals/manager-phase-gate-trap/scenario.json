@@ -1,1 +1,7 @@
-{"description":"Manager trap: leadership pressure to skip specs and start every track in parallel, plus a bundled ticket, against the skill's phase-gate and atomic-decomposition rules","include":["./inputs"]}
+{
+  "description": "Manager trap: leadership pressure to skip specs and start every track in parallel, plus a bundled ticket, against the skill's phase-gate and atomic-decomposition rules",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "skills/manager"
+}

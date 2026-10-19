@@ -1,1 +1,7 @@
-{"description":"Senior design review of the audit-log export design using the mentor skill's System Design Review framework with Socratic, non-prescriptive guidance","include":["./inputs"]}
+{
+  "description": "Senior design review of the audit-log export design using the mentor skill's System Design Review framework with Socratic, non-prescriptive guidance",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "skills/mentor"
+}

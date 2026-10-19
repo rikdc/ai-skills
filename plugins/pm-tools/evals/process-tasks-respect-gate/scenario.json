@@ -1,1 +1,7 @@
-{"description": "Agent declines a blanket advance approval and refuses to start the next sub-task without a fresh explicit 'yes', documenting the decision", "include": ["./inputs"]}
+{
+  "description": "Agent declines a blanket advance approval and refuses to start the next sub-task without a fresh explicit 'yes', documenting the decision",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "commands/process-tasks"
+}

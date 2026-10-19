@@ -2,8 +2,8 @@
 name: review-evals
 description: Reviews eval scenarios and skills with judgement, covering what a deterministic gate cannot - whether a scenario discriminates, whether a rubric is fair to the unit it tests, whether a recording shim is faithful, and whether a skill's description and body guide an agent. Also grades the criteria an eval run left pending. Use when asked to review a pull request that touches a skill or an eval scenario, to judge an eval run, or to check that a set of evals actually proves what it claims.
 user-invocable: true
-argument-hint: "[pr-number | --changes <git-ref> | --result <path>]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash(git:*), Bash(gh:*), Bash(jq:*), Bash(tests/test-evals.sh:*), Bash(scripts/eval-run.sh:*), Bash(make:*)
+argument-hint: "[pr-number | --changes <git-ref> | --result <path> | --suite <path>]"
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash(git:*), Bash(gh:*), Bash(jq:*), Bash(tar:*), Bash(tests/test-evals.sh:*), Bash(scripts/eval-run.sh:*), Bash(scripts/eval-suite.sh:*), Bash(scripts/eval-grade.sh:*), Bash(make:*)
 ---
 # Review Evals - judgement over evals and skills
 
@@ -19,6 +19,8 @@ contributor's machine, and it only ever reads refs you trust.
 ## Scope the review
 
 - An eval run left pending criteria: `--result <dir>` (see "Grade a run").
+- A finished suite: `--suite <dir>`; start from `grading/index.tsv` and
+  `results.jsonl`, then grade what is pending.
 - A pull request: `gh pr diff <number>` plus
   `tests/test-evals.sh --changes <base-ref>` to list the skills and scenarios
   it touches.
@@ -78,6 +80,15 @@ scores whatever a script can score. What remains is in
    the without-arm total. A large positive delta is the unit earning its
    place; near-zero means the agent already did it, or the scenario cannot
    tell. Never report the with-arm score alone.
+
+A suite run keeps the same files under `results/eval-suite/<id>/runs/` and adds
+`grading/index.tsv`. Grade a whole suite in one pass with
+`scripts/eval-grade.sh --suite <dir> --judge-cmd '<your agent CLI>'`; the
+adapter rejects a judgement that does not cover exactly the pending criteria,
+and re-running the suite with `--resume` folds accepted judgements into its
+percentages. When reviewing the numbers, still read a sample of the evidence:
+a judge that scored without looking is indistinguishable from a good one in
+the totals.
 
 ## Report
 

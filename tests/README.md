@@ -78,6 +78,70 @@ machine, not in public CI.
 ./tests/test-evals.sh --changes origin/main    # list the skills/scenarios a ref touched
 ```
 
+### `test-eval-usage.sh`
+
+Deterministic parser tests for `scripts/eval-usage.sh`, with local fixture
+logs and hook scripts only:
+
+- opencode JSONL `step_finish` summation and Claude result JSON
+- unknown and partial token-only usage, with invalid numbers ignored
+- hooks that write `USAGE_FILE` or print JSON
+- failing/invalid hook fallback to the built-in parser
+
+```bash
+./tests/test-eval-usage.sh
+```
+
+### `test-eval-suite.sh`
+
+Deterministic tests for the local eval harness — no model, no network, so it
+runs in CI:
+
+- the runner's and suite's own selftests
+- discovery matches `plugins/*/evals/*/` and ignores worktrees
+- `--plan` invocation counts, and shards that partition without overlap
+- `--unit` selection: skills install only the named skill, commands only the
+  named command, hooks are accepted without an install, and unknown units
+  fail clearly
+- manifest/config unit recording and `--resume` equality, including manifest
+  rewriting for a narrowed resume and multiple units forwarded separately
+- an uncreatable `--out` fails before any job starts
+- parallel execution, `--resume`, and aggregation, with a partial rubric kept
+  against the fixed 100-point denominator
+- usage capture: suite cost sums, partial coverage, unknown never summed as
+  zero, judge-usage backfill, and `--resume` usage backfill
+- the judge adapter rejects invalid judgements and folds valid ones into
+  per-arm percentages
+- `--strict` fails a suite that does not discriminate
+
+```bash
+./tests/test-eval-suite.sh
+```
+
+### `test-eval-report.sh`
+
+Deterministic tests for the report renderer and `make eval`, with synthetic
+suite directories and no model or network:
+
+- the fixed 100-point denominator: `52/100` with unjudged criteria stays
+  pending rather than being renormalised
+- per-criterion pairing by name and mean deltas across runs
+- declared runs with missing directories stay incomplete (never a false
+  `helps`), and `results.jsonl` runner failures reach the verdict
+- regression detection and every verdict state (`incomplete`, `indicative`,
+  `inconclusive`, `helps`, `hurts`, `no measurable effect`)
+- unwritable `--out` directories fail instead of printing success
+- cost/usage in CLI, Markdown, JSON and HTML, including unknown/partial states
+  and the efficiency claim only when the data supports it
+- JSON, Markdown and self-contained HTML generation, including escaping of
+  scenario and criterion text
+- `make eval` dry-run selection (`SKILL=`, `UNIT=`), the required-`AGENT`
+  guard, and rejection of `SKILL` with `UNIT`
+
+```bash
+./tests/test-eval-report.sh
+```
+
 ## Related Checks
 
 `make test` covers the suites above. Two other checks run separately, and in
@@ -95,8 +159,11 @@ so they run on a contributor's machine rather than in CI:
 
 ```bash
 scripts/eval-run.sh --selftest                 # runner plumbing, no model
+scripts/eval-suite.sh --selftest               # suite plumbing, no model
 scripts/eval-run.sh --plugin <plugin> --scenario <scenario> --agent-cmd 'claude -p'
+scripts/eval-suite.sh --agent-cmd 'claude -p' --jobs 4
 ```
 
 See `plugins/eval-workflow/skills/review-evals/SKILL.md` for how the pending
-criteria of a run get graded.
+criteria of a run get graded, and `plugins/eval-workflow/README.md` for the
+suite's selection, resume and reporting options.

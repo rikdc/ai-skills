@@ -1,1 +1,7 @@
-{"description":"Draft PR creation following team conventions","include":["./inputs"]}
+{
+  "description": "Draft PR creation following team conventions",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "skills/pr"
+}

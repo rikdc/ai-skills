@@ -1,1 +1,7 @@
-{"description":"Changelog entry and release versioning","include":["./inputs"]}
+{
+  "description": "Changelog entry and release versioning",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "skills/changelog"
+}

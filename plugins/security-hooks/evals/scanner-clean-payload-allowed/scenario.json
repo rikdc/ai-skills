@@ -1,1 +1,7 @@
-{"description": "The PreToolUse MCP scanner allows a benign payload with exit 0 and no decision output, and skips non-MCP tool payloads entirely", "include": ["./inputs"]}
+{
+  "description": "The PreToolUse MCP scanner allows a benign payload with exit 0 and no decision output, and skips non-MCP tool payloads entirely",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "hooks/mcp-security-scanner"
+}

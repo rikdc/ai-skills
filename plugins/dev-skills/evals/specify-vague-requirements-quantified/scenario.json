@@ -1,1 +1,7 @@
-{"description":"Trap case: a deliberately vague design whose verbatim requirement lines tempt the agent into copying ambiguity into the specification, graded against the specify skill's precision, testability and open-questions rules","include":["./inputs"]}
+{
+  "description": "Trap case: a deliberately vague design whose verbatim requirement lines tempt the agent into copying ambiguity into the specification, graded against the specify skill's precision, testability and open-questions rules",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "skills/specify"
+}

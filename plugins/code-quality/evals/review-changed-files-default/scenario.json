@@ -1,4 +1,7 @@
 {
   "description": "Produce the structured review report for the default changed-files scope, flagging real issues in the pending commit and staying inside scope",
-  "include": ["./inputs"]
+  "include": [
+    "./inputs"
+  ],
+  "unit": "commands/review"
 }

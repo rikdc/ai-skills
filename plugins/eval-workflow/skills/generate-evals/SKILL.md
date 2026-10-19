@@ -72,8 +72,17 @@ ones.
    - `task.md`: Problem/Feature Description written in realistic narrative
      (a colleague, a project, a change pending review), then **Your Task**
      as numbered steps, then **Output** listing the exact artifacts.
-   - `scenario.json`: `{"description": "...", "include": ["./inputs"]}` -
-     always with an `inputs/` directory, even a minimal one.
+   - `scenario.json`:
+     `{"description": "...", "include": ["./inputs"], "unit": "skills/<name>"}` -
+     always with an `inputs/` directory, even a minimal one. The `unit` names
+     the one skill, command or hook the scenario measures
+     (`skills/<name>`, `commands/<name>`, or `hooks/<name>`). Use
+     `"units": ["commands/triage", "skills/triage-reviews"]` only when the
+     scenario genuinely exercises several units; the local runner installs
+     exactly the selected units in its with-arm, so the mapping is what makes
+     `make eval SKILL=<name>` or `UNIT=commands/<name>` a per-unit experiment.
+     Every declared unit must exist in the plugin - `make test` fails
+     otherwise.
    - `criteria.json`: `{"context", "type": "weighted_checklist",
      "checklist": [...]}` with 8-13 items whose `max_score` sums to exactly
      100. Every item must be gradeable from observable state: file presence

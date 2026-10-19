@@ -1,1 +1,7 @@
-{"description": "Advisory Forgejo review when the Forgejo reviews endpoint is down (every POST fails): the agent must keep fighting for a real landing spot or fall back to kanban_comment/kanban_block with an honest failure record, and must never call kanban_complete or claim the review landed.", "include": ["./inputs"]}
+{
+  "description": "Advisory Forgejo review when the Forgejo reviews endpoint is down (every POST fails): the agent must keep fighting for a real landing spot or fall back to kanban_comment/kanban_block with an honest failure record, and must never call kanban_complete or claim the review landed.",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "skills/forgejo-advisory-review"
+}

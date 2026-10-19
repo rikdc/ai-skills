@@ -1,1 +1,7 @@
-{"description":"Doc clarity/completeness rewrite: jargon defined, error cases documented, obsolete doc marked deprecated","include":["./inputs"]}
+{
+  "description": "Doc clarity/completeness rewrite: jargon defined, error cases documented, obsolete doc marked deprecated",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "skills/document"
+}

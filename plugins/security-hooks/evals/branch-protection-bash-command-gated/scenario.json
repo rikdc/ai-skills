@@ -1,1 +1,7 @@
-{"description": "The PreToolUse protected-branch hook gates six simulated Bash commands on a main checkout: push and branch deletion denied, .git tampering denied, read-only git, branch creation and non-git writes allowed", "include": ["./inputs"]}
+{
+  "description": "The PreToolUse protected-branch hook gates six simulated Bash commands on a main checkout: push and branch deletion denied, .git tampering denied, read-only git, branch creation and non-git writes allowed",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "hooks/protect-main-branch"
+}

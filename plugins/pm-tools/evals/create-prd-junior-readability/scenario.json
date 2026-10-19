@@ -1,1 +1,7 @@
-{"description": "Agent writes a PRD whose functional requirements are explicit and jargon-free for a junior developer audience, and does not jump into implementation", "include": ["./inputs"]}
+{
+  "description": "Agent writes a PRD whose functional requirements are explicit and jargon-free for a junior developer audience, and does not jump into implementation",
+  "include": [
+    "./inputs"
+  ],
+  "unit": "commands/create-prd"
+}

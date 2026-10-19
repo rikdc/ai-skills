@@ -1,4 +1,7 @@
 {
   "description": "Reviews a NixOS module embedding plaintext secrets and grades a written review recommending agenix/sops-nix pattern, path-not-value consumption, and rejection of the file-and-chmod easy fix.",
-  "include": ["./inputs"]
+  "include": [
+    "./inputs"
+  ],
+  "unit": "skills/nix-expert"
 }
