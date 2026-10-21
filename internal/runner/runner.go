@@ -54,6 +54,11 @@ type Config struct {
 	Executor executor.AgentExecutor
 	Logger   *slog.Logger
 
+	// SkipRun, when non-nil, reports whether an arm/run pair is already
+	// satisfied and must not be executed again. Suite resume uses it; direct
+	// `evalctl run` leaves it nil.
+	SkipRun func(arm string, run int) bool
+
 	// StoreHooks injects deterministic attempt-store failpoints. Tests use it;
 	// production leaves it zero.
 	StoreHooks attempts.Hooks
@@ -236,6 +241,9 @@ func (r *Runner) Run(ctx context.Context) (*Summary, error) {
 	var failed int
 	for _, arm := range r.arms {
 		for run := 1; run <= r.cfg.Runs; run++ {
+			if r.cfg.SkipRun != nil && r.cfg.SkipRun(arm, run) {
+				continue
+			}
 			outcome, err := r.runOnce(ctx, arm, run)
 			if err != nil {
 				return nil, err

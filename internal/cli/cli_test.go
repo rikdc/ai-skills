@@ -118,7 +118,7 @@ func TestDoctorReportsMissingRoot(t *testing.T) {
 }
 
 func TestStubCommandsExitTwo(t *testing.T) {
-	for _, name := range []string{"suite", "grade", "selftest"} {
+	for _, name := range []string{"selftest"} {
 		t.Run(name, func(t *testing.T) {
 			_, _, err := executeCommand(t, name)
 			if err == nil {
