@@ -819,11 +819,21 @@ func (r *Runner) applyRetention(store *attempts.Store) error {
 	if err != nil {
 		return err
 	}
+	// A failed rerun that supersedes the accepted attempt is the run's
+	// reported outcome, so its evidence is kept like the accepted attempt's.
+	supersedingID := ""
+	if agentID != "" {
+		if accepted, err := store.LoadAttempt(agentID); err == nil {
+			if superseding := attempts.SupersedingAttempt(all, accepted); superseding != nil {
+				supersedingID = superseding.ID
+			}
+		}
+	}
 	for _, attempt := range all {
 		if attempt.Finished == nil {
 			continue
 		}
-		if attempt.ID == agentID || attempt.ID == judgeID {
+		if attempt.ID == agentID || attempt.ID == judgeID || attempt.ID == supersedingID {
 			continue
 		}
 		if mode == "failed" && attempt.Status != model.StatusOK {

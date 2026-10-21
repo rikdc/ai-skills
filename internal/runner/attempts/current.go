@@ -313,11 +313,11 @@ func (s *Store) CheckReusable(fingerprint string) error {
 	if agent.Finished.GradingRequestSHA256 != pointer.AgentGradingRequestSHA256 {
 		return fmt.Errorf("accepted attempt grading-request digest does not match current pointer")
 	}
-	superseding, err := s.supersedingAfter(agent)
+	list, err := s.Enumerate()
 	if err != nil {
 		return err
 	}
-	if superseding != nil {
+	if superseding := SupersedingAttempt(list, agent); superseding != nil {
 		return fmt.Errorf("attempt %s after accepted attempt %s did not finish ok", superseding.ID, agent.ID)
 	}
 	if err := VerifyEvidence(agent); err != nil {
@@ -355,23 +355,39 @@ func LatestExecution(list []*Attempt) *Attempt {
 	return latest
 }
 
-// Supersedes reports whether latest replaces accepted as the run's outcome:
-// it is a newer execution attempt that finished with a non-ok status
-// (including cancelled and timed out). That rerun is the run's current
-// measurement; the accepted pointer stays on disk as provenance but is no
-// longer the run's result or reusable. An unfinished attempt is in flight or
-// crashed and never supersedes.
-func Supersedes(latest, accepted *Attempt) bool {
-	if latest == nil || accepted == nil || latest.Sequence <= accepted.Sequence {
-		return false
+// SupersedingAttempt returns the attempt that replaces accepted as the run's
+// outcome, or nil. That is the newest finished agent or hook attempt newer than
+// accepted, when it finished with a non-ok status (including cancelled and
+// timed out). Unfinished attempts are in flight or crashed: they are skipped,
+// so they neither supersede nor hide an earlier failed rerun. The accepted
+// pointer stays on disk as provenance but is no longer the run's result,
+// reusable, or gradable. list comes from Enumerate, which already skips
+// failed allocations and invalid attempt directories.
+func SupersedingAttempt(list []*Attempt, accepted *Attempt) *Attempt {
+	if accepted == nil {
+		return nil
 	}
-	return latest.Finished != nil && latest.Finished.Status != model.StatusOK
+	var newest *Attempt
+	for _, attempt := range list {
+		if attempt.Kind != model.KindAgent && attempt.Kind != model.KindHook {
+			continue
+		}
+		if attempt.Finished == nil || attempt.Sequence <= accepted.Sequence {
+			continue
+		}
+		if newest == nil || attempt.Sequence > newest.Sequence {
+			newest = attempt
+		}
+	}
+	if newest == nil || newest.Finished.Status == model.StatusOK {
+		return nil
+	}
+	return newest
 }
 
-// Superseding returns the attempt that supersedes the accepted one, or nil
-// when there is no accepted attempt or it is still the run's outcome. It reads
-// only the newest execution attempt, so unrelated corrupt attempts are ignored.
-func (s *Store) Superseding() (*Attempt, error) {
+// Superseded reports the attempt that replaces the accepted one, or nil when
+// there is no accepted attempt or it is still the run's outcome.
+func (s *Store) Superseded() (*Attempt, error) {
 	pointer, _, err := s.LoadCurrent()
 	if err != nil {
 		return nil, nil
@@ -380,35 +396,11 @@ func (s *Store) Superseding() (*Attempt, error) {
 	if err != nil {
 		return nil, nil
 	}
-	return s.supersedingAfter(accepted)
-}
-
-func (s *Store) supersedingAfter(accepted *Attempt) (*Attempt, error) {
-	entries, err := os.ReadDir(s.AttemptsDir())
+	list, err := s.Enumerate()
 	if err != nil {
-		return nil, fmt.Errorf("list attempts: %w", err)
+		return nil, err
 	}
-	newest, newestSeq := "", accepted.Sequence
-	for _, entry := range entries {
-		kind, sequence, ok := parseAttemptID(entry.Name())
-		if !ok || !entry.IsDir() || (kind != model.KindAgent && kind != model.KindHook) {
-			continue
-		}
-		if sequence > newestSeq {
-			newest, newestSeq = entry.Name(), sequence
-		}
-	}
-	if newest == "" {
-		return nil, nil
-	}
-	latest, err := s.LoadAttempt(newest)
-	if err != nil {
-		return nil, fmt.Errorf("newer attempt %s: %w", newest, err)
-	}
-	if !Supersedes(latest, accepted) {
-		return nil, nil
-	}
-	return latest, nil
+	return SupersedingAttempt(list, accepted), nil
 }
 
 // Reusable reports whether the completion predicate holds for fingerprint.
@@ -486,11 +478,6 @@ func (s *Store) Adopt(opts AdoptOptions) (*model.CurrentPointer, bool, error) {
 	if err != nil {
 		return nil, false, err
 	}
-	// An older ok attempt behind a newer failed one is not the run's outcome.
-	if latest := LatestExecution(all); latest != nil &&
-		latest.Finished != nil && latest.Finished.Status != model.StatusOK {
-		return nil, false, nil
-	}
 	var execution *Attempt
 	for _, attempt := range all {
 		if !adoptionCandidate(attempt, opts) {
@@ -500,7 +487,8 @@ func (s *Store) Adopt(opts AdoptOptions) (*model.CurrentPointer, bool, error) {
 			execution = attempt
 		}
 	}
-	if execution == nil {
+	// An ok attempt behind a newer failed one is not the run's outcome.
+	if execution == nil || SupersedingAttempt(all, execution) != nil {
 		return nil, false, nil
 	}
 	var judge *Attempt

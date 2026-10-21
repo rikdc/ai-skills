@@ -484,14 +484,17 @@ func loadRunRow(runDir, arm string, run int, rubric []model.Criterion, denominat
 	execution := attempts.LatestExecution(list)
 	if useCurrent {
 		agent, err := store.LoadAttempt(pointer.AgentAttempt)
-		switch {
-		case err == nil && attempts.Supersedes(execution, agent):
-			// A failed or interrupted rerun is the run's outcome; the accepted
-			// pointer is provenance only.
-			row.SupersededAttempt = agent.ID
-			useCurrent = false
-		case err == nil:
+		if err == nil {
 			execution = agent
+			if superseding := attempts.SupersedingAttempt(list, agent); superseding != nil {
+				// A failed rerun is the run's outcome; the accepted pointer is
+				// provenance only, and its recorded skill use describes the
+				// replaced attempt.
+				execution = superseding
+				row.SupersededAttempt = agent.ID
+				row.SkillUse = nil
+				useCurrent = false
+			}
 		}
 	}
 	if useCurrent {

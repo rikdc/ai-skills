@@ -29,6 +29,9 @@ const (
 	OutcomeAlreadyComplete Outcome = "already-complete"
 	// OutcomeNothingPending means the grading request has no pending criteria.
 	OutcomeNothingPending Outcome = "nothing-pending"
+	// OutcomeSuperseded means a newer failed rerun replaced the accepted
+	// attempt, so there is no current result to grade.
+	OutcomeSuperseded Outcome = "superseded"
 )
 
 // Result is the outcome of grading one run directory.
@@ -65,6 +68,7 @@ type SuiteResult struct {
 	Total           int
 	Graded          int
 	AlreadyComplete int
+	Superseded      int
 	Failed          int
 }
 
@@ -122,6 +126,14 @@ func Grade(ctx context.Context, cfg Config) (Result, error) {
 	if agent.Kind != model.KindAgent && agent.Kind != model.KindHook {
 		return empty, errs.Operational("%s: accepted attempt %s is not an execution attempt",
 			runDir, agent.ID)
+	}
+	// Grading a replaced result would pay the judge for a score no reader shows.
+	list, err := store.Enumerate()
+	if err != nil {
+		return empty, errs.Operational("%s: list attempts: %v", runDir, err)
+	}
+	if attempts.SupersedingAttempt(list, agent) != nil {
+		return Result{RunDir: runDir, Outcome: OutcomeSuperseded}, nil
 	}
 	if agent.Finished == nil || agent.Finished.EvidenceSHA256 != pointer.AgentEvidenceSHA256 ||
 		agent.Finished.GradingRequestSHA256 != pointer.AgentGradingRequestSHA256 {
@@ -665,9 +677,12 @@ func GradeSuite(ctx context.Context, cfg Config) (SuiteResult, error) {
 			}
 			continue
 		}
-		if result.Outcome == OutcomeGraded {
+		switch result.Outcome {
+		case OutcomeGraded:
 			suite.Graded++
-		} else {
+		case OutcomeSuperseded:
+			suite.Superseded++
+		default:
 			suite.AlreadyComplete++
 		}
 	}

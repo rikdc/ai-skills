@@ -254,19 +254,7 @@ func matchedArmToken(scenarios []model.ScenarioResult, arm string, get func(mode
 }
 
 func runCost(run model.RunRow) *float64 {
-	a := usageMetric(run.AgentUsage, run.AgentUsage.CostUSD)
-	j := usageMetric(run.JudgeUsage, run.JudgeUsage.CostUSD)
-	if run.JudgeUsage.State == model.UsageNotApplicable {
-		return a
-	}
-	if run.AgentUsage.State == model.UsageNotApplicable {
-		return j
-	}
-	if a == nil || j == nil {
-		return nil
-	}
-	value := *a + *j
-	return &value
+	return combinedMetric(run.AgentUsage, run.JudgeUsage, func(u model.Usage) *float64 { return u.CostUSD })
 }
 
 func timingTotal(scenarios []model.ScenarioResult, get func(model.ArmStats) *float64) *float64 {

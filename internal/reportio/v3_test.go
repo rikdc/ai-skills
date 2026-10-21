@@ -307,3 +307,35 @@ func TestV3AttemptsCarryFailureStatusAndError(t *testing.T) {
 		t.Fatal("attempt without finished.json must be interrupted")
 	}
 }
+
+func TestV3FailedRerunSupersedesAcceptedAttempt(t *testing.T) {
+	dir := newV3Suite(t)
+	runDir := filepath.Join(dir, "runs", "demo", "v3case", "with", "run-1")
+	failed := filepath.Join(runDir, "attempts", "agent-000004")
+	writeJSON(t, filepath.Join(failed, "started.json"), model.StartedAttempt{
+		SchemaVersion: 3, AttemptID: "agent-000004", Kind: model.KindAgent,
+		StartedAt: "2026-02-02T00:02:00Z",
+	})
+	writeJSON(t, filepath.Join(failed, "finished.json"), model.FinishedAttempt{
+		SchemaVersion: 3, AttemptID: "agent-000004", Kind: model.KindAgent,
+		FinishedAt: "2026-02-02T00:03:00Z", Status: model.StatusAgentFailed,
+		StopReason: model.StopProviderError, Usage: model.Usage{State: model.UsageKnown, Known: true, Source: "x"},
+	})
+	// A failed allocation after it is not an attempt and must not hide it.
+	if err := os.MkdirAll(filepath.Join(runDir, "attempts", "agent-000005"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	in, err := reportio.Load(dir, reportio.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	with := in.Scenarios[0].Runs[0]
+	if with.Status != string(model.StatusAgentFailed) || with.Complete || with.AgentAttempt != "agent-000004" ||
+		len(with.JudgedItems) != 0 || with.JudgeAttempt != "" {
+		t.Fatalf("with run = %+v, want the failed rerun", with)
+	}
+	if with.DurationSeconds == nil || *with.DurationSeconds != 60 {
+		t.Fatalf("duration = %v, want the rerun's 60s", with.DurationSeconds)
+	}
+}

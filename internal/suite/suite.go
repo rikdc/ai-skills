@@ -972,6 +972,10 @@ func (r *Runner) checkJudgeProvenance(selected []scenario.Selected, identity str
 				if err != nil || pointer.JudgeAttempt == "" {
 					continue
 				}
+				// A replaced result's judgement is never shown or reused.
+				if superseding, _ := store.Superseded(); superseding != nil {
+					continue
+				}
 				if pointer.JudgeIdentitySHA256 != identity {
 					return errs.Usage(
 						"%s was judged by a different judge; pass --regrade to replace the judgement", dir)

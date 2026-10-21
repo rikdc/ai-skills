@@ -763,8 +763,9 @@ func TestAttemptArtifactsRetention(t *testing.T) {
 			case "failed":
 				wantPruned["agent-000001"] = true
 			case "none":
+				// agent-000003 failed after agent-000002 was accepted, so it
+				// supersedes it as the run's outcome and keeps its evidence.
 				wantPruned["agent-000001"] = true
-				wantPruned["agent-000003"] = true
 			}
 			for _, attempt := range all {
 				_, snapErr := os.Stat(filepath.Join(attempt.Dir, "snapshot.tar"))

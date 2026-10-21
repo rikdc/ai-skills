@@ -164,8 +164,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the failure with no score, and the suite exits 1. Previously the old
   accepted score was reported and the suite exited 0. `current.json` is kept
   only as provenance; the run is no longer reusable or adoptable, so
-  `--resume` retries it and `keep-failures` keeps it. An unfinished newer
-  attempt (in flight or crashed) does not replace the accepted result.
+  `--resume` retries it and `keep-failures` keeps it. `evalctl grade` skips
+  it (`superseded`) instead of paying the judge for a hidden score, and
+  `--attempt-artifacts none` keeps its evidence. An unfinished newer attempt
+  (in flight or crashed) neither replaces the accepted result nor hides an
+  earlier failed rerun.
 - After an interrupt, `evalctl run`, `suite`, and `grade --suite` stop
   starting new runs and judge calls instead of recording a cancelled attempt
   for every remaining one.

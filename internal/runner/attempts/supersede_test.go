@@ -34,29 +34,42 @@ func failRerun(t *testing.T, store *Store, status model.RunStatus) *Attempt {
 	})
 }
 
-func TestSupersedes(t *testing.T) {
+func TestSupersedingAttempt(t *testing.T) {
 	finished := func(seq int, status model.RunStatus) *Attempt {
 		return &Attempt{Kind: model.KindAgent, Sequence: seq, Status: status,
 			Finished: &model.FinishedAttempt{Status: status}}
 	}
+	unfinished := func(seq int) *Attempt {
+		return &Attempt{Kind: model.KindAgent, Sequence: seq, Status: model.StatusInterrupted}
+	}
+	judge := &Attempt{Kind: model.KindJudge, Sequence: 3, Finished: &model.FinishedAttempt{Status: model.StatusAgentFailed}}
 	accepted := finished(2, model.StatusOK)
 	for _, test := range []struct {
-		name   string
-		latest *Attempt
-		want   bool
+		name string
+		list []*Attempt
+		want int // sequence of the superseding attempt, 0 for none
 	}{
-		{"no attempts", nil, false},
-		{"accepted is latest", accepted, false},
-		{"older failure", finished(1, model.StatusAgentFailed), false},
-		{"newer ok", finished(3, model.StatusOK), false},
-		{"newer unfinished", &Attempt{Kind: model.KindAgent, Sequence: 3, Status: model.StatusInterrupted}, false},
-		{"newer failed", finished(3, model.StatusAgentFailed), true},
-		{"newer cancelled", finished(3, model.StatusCancelled), true},
-		{"newer timed out", finished(3, model.StatusTimedOut), true},
+		{"accepted only", []*Attempt{accepted}, 0},
+		{"older failure", []*Attempt{finished(1, model.StatusAgentFailed), accepted}, 0},
+		{"newer ok", []*Attempt{accepted, finished(3, model.StatusOK)}, 0},
+		{"newer unfinished", []*Attempt{accepted, unfinished(3)}, 0},
+		{"newer judge failure", []*Attempt{accepted, judge}, 0},
+		{"newer failed", []*Attempt{accepted, finished(3, model.StatusAgentFailed)}, 3},
+		{"newer cancelled", []*Attempt{accepted, finished(3, model.StatusCancelled)}, 3},
+		{"newer timed out", []*Attempt{accepted, finished(3, model.StatusTimedOut)}, 3},
+		{"crash after a failed rerun", []*Attempt{accepted, finished(3, model.StatusAgentFailed), unfinished(4)}, 3},
+		{"ok after a failed rerun", []*Attempt{accepted, finished(3, model.StatusAgentFailed), finished(4, model.StatusOK)}, 0},
 	} {
-		if got := Supersedes(test.latest, accepted); got != test.want {
-			t.Errorf("%s: Supersedes = %v, want %v", test.name, got, test.want)
+		got := SupersedingAttempt(test.list, accepted)
+		switch {
+		case test.want == 0 && got != nil:
+			t.Errorf("%s: superseded by %d, want none", test.name, got.Sequence)
+		case test.want != 0 && (got == nil || got.Sequence != test.want):
+			t.Errorf("%s: superseded by %v, want %d", test.name, got, test.want)
 		}
+	}
+	if SupersedingAttempt([]*Attempt{finished(3, model.StatusAgentFailed)}, nil) != nil {
+		t.Error("no accepted attempt cannot be superseded")
 	}
 }
 
@@ -68,7 +81,7 @@ func TestFailedRerunSupersedesAcceptedRun(t *testing.T) {
 	if err := store.CheckReusable("fp"); err == nil {
 		t.Fatal("run with a failed rerun is still reusable")
 	}
-	superseding, err := store.Superseding()
+	superseding, err := store.Superseded()
 	if err != nil || superseding == nil || superseding.ID != rerun.ID {
 		t.Fatalf("Superseding = %v, %v; want %s", superseding, err, rerun.ID)
 	}
@@ -90,7 +103,7 @@ func TestUnfinishedRerunDoesNotSupersede(t *testing.T) {
 	if err := store.CheckReusable("fp"); err != nil {
 		t.Fatalf("an in-flight or crashed rerun made the run non-reusable: %v", err)
 	}
-	if superseding, err := store.Superseding(); err != nil || superseding != nil {
+	if superseding, err := store.Superseded(); err != nil || superseding != nil {
 		t.Fatalf("Superseding = %v, %v; want none", superseding, err)
 	}
 }
@@ -104,5 +117,32 @@ func TestCorruptOlderAttemptDoesNotBlockReuse(t *testing.T) {
 	}
 	if err := store.CheckReusable("fp"); err != nil {
 		t.Fatalf("a corrupt older attempt blocked reuse: %v", err)
+	}
+}
+
+func TestEmptyNewerAttemptDirectoryDoesNotBlockReuse(t *testing.T) {
+	store := testStore(t)
+	accepted := acceptedRun(t, store)
+	// A crash during allocation can leave an attempt directory with no
+	// started.json; it is not an attempt.
+	if err := os.MkdirAll(filepath.Join(store.AttemptsDir(), formatAttemptID(model.KindAgent, accepted.Sequence+1)), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CheckReusable("fp"); err != nil {
+		t.Fatalf("an empty attempt directory blocked reuse: %v", err)
+	}
+}
+
+func TestCrashAfterFailedRerunStillSupersedes(t *testing.T) {
+	store := testStore(t)
+	acceptedRun(t, store)
+	failed := failRerun(t, store, model.StatusAgentFailed)
+	mustAllocate(t, store, model.KindAgent, "fp")
+
+	if err := store.CheckReusable("fp"); err == nil {
+		t.Fatal("a crashed attempt hid the failed rerun")
+	}
+	if superseding, err := store.Superseded(); err != nil || superseding == nil || superseding.ID != failed.ID {
+		t.Fatalf("Superseded = %v, %v; want %s", superseding, err, failed.ID)
 	}
 }

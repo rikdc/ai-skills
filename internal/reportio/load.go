@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/rikdc/ai-skills/internal/model"
+	"github.com/rikdc/ai-skills/internal/runner/attempts"
 	"github.com/rikdc/ai-skills/internal/skilluse"
 )
 
@@ -592,49 +593,29 @@ func loadV3Run(runDir, rel string, ri model.RunInput, rubric []model.Criterion, 
 	return ri, nil
 }
 
-// supersedingAttempt returns the newest agent or hook attempt newer than the
-// accepted one when it finished with a non-ok status, or "" when the accepted
-// attempt is still the run's outcome. An unfinished attempt (in flight or
-// crashed) never supersedes.
+// supersedingAttempt returns the attempt that replaces the accepted one as the
+// run's outcome (see attempts.SupersedingAttempt), or "" when the accepted
+// attempt is still the outcome. An unreadable attempt store never fails the
+// report; the accepted attempt is then reported as before.
 func supersedingAttempt(runDir, accepted string) (string, *startedFile, *finishedFile, error) {
-	acceptedSeq, ok := attemptSequence(accepted)
-	if !ok {
-		return "", nil, nil, nil
-	}
-	entries, err := os.ReadDir(filepath.Join(runDir, "attempts"))
+	store := attempts.New(runDir)
+	acceptedAttempt, err := store.LoadAttempt(accepted)
 	if err != nil {
 		return "", nil, nil, nil
 	}
-	newest, newestSeq := "", acceptedSeq
-	for _, entry := range entries {
-		kind := kindFromDirName(entry.Name())
-		if !entry.IsDir() || (kind != model.KindAgent && kind != model.KindHook) {
-			continue
-		}
-		if seq, ok := attemptSequence(entry.Name()); ok && seq > newestSeq {
-			newest, newestSeq = entry.Name(), seq
-		}
-	}
-	if newest == "" {
+	list, err := store.Enumerate()
+	if err != nil {
 		return "", nil, nil, nil
 	}
-	started, finished, err := readAttempt(filepath.Join(runDir, "attempts", newest))
+	superseding := attempts.SupersedingAttempt(list, acceptedAttempt)
+	if superseding == nil {
+		return "", nil, nil, nil
+	}
+	started, finished, err := readAttempt(superseding.Dir)
 	if err != nil {
 		return "", nil, nil, err
 	}
-	if started == nil || finished == nil || finished.Status == model.StatusOK {
-		return "", nil, nil, nil
-	}
-	return newest, started, finished, nil
-}
-
-func attemptSequence(id string) (int, bool) {
-	i := strings.LastIndex(id, "-")
-	if i < 0 {
-		return 0, false
-	}
-	seq, err := strconv.Atoi(id[i+1:])
-	return seq, err == nil
+	return superseding.ID, started, finished, nil
 }
 
 // supersededRun reports a failed rerun as the run's outcome.

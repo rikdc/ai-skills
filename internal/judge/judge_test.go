@@ -851,6 +851,29 @@ func TestGradeSuiteStopsAfterCancellation(t *testing.T) {
 	}
 }
 
+func TestGradeSkipsSupersededRun(t *testing.T) {
+	f := newFixture(t, standardPending())
+	rerun, err := f.store.Allocate(model.StartedAttempt{
+		Kind: model.KindAgent, RunID: "demo/basic/with/run-1", Fingerprint: "fp",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.store.Finish(rerun.ID, model.FinishedAttempt{
+		Status: model.StatusTimedOut, StopReason: model.StopTimeout, Usage: knownAgentUsage(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFake(testCommand)
+	result, err := gradeRun(t, f, fake, testCommand, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Outcome != OutcomeSuperseded || fake.calls != 0 {
+		t.Fatalf("outcome = %q, judge calls = %d; want superseded with no judge call", result.Outcome, fake.calls)
+	}
+}
+
 func TestRegradeWithPrunedEvidenceFails(t *testing.T) {
 	f := newFixture(t, standardPending())
 	if _, err := gradeRun(t, f, newFake(testCommand), testCommand, false); err != nil {
