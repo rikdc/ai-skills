@@ -99,6 +99,7 @@ func RenderMarkdown(report model.Report) string {
 			b.WriteString("\nCost totals include functional runs; delta and efficiency use comparison scenarios only.\n")
 		}
 	}
+	b.WriteString(renderExpenditureMarkdown(report))
 	b.WriteString(renderComparisonMarkdown(report))
 
 	b.WriteString("\n## Timing\n\n")
@@ -129,6 +130,26 @@ func costTableRows(report model.Report) []costRow {
 		{"cache read", fmtTokens(report.Cost.With.Combined.Tokens.CacheRead.Total), fmtTokens(report.Cost.Without.Combined.Tokens.CacheRead.Total), fmtTokensDelta(d.CombinedCacheReadTokens)},
 		{"total tokens", fmtTokens(report.Cost.With.Combined.Tokens.Total), fmtTokens(report.Cost.Without.Combined.Tokens.Total), fmtTokensDelta(d.CombinedTokens)},
 	}
+}
+
+func renderExpenditureMarkdown(report model.Report) string {
+	e := report.Expenditure
+	if e.TotalAttempts == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("\n## Expenditure\n\n")
+	b.WriteString("| Attempts | Agent | Hook | Judge | Known | Unknown | Not applicable | Known total |\n")
+	b.WriteString("| --- | --- | --- | --- | --- | --- | --- | --- |\n")
+	fmt.Fprintf(&b, "| %d | %d | %d | %d | %d | %d | %d | %s |\n",
+		e.TotalAttempts, e.AgentAttempts, e.HookAttempts, e.JudgeAttempts,
+		e.KnownAttempts, e.UnknownAttempts, e.NotApplicableAttempts, fmtMoney(e.KnownTotal.CostUSD))
+	if e.Complete {
+		b.WriteString("\nEvery applicable attempt has known usage. Expenditure includes superseded, failed and regraded attempts.\n")
+	} else {
+		b.WriteString("\nThe known total is a lower bound: at least one applicable attempt has unknown usage. Unknown is never counted as zero.\n")
+	}
+	return b.String()
 }
 
 func renderComparisonMarkdown(report model.Report) string {

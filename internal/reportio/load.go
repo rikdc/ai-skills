@@ -5,6 +5,8 @@ package reportio
 
 import (
 	"bufio"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -123,10 +125,14 @@ type finishedFile struct {
 	Status               model.RunStatus   `json:"status"`
 	StopReason           string            `json:"stop_reason"`
 	Usage                model.Usage       `json:"usage"`
+	AgentExit            *int              `json:"agent_exit"`
+	TimedOut             bool              `json:"timed_out"`
+	DurationSeconds      *float64          `json:"duration_seconds"`
 	GradedAgentAttempt   string            `json:"graded_agent_attempt"`
 	GradedEvidenceSHA256 string            `json:"graded_evidence_sha256"`
 	GradingRequestSHA256 string            `json:"grading_request_sha256"`
 	JudgeIdentitySHA256  string            `json:"judge_identity_sha256"`
+	JudgementSHA256      string            `json:"judgement_sha256"`
 }
 
 // Load reads a suite directory, accepting v1/v2 (legacy) and v3 layouts.
@@ -162,6 +168,10 @@ func Load(suiteDir string, opts Options) (*model.ReportInput, error) {
 	}
 
 	runs := mf.Config.Runs
+	if runs <= 0 {
+		// Legacy v1 manifests omitted runs; the shell report defaults to 1.
+		runs = 1
+	}
 	arm := strings.TrimSpace(mf.Config.Arm)
 	if arm == "" {
 		arm = "both"
@@ -199,12 +209,13 @@ func Load(suiteDir string, opts Options) (*model.ReportInput, error) {
 		Results: results,
 	}
 	in.State.Counts = normalizeCounts(sf.Counts)
+	// counts.duration_seconds is the v1 field the shell report renders.
+	// suite.json's top-level duration_seconds is a v3 addition and is only a
+	// fallback, which keeps legacy and v3 wall-clock semantics aligned.
 	in.State.DurationSeconds = sf.DurationSeconds
-	if in.State.DurationSeconds == nil {
-		if raw, ok := sf.Counts["duration_seconds"]; ok {
-			if f, err := raw.Float64(); err == nil {
-				in.State.DurationSeconds = &f
-			}
+	if raw, ok := sf.Counts["duration_seconds"]; ok {
+		if f, err := raw.Float64(); err == nil {
+			in.State.DurationSeconds = &f
 		}
 	}
 
@@ -376,7 +387,7 @@ func loadLegacyRun(runDir, rel string, ri model.RunInput, rubric []model.Criteri
 	ri.AgentAttempt = result.AgentAttempt
 	ri.JudgeAttempt = result.JudgeAttempt
 
-	if judgeDuration, err := readJudgeDuration(runDir); err == nil {
+	if judgeDuration, err := readJudgeDuration(runDir, ""); err == nil {
 		ri.JudgeDurationSeconds = judgeDuration
 	}
 
@@ -386,7 +397,7 @@ func loadLegacyRun(runDir, rel string, ri model.RunInput, rubric []model.Criteri
 	}
 	ri.MechanicalItems = items
 
-	if judged, ok, err := readValidJudgement(
+	if judged, ok, err := readLegacyJudgement(
 		filepath.Join(runDir, "judgement.json"),
 		filepath.Join(runDir, "grading-request.json"),
 		rubric,
@@ -399,9 +410,10 @@ func loadLegacyRun(runDir, rel string, ri model.RunInput, rubric []model.Criteri
 	ri.AgentUsage = readUsageFile(filepath.Join(runDir, "usage.json"), true)
 	ri.Usage = ri.AgentUsage
 	judgeInvoked := fileExists(filepath.Join(runDir, "judge-result.json")) ||
-		fileExists(filepath.Join(runDir, "judgement.json"))
+		fileExists(filepath.Join(runDir, "judgement.json")) ||
+		fileExists(filepath.Join(runDir, "judge.log"))
 	if judgeInvoked {
-		ri.JudgeUsage = readUsageFile(filepath.Join(runDir, "judge-usage.json"), true)
+		ri.JudgeUsage = readUsageFile(filepath.Join(runDir, "judge-usage.json"), false)
 	} else {
 		ri.JudgeUsage = notApplicableUsage()
 	}
@@ -410,64 +422,85 @@ func loadLegacyRun(runDir, rel string, ri model.RunInput, rubric []model.Criteri
 }
 
 func loadV3Run(runDir, rel string, ri model.RunInput, rubric []model.Criterion) (model.RunInput, error) {
+	currentBytes, err := os.ReadFile(filepath.Join(runDir, "current.json"))
+	if err != nil {
+		return ri, fmt.Errorf("read current.json in %s: %w", runDir, err)
+	}
 	var current model.CurrentPointer
-	if err := readJSON(filepath.Join(runDir, "current.json"), &current); err != nil {
+	if err := json.Unmarshal(currentBytes, &current); err != nil {
 		return ri, fmt.Errorf("invalid current.json in %s: %w", runDir, err)
 	}
+	currentSHA := sha256Hex(currentBytes)
 	ri.AgentAttempt = current.AgentAttempt
 	ri.JudgeAttempt = current.JudgeAttempt
-	ri.Complete = true
-	ri.Status = string(model.StatusOK)
+	ri.Complete = false
+	ri.Status = string(model.StatusIncomplete)
+	ri.Usage = unknownUsage("agent")
+	ri.AgentUsage = ri.Usage
+	ri.JudgeUsage = notApplicableUsage()
+
+	if current.AgentAttempt == "" {
+		ri.CombinedUsage = combineUsage(ri.AgentUsage, ri.JudgeUsage)
+		return ri, nil
+	}
 
 	agentDir := filepath.Join(runDir, "attempts", current.AgentAttempt)
 	started, finished, err := readAttempt(agentDir)
 	if err != nil {
 		return ri, err
 	}
-	_ = started
+	if started == nil {
+		// current.json points at an attempt that is not on disk. The pointer
+		// wins over any projection, but the run has no usable accepted result.
+		ri.CombinedUsage = combineUsage(ri.AgentUsage, ri.JudgeUsage)
+		return ri, nil
+	}
 	if finished == nil {
 		ri.Status = string(model.StatusInterrupted)
-		ri.Complete = false
 		ri.StopReason = model.StopInterrupted
-		ri.AgentUsage = unknownUsage("agent")
-		ri.Usage = ri.AgentUsage
+		ri.Usage = unknownUsage("agent")
+		ri.AgentUsage = ri.Usage
 		ri.JudgeUsage = judgeUsageFor(runDir, current.JudgeAttempt)
 		ri.CombinedUsage = combineUsage(ri.AgentUsage, ri.JudgeUsage)
 		return ri, nil
 	}
 	ri.Status = string(finished.Status)
+	ri.Complete = finished.Status == model.StatusOK
 	if ri.Status == "" {
-		ri.Status = string(model.StatusOK)
+		ri.Status = string(model.StatusIncomplete)
+		ri.Complete = false
 	}
 	ri.StopReason = finished.StopReason
-	ri.TimedOut = finished.Status == model.StatusTimedOut || finished.StopReason == model.StopTimeout
-
-	ri.AgentUsage = readAttemptUsage(agentDir, model.KindAgent, finished)
-	ri.Usage = ri.AgentUsage
-
-	// The projection supplies fields the attempt contract does not record.
-	var result legacyResult
-	resultPath := filepath.Join(runDir, "result.json")
-	projectionValid := false
-	if err := readJSON(resultPath, &result); err == nil {
-		projectionValid = result.AgentAttempt == "" || result.AgentAttempt == current.AgentAttempt
-	}
-	if projectionValid && result.AgentAttempt == current.AgentAttempt {
-		ri.AgentExit = parseIntRaw(result.AgentExit)
-		if result.DurationSeconds != nil {
-			ri.DurationSeconds = result.DurationSeconds
-		}
-		if !ri.TimedOut && result.TimedOut {
-			ri.TimedOut = true
-		}
-	}
+	ri.TimedOut = finished.TimedOut || finished.Status == model.StatusTimedOut ||
+		finished.StopReason == model.StopTimeout
+	ri.AgentExit = finished.AgentExit
+	ri.DurationSeconds = finished.DurationSeconds
 	if ri.DurationSeconds == nil {
 		ri.DurationSeconds = durationBetween(started, finished)
 	}
 
+	// result.json is a projection. It is only consulted for fields the
+	// attempt contract does not record, and only when it is bound to the
+	// accepted current pointer.
+	projection, projectionValid := readProjection(runDir, current.AgentAttempt, currentSHA)
+	if projection != nil {
+		if ri.AgentExit == nil {
+			ri.AgentExit = parseIntRaw(projection.AgentExit)
+		}
+		if ri.DurationSeconds == nil {
+			ri.DurationSeconds = projection.DurationSeconds
+		}
+		if !ri.TimedOut && projection.TimedOut {
+			ri.TimedOut = true
+		}
+		if projection.Evidence != "" {
+			ri.Evidence = projection.Evidence
+		}
+	}
+
 	var fallbackItems []model.JudgedItem
-	if projectionValid && result.AgentAttempt == current.AgentAttempt {
-		fallbackItems = result.Mechanical.Items
+	if projectionValid {
+		fallbackItems = projection.Mechanical.Items
 	}
 	items, err := readMechanical(agentDir, fallbackItems)
 	if err != nil {
@@ -475,42 +508,48 @@ func loadV3Run(runDir, rel string, ri model.RunInput, rubric []model.Criterion) 
 	}
 	ri.MechanicalItems = items
 
+	ri.AgentUsage = readAttemptUsage(agentDir, model.KindAgent, finished)
+	ri.Usage = ri.AgentUsage
+
 	if current.JudgeAttempt != "" {
 		judgeDir := filepath.Join(runDir, "attempts", current.JudgeAttempt)
 		judgeStarted, judgeFinished, err := readAttempt(judgeDir)
 		if err != nil {
 			return ri, err
 		}
-		_ = judgeStarted
-		if judgeFinished != nil && judgeBindingValid(current, judgeFinished) {
-			if judged, ok, err := readValidJudgement(
-				filepath.Join(judgeDir, "judgement.json"),
-				filepath.Join(runDir, "grading-request.json"),
-				rubric,
-			); err != nil {
-				return ri, err
-			} else if ok {
-				ri.JudgedItems = judged
-			}
-			ri.JudgeUsage = readAttemptUsage(judgeDir, model.KindJudge, judgeFinished)
-			if ri.JudgeUsage.State == "" {
-				ri.JudgeUsage = unknownUsage("judge")
-			}
-		} else {
+		switch {
+		case judgeFinished == nil:
 			ri.JudgeUsage = unknownUsage("judge")
-		}
-		if judgeDuration, err := readJudgeDuration(runDir); err == nil {
-			ri.JudgeDurationSeconds = judgeDuration
-		} else if judgeFinished != nil {
-			ri.JudgeDurationSeconds = durationBetween(judgeStarted, judgeFinished)
+		default:
+			ri.JudgeUsage = readAttemptUsage(judgeDir, model.KindJudge, judgeFinished)
+			ri.JudgeDurationSeconds = judgeFinished.DurationSeconds
+			if ri.JudgeDurationSeconds == nil {
+				ri.JudgeDurationSeconds = durationBetween(judgeStarted, judgeFinished)
+			}
+			if ri.JudgeDurationSeconds == nil {
+				if duration, err := readJudgeDuration(runDir, judgeDir); err == nil {
+					ri.JudgeDurationSeconds = duration
+				}
+			}
+			if ri.Status == string(model.StatusOK) &&
+				judgeBindingValid(current, judgeFinished) &&
+				judgementDigestValid(judgeDir, judgeFinished) {
+				pending := pendingCriteria(runDir, current, items, rubric)
+				if judged, ok, err := readValidJudgement(
+					filepath.Join(judgeDir, "judgement.json"),
+					pending,
+					rubric,
+				); err != nil {
+					return ri, err
+				} else if ok {
+					ri.JudgedItems = judged
+				}
+			}
 		}
 	} else {
 		ri.JudgeUsage = notApplicableUsage()
 	}
 	ri.CombinedUsage = combineUsage(ri.AgentUsage, ri.JudgeUsage)
-	if result.Evidence != "" {
-		ri.Evidence = result.Evidence
-	}
 	if ri.Status != string(model.StatusOK) {
 		// Accepted usage covers only successful accepted runs; a failed
 		// attempt still contributes to expenditure.
@@ -522,11 +561,64 @@ func loadV3Run(runDir, rel string, ri model.RunInput, rubric []model.Criterion) 
 	return ri, nil
 }
 
+// readProjection returns result.json only when it is bound to the accepted
+// execution attempt and, when recorded, to the current pointer digest.
+func readProjection(runDir, agentAttempt, currentSHA string) (*legacyResult, bool) {
+	var result legacyResult
+	if err := readJSON(filepath.Join(runDir, "result.json"), &result); err != nil {
+		return nil, false
+	}
+	if result.AgentAttempt == "" || result.AgentAttempt != agentAttempt {
+		return nil, false
+	}
+	if result.CurrentSHA256 != "" && result.CurrentSHA256 != currentSHA {
+		return nil, false
+	}
+	return &result, true
+}
+
+// pendingCriteria reads the accepted grading-request projection only when its
+// bytes match the digest bound by current.json. A stale or missing projection
+// is rebuilt in memory from the rubric and the mechanical items.
+func pendingCriteria(runDir string, current model.CurrentPointer,
+	mechanical []model.JudgedItem, rubric []model.Criterion) []model.Criterion {
+	if data, err := os.ReadFile(filepath.Join(runDir, "grading-request.json")); err == nil {
+		bound := current.AgentGradingRequestSHA256
+		if bound == "" || sha256Hex(data) == bound {
+			var request model.GradingRequest
+			if json.Unmarshal(data, &request) == nil &&
+				(request.AgentAttempt == "" || request.AgentAttempt == current.AgentAttempt) &&
+				(request.EvidenceSHA256 == "" || request.EvidenceSHA256 == current.AgentEvidenceSHA256) {
+				return request.JudgementPending
+			}
+		}
+	}
+	covered := make(map[string]bool, len(mechanical))
+	for _, item := range mechanical {
+		covered[item.Name] = true
+	}
+	pending := make([]model.Criterion, 0, len(rubric))
+	for _, criterion := range rubric {
+		if !covered[criterion.Name] {
+			pending = append(pending, criterion)
+		}
+	}
+	return pending
+}
+
 func judgeBindingValid(current model.CurrentPointer, finished *finishedFile) bool {
+	if finished == nil || finished.Status != model.StatusOK {
+		return false
+	}
+	if finished.GradedAgentAttempt == "" || finished.GradedEvidenceSHA256 == "" ||
+		finished.GradingRequestSHA256 == "" {
+		return false
+	}
 	if current.GradedAgentAttempt != "" && finished.GradedAgentAttempt != current.GradedAgentAttempt {
 		return false
 	}
-	if current.AgentEvidenceSHA256 != "" && finished.GradedEvidenceSHA256 != current.AgentEvidenceSHA256 {
+	evidence := firstNonEmpty(current.GradedEvidenceSHA256, current.AgentEvidenceSHA256)
+	if evidence != "" && finished.GradedEvidenceSHA256 != evidence {
 		return false
 	}
 	wantRequest := firstNonEmpty(current.GradingRequestSHA256, current.AgentGradingRequestSHA256)
@@ -537,6 +629,19 @@ func judgeBindingValid(current model.CurrentPointer, finished *finishedFile) boo
 		return false
 	}
 	return true
+}
+
+// judgementDigestValid binds judgement.json to the judge attempt's immutable
+// digest. A v3 judge attempt without a digest cannot be accepted.
+func judgementDigestValid(judgeDir string, finished *finishedFile) bool {
+	if finished == nil || finished.JudgementSHA256 == "" {
+		return false
+	}
+	data, err := os.ReadFile(filepath.Join(judgeDir, "judgement.json"))
+	if err != nil {
+		return false
+	}
+	return sha256Hex(data) == finished.JudgementSHA256
 }
 
 func judgeUsageFor(runDir, judgeAttempt string) model.Usage {
@@ -557,22 +662,19 @@ func judgeUsageFor(runDir, judgeAttempt string) model.Usage {
 
 func readAttempt(dir string) (*startedFile, *finishedFile, error) {
 	var started startedFile
-	startedExists := false
+	var startedPtr *startedFile
 	if err := readJSON(filepath.Join(dir, "started.json"), &started); err == nil {
-		startedExists = true
+		startedPtr = &started
 	} else if !os.IsNotExist(err) {
 		return nil, nil, fmt.Errorf("invalid started.json in %s: %w", dir, err)
 	}
 	var finished finishedFile
 	if err := readJSON(filepath.Join(dir, "finished.json"), &finished); err == nil {
-		return &started, &finished, nil
+		return startedPtr, &finished, nil
 	} else if !os.IsNotExist(err) {
 		return nil, nil, fmt.Errorf("invalid finished.json in %s: %w", dir, err)
 	}
-	if startedExists {
-		return &started, nil, nil
-	}
-	return nil, nil, nil
+	return startedPtr, nil, nil
 }
 
 // loadAttempts enumerates immutable attempt directories for v3 runs. A nil
@@ -646,10 +748,10 @@ func readAttemptUsage(dir string, kind model.AttemptKind, finished *finishedFile
 			return usage
 		}
 	}
-	if finished != nil && finished.Usage.State != "" {
-		return finished.Usage
+	if finished != nil {
+		return finished.Usage.NormalizeState()
 	}
-	return model.Usage{}
+	return unknownUsage(string(kind))
 }
 
 func readMechanical(runDir string, fallback []model.JudgedItem) ([]model.JudgedItem, error) {
@@ -668,16 +770,24 @@ func readMechanical(runDir string, fallback []model.JudgedItem) ([]model.JudgedI
 	return items, nil
 }
 
-func readValidJudgement(judgementPath, requestPath string, rubric []model.Criterion) ([]model.JudgedItem, bool, error) {
-	var judgement []model.JudgedItem
-	if err := readJSON(judgementPath, &judgement); err != nil {
-		return nil, false, nil
-	}
+// readLegacyJudgement validates a v1/v2 judgement against the pending criteria
+// recorded in the same run directory's grading-request.
+func readLegacyJudgement(judgementPath, requestPath string, rubric []model.Criterion) ([]model.JudgedItem, bool, error) {
 	var request model.GradingRequest
 	if err := readJSON(requestPath, &request); err != nil {
 		return nil, false, nil
 	}
-	if len(judgement) == 0 || !judgementMatchesRequest(judgement, request.JudgementPending, rubric) {
+	return readValidJudgement(judgementPath, request.JudgementPending, rubric)
+}
+
+// readValidJudgement accepts a judgement only when it covers exactly the
+// pending criteria with the rubric's own maxima.
+func readValidJudgement(judgementPath string, pending []model.Criterion, rubric []model.Criterion) ([]model.JudgedItem, bool, error) {
+	var judgement []model.JudgedItem
+	if err := readJSON(judgementPath, &judgement); err != nil {
+		return nil, false, nil
+	}
+	if len(judgement) == 0 || !judgementMatchesRequest(judgement, pending, rubric) {
 		return nil, false, nil
 	}
 	return judgement, true, nil
@@ -715,12 +825,24 @@ func judgementMatchesRequest(judgement []model.JudgedItem, pending []model.Crite
 	return true
 }
 
-func readJudgeDuration(runDir string) (*float64, error) {
-	var result judgeResultFile
-	if err := readJSON(filepath.Join(runDir, "judge-result.json"), &result); err != nil {
-		return nil, err
+// readJudgeDuration reads the v3 attempt-local judge result first, then falls
+// back to the legacy run-level projection.
+func readJudgeDuration(runDir, judgeDir string) (*float64, error) {
+	candidates := make([]string, 0, 2)
+	if judgeDir != "" {
+		candidates = append(candidates, filepath.Join(judgeDir, "judge-result.json"))
 	}
-	return result.DurationSeconds, nil
+	candidates = append(candidates, filepath.Join(runDir, "judge-result.json"))
+	var lastErr error
+	for _, path := range candidates {
+		var result judgeResultFile
+		if err := readJSON(path, &result); err != nil {
+			lastErr = err
+			continue
+		}
+		return result.DurationSeconds, nil
+	}
+	return nil, lastErr
 }
 
 func readUsageFile(path string, agent bool) model.Usage {
@@ -739,52 +861,11 @@ func readUsageFileFound(path string) (model.Usage, bool) {
 	if err := readJSON(path, &usage); err != nil {
 		return model.Usage{}, false
 	}
-	if usage.State == "" {
-		if usage.Known {
-			usage.State = model.UsageKnown
-		} else {
-			usage.State = model.UsageUnknown
-		}
-	}
-	return usage, true
+	return usage.NormalizeState(), true
 }
 
 func combineUsage(agent, judge model.Usage) model.Usage {
-	if judge.State == model.UsageNotApplicable {
-		return agent
-	}
-	if agent.State == model.UsageNotApplicable {
-		return judge
-	}
-	if agent.State != model.UsageKnown || judge.State != model.UsageKnown {
-		return unknownUsage("combined")
-	}
-	out := model.Usage{State: model.UsageKnown, Known: true, Source: "combined"}
-	out.InputTokens = sumInt64(agent.InputTokens, judge.InputTokens)
-	out.OutputTokens = sumInt64(agent.OutputTokens, judge.OutputTokens)
-	out.ReasoningTokens = sumInt64(agent.ReasoningTokens, judge.ReasoningTokens)
-	out.CacheReadTokens = sumInt64(agent.CacheReadTokens, judge.CacheReadTokens)
-	out.CacheWriteTokens = sumInt64(agent.CacheWriteTokens, judge.CacheWriteTokens)
-	out.TotalTokens = sumInt64(agent.TotalTokens, judge.TotalTokens)
-	out.CostUSD = sumFloat64(agent.CostUSD, judge.CostUSD)
-	out.Currency = firstNonEmpty(agent.Currency, judge.Currency)
-	return out
-}
-
-func sumInt64(a, b *int64) *int64 {
-	if a == nil || b == nil {
-		return nil
-	}
-	v := *a + *b
-	return &v
-}
-
-func sumFloat64(a, b *float64) *float64 {
-	if a == nil || b == nil {
-		return nil
-	}
-	v := *a + *b
-	return &v
+	return model.Combine(agent, judge)
 }
 
 func notApplicableUsage() model.Usage {
@@ -898,4 +979,9 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func sha256Hex(data []byte) string {
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
 }

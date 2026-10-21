@@ -25,6 +25,11 @@ Cost totals include functional runs; delta and efficiency use comparison scenari
   coverage: agent 8/8, judge 6/8, total 6/8 (partial)
 Efficiency: — (cost coverage or score delta does not support a per-point claim)
 
+Expenditure (all immutable attempts)
+  attempts 4 · agent 2 · hook 0 · judge 2
+  known 2 · unknown 1 · not applicable 1 · known total $0.012 (lower bound; unknown usage is never zero)
+  Includes functional runs and superseded/regraded attempts.
+
 Timing
   wall 43s · agent 1m · judge — · 8 run(s), 0 timed out
 

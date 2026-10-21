@@ -154,3 +154,55 @@ func TestReportCommandErrors(t *testing.T) {
 		t.Fatalf("bad format error = %v code %d", err, errs.Code(err))
 	}
 }
+
+func TestReportCommandStreamsPerFormat(t *testing.T) {
+	suite := t.TempDir()
+	makeCLISuite(t, suite, 100, 90)
+
+	stdout, stderr, err := execute(t, "report", suite)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout, "Eval report:") || !strings.Contains(stdout, "Report directory:") {
+		t.Fatalf("cli stdout = %q", stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("cli stderr = %q", stderr)
+	}
+	if _, err := os.Stat(filepath.Join(suite, "report", "report.json")); err != nil {
+		t.Fatalf("cli did not always write report.json: %v", err)
+	}
+
+	stdout, stderr, err = execute(t, "report", suite, "--format", "md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout, "# Eval report:") {
+		t.Fatalf("md stdout = %q", stdout)
+	}
+	if !strings.Contains(stderr, filepath.Join(suite, "report", "report.md")) {
+		t.Fatalf("md stderr = %q", stderr)
+	}
+
+	stdout, stderr, err = execute(t, "report", suite, "--format", "html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout, filepath.Join(suite, "report", "report.html")) {
+		t.Fatalf("html stdout = %q", stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("html stderr = %q", stderr)
+	}
+
+	stdout, stderr, err = execute(t, "report", suite, "--format", "json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(strings.TrimSpace(stdout), "{") {
+		t.Fatalf("json stdout = %q", stdout)
+	}
+	if !strings.Contains(stderr, "report.json") {
+		t.Fatalf("json stderr = %q", stderr)
+	}
+}
