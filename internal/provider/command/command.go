@@ -18,6 +18,7 @@ import (
 
 	"github.com/rikdc/ai-skills/internal/executor"
 	"github.com/rikdc/ai-skills/internal/model"
+	"github.com/rikdc/ai-skills/internal/platform/env"
 	"github.com/rikdc/ai-skills/internal/platform/errs"
 	"github.com/rikdc/ai-skills/internal/platform/execx"
 	"github.com/rikdc/ai-skills/internal/usage"
@@ -532,53 +533,19 @@ func (e *Executor) fail(stopReason, message string, started time.Time) (executor
 
 // sanitizeEnv keeps only the documented variables and removes credential-like
 // names. This prevents accidental API-key propagation; it is not isolation.
+// A name listed in passEnv is passed through even when it looks like a
+// credential: --pass-env is an explicit opt-in, not an accident.
 func sanitizeEnv(base []string, home string, passEnv []string) []string {
 	allowed := map[string]bool{
 		"PATH": true, "LANG": true, "LC_ALL": true, "LC_CTYPE": true,
 		"TMPDIR": true, "TZ": true, "USER": true, "LOGNAME": true,
 		"SHELL": true,
 	}
-	for _, name := range passEnv {
-		allowed[name] = true
-	}
-
-	values := make(map[string]string, len(base)+3)
-	for _, entry := range base {
-		i := strings.IndexByte(entry, '=')
-		if i <= 0 {
-			continue
-		}
-		name, value := entry[:i], entry[i+1:]
-		if deniedEnv(name) {
-			continue
-		}
-		if allowed[name] || strings.HasPrefix(name, "EVAL_") {
-			values[name] = value
-		}
-	}
+	values := env.Filter(base, allowed, passEnv)
 	values["HOME"] = home
 	values["TERM"] = "dumb"
 	if _, ok := values["PATH"]; !ok {
-		values["PATH"] = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+		values["PATH"] = env.DefaultPath
 	}
-
-	out := make([]string, 0, len(values))
-	for name, value := range values {
-		out = append(out, name+"="+value)
-	}
-	return out
-}
-
-func deniedEnv(name string) bool {
-	switch {
-	case strings.HasPrefix(name, "OPENAI_"),
-		strings.HasPrefix(name, "EVALCTL_"),
-		strings.HasSuffix(name, "_KEY"),
-		strings.HasSuffix(name, "_TOKEN"),
-		strings.Contains(name, "_SECRET"),
-		strings.Contains(name, "_PASSWORD"):
-		return true
-	default:
-		return false
-	}
+	return env.List(values)
 }

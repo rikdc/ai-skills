@@ -606,6 +606,46 @@ func TestStrictRejectsPendingCriteria(t *testing.T) {
 	}
 }
 
+// TestUnusedSkillWarnsAndFailsStrict covers the not-invoked signal end to end:
+// a recognised log that never touches the skill, the warning emitted through
+// the logger, the summary section, and the --strict failure.
+func TestUnusedSkillWarnsAndFailsStrict(t *testing.T) {
+	fx := newFixture(t)
+	// A silent script would only prove "unknown"; a recognised event stream
+	// that never names the skill proves non-use.
+	writeFile(t, fx.agentScript,
+		"#!/usr/bin/env bash\nset -euo pipefail\nprintf '%s\\n' '{\"type\":\"system\",\"subtype\":\"init\"}'\n",
+		0o755)
+	out := filepath.Join(t.TempDir(), "suite")
+	var logs bytes.Buffer
+	cfg := fx.suiteConfig(t, out)
+	cfg.Strict = true
+	cfg.Logger = slog.New(slog.NewTextHandler(&logs, nil))
+	_, _, err := runSuite(t, cfg)
+	if err == nil || errs.Code(err) != 1 {
+		t.Fatalf("strict exit = %v, want 1", err)
+	}
+	if !strings.Contains(err.Error(), "never invoked their skill") {
+		t.Fatalf("strict message lacks the unused-skill failure: %v", err)
+	}
+	if !strings.Contains(logs.String(), "skill not invoked") ||
+		!strings.Contains(logs.String(), "run=1") {
+		t.Fatalf("run warning missing from logs: %s", logs.String())
+	}
+	summary, readErr := os.ReadFile(filepath.Join(out, "summary.md"))
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	if !strings.Contains(string(summary), "## Skill not exercised") ||
+		!strings.Contains(string(summary), "demo/compare") {
+		t.Fatalf("summary lacks the unused-skill section: %s", summary)
+	}
+	doc := readSuiteJSON(t, out)
+	if doc.Counts["scenarios_with_unused_skills"] != 1 {
+		t.Fatalf("unused-skill count = %+v\nsummary:\n%s", doc.Counts, summary)
+	}
+}
+
 func TestBadOutAndJobsValidation(t *testing.T) {
 	fx := newFixture(t)
 	out := t.TempDir()
@@ -1062,6 +1102,191 @@ func TestSuiteLogsJudgeFailure(t *testing.T) {
 	}
 }
 
+// warningLogs returns the parsed fields of every WARN line in a log.
+func warningLogs(logged string) []map[string]string {
+	var warnings []map[string]string
+	for _, line := range strings.Split(strings.TrimSpace(logged), "\n") {
+		fields := logFields(line)
+		if fields["level"] == "WARN" {
+			warnings = append(warnings, fields)
+		}
+	}
+	return warnings
+}
+
+// serialWarnings counts the warnings that say the scenarios run one after
+// another.
+func serialWarnings(logged string) []map[string]string {
+	var found []map[string]string
+	for _, fields := range warningLogs(logged) {
+		if strings.Contains(fields["msg"], "one after another") {
+			found = append(found, fields)
+		}
+	}
+	return found
+}
+
+// TestSuiteLogsProgressPositions covers the progress counters: the plan
+// denominator is what this pass executes, each scenario is numbered against
+// the scenarios that run, and a run's two records carry the same position.
+func TestSuiteLogsProgressPositions(t *testing.T) {
+	fx := newFixture(t)
+	buffer := &logBuffer{}
+	cfg := loggedSuiteConfig(t, fx, filepath.Join(t.TempDir(), "suite"), buffer)
+	cfg.Runs = 2
+	if _, _, err := runSuite(t, cfg); err != nil {
+		t.Fatalf("suite: %v", err)
+	}
+	logged := buffer.String()
+	findLog(t, logged, "suite plan", map[string]string{
+		"scenarios": "1", "agent_invocations": "4", "judge_invocations": "4",
+		"jobs": "1", "timeout_seconds": "30",
+	})
+	findLog(t, logged, "scenario started", map[string]string{"plugin": "demo", "progress": "1/1"})
+	findLog(t, logged, "scenario finished", map[string]string{"plugin": "demo", "progress": "1/1"})
+
+	for _, tc := range []struct {
+		arm      string
+		run      int
+		progress string
+	}{
+		{arm: "without", run: 1, progress: "1/4"},
+		{arm: "without", run: 2, progress: "2/4"},
+		{arm: "with", run: 1, progress: "3/4"},
+		{arm: "with", run: 2, progress: "4/4"},
+	} {
+		wanted := map[string]string{"arm": tc.arm, "run": strconv.Itoa(tc.run)}
+		started := findLog(t, logged, "run started", wanted)
+		if started["progress"] != tc.progress {
+			t.Fatalf("%s run %d started progress = %q, want %q",
+				tc.arm, tc.run, started["progress"], tc.progress)
+		}
+		finished := findLog(t, logged, "run finished", wanted)
+		if finished["progress"] != tc.progress {
+			t.Fatalf("%s run %d finished progress = %q, want %q",
+				tc.arm, tc.run, finished["progress"], tc.progress)
+		}
+	}
+	if got := countLog(logged, "run started"); got != 4 {
+		t.Fatalf("run started lines = %d, want 4:\n%s", got, logged)
+	}
+}
+
+// TestSuiteLogsProgressOnResume covers the resume-safe denominator: a pass that
+// retries one failed run out of two reports 1/1, not 1/2.
+func TestSuiteLogsProgressOnResume(t *testing.T) {
+	fx := newFixture(t)
+	writeFile(t, fx.agentScript, fmt.Sprintf(`#!/usr/bin/env bash
+set -euo pipefail
+printf 'call\n' >> %q
+count="$(wc -l < %q)"
+if ((count == 2)); then
+    exit 1
+fi
+`, fx.agentCalls, fx.agentCalls), 0o755)
+	out := filepath.Join(t.TempDir(), "suite")
+	first := fx.suiteConfig(t, out)
+	first.Selection = scenario.Selection{Pattern: "^demo/compare$"}
+	first.Arm = "with"
+	first.Runs = 2
+	if _, _, err := runSuite(t, first); err == nil {
+		t.Fatal("expected the first pass to report the failing run")
+	}
+
+	buffer := &logBuffer{}
+	resumed := fx.suiteConfig(t, out)
+	resumed.Selection = scenario.Selection{Pattern: "^demo/compare$"}
+	resumed.Arm = "with"
+	resumed.Runs = 2
+	resumed.Resume = true
+	resumed.ResumePolicy = PolicyRetryFailed
+	resumed.Logger = testLogger(buffer, slog.LevelInfo)
+	_, result, err := runSuite(t, resumed)
+	if err != nil {
+		t.Fatalf("resume: %v", err)
+	}
+	if result.Executed != 1 || result.Skipped != 0 {
+		t.Fatalf("resume executed/skipped = %d/%d, want 1/0", result.Executed, result.Skipped)
+	}
+	logged := buffer.String()
+	findLog(t, logged, "suite plan", map[string]string{
+		"scenarios": "1", "agent_invocations": "1", "judge_invocations": "none",
+		"jobs": "1", "timeout_seconds": "30",
+	})
+	findLog(t, logged, "scenario started", map[string]string{"scenario": "compare", "progress": "1/1"})
+	started := findLog(t, logged, "run started", map[string]string{"arm": "with", "run": "2"})
+	if started["progress"] != "1/1" {
+		t.Fatalf("resumed run progress = %q, want 1/1", started["progress"])
+	}
+	if got := countLog(logged, "run started"); got != 1 {
+		t.Fatalf("run started lines = %d, want 1 (the reusable run consumes no position):\n%s", got, logged)
+	}
+}
+
+// TestSuiteLogsPlanSummaryAndSerialWarning covers the run-start records: the
+// plan line naming the shape of the pass before any run starts, and the warning
+// that a single job serialises a multi-scenario campaign.
+func TestSuiteLogsPlanSummaryAndSerialWarning(t *testing.T) {
+	fx := newFixture(t)
+	fx.addScenario(t, "demo", "third",
+		`{"description":"third","include":["./inputs"],"unit":"skills/good"}`, "comparison")
+
+	// One run per arm over three scenarios: compare and third have both arms,
+	// functional only the with arm.
+	serialBuffer := &logBuffer{}
+	serial := loggedSuiteConfig(t, fx, filepath.Join(t.TempDir(), "suite"), serialBuffer)
+	serial.Selection = scenario.Selection{}
+	if _, _, err := runSuite(t, serial); err != nil {
+		t.Fatalf("suite: %v", err)
+	}
+	logged := serialBuffer.String()
+	findLog(t, logged, "suite plan", map[string]string{
+		"scenarios": "3", "agent_invocations": "5", "judge_invocations": "5",
+		"jobs": "1", "timeout_seconds": "30",
+	})
+	if strings.Index(logged, "suite plan") > strings.Index(logged, "run started") {
+		t.Fatalf("the plan record did not precede the first run:\n%s", logged)
+	}
+	warnings := serialWarnings(logged)
+	if len(warnings) != 1 {
+		t.Fatalf("serial warnings = %d, want 1:\n%s", len(warnings), logged)
+	}
+	if !strings.Contains(warnings[0]["msg"], "--jobs N") ||
+		!strings.Contains(warnings[0]["msg"], "JOBS=N") {
+		t.Fatalf("serial warning names no flag: %q", warnings[0]["msg"])
+	}
+	if warnings[0]["scenarios"] != "3" || warnings[0]["jobs"] != "1" {
+		t.Fatalf("serial warning attributes = %v", warnings[0])
+	}
+
+	concurrentBuffer := &logBuffer{}
+	concurrent := loggedSuiteConfig(t, fx, filepath.Join(t.TempDir(), "suite"), concurrentBuffer)
+	concurrent.Selection = scenario.Selection{}
+	concurrent.Jobs = 3
+	if _, _, err := runSuite(t, concurrent); err != nil {
+		t.Fatalf("suite with jobs=3: %v", err)
+	}
+	concurrentLogged := concurrentBuffer.String()
+	findLog(t, concurrentLogged, "suite plan", map[string]string{"jobs": "3", "scenarios": "3"})
+	if got := serialWarnings(concurrentLogged); len(got) != 0 {
+		t.Fatalf("jobs=3 warned about serial execution: %v", got)
+	}
+
+	// Without a judge the plan names the judge count as none.
+	noJudgeBuffer := &logBuffer{}
+	noJudge := loggedSuiteConfig(t, fx, filepath.Join(t.TempDir(), "suite"), noJudgeBuffer)
+	noJudge.Selection = scenario.Selection{}
+	noJudge.Jobs = 2
+	noJudge.JudgeCmd = ""
+	noJudge.JudgeExec = nil
+	if _, _, err := runSuite(t, noJudge); err != nil {
+		t.Fatalf("suite without a judge: %v", err)
+	}
+	findLog(t, noJudgeBuffer.String(), "suite plan", map[string]string{
+		"agent_invocations": "5", "judge_invocations": "none", "jobs": "2",
+	})
+}
+
 func TestSuiteNilLoggerDoesNotPanic(t *testing.T) {
 	fx := newFixture(t)
 	out := filepath.Join(t.TempDir(), "suite")
@@ -1072,5 +1297,40 @@ func TestSuiteNilLoggerDoesNotPanic(t *testing.T) {
 	cfg.Logger = nil
 	if _, _, err := runSuite(t, cfg); err != nil {
 		t.Fatalf("suite with nil logger: %v", err)
+	}
+}
+
+func TestResumeAllowsTimeoutChangesButNotContractChanges(t *testing.T) {
+	base := model.SuiteConfig{
+		AgentCmd: "agent", Arm: "both", Runs: 3,
+		TimeoutSeconds: 900, SetupTimeoutSeconds: 300,
+		ChecksTimeoutSeconds: 120, JudgeTimeoutSeconds: 600,
+	}
+	retimed := base
+	retimed.TimeoutSeconds = 420
+	retimed.JudgeTimeoutSeconds = 300
+
+	if problems := compareConfigs(base, retimed, false); len(problems) != 0 {
+		t.Fatalf("a timeout-only change must not be refused: %v", problems)
+	}
+	notice := resumeTimeoutNotice(base, retimed)
+	for _, want := range []string{"agent 900s → 420s", "judge 600s → 300s"} {
+		if !strings.Contains(notice, want) {
+			t.Fatalf("notice %q lacks %q", notice, want)
+		}
+	}
+	if notice := resumeTimeoutNotice(base, base); notice != "" {
+		t.Fatalf("unchanged caps must be silent, got %q", notice)
+	}
+
+	changed := base
+	changed.AgentCmd = "other agent"
+	if problems := compareConfigs(base, changed, false); len(problems) == 0 {
+		t.Fatal("an agent_cmd change must still be refused")
+	}
+	changed = base
+	changed.Runs = 1
+	if problems := compareConfigs(base, changed, false); len(problems) == 0 {
+		t.Fatal("a RUNS change must still be refused")
 	}
 }

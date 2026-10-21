@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `evalctl suite` now announces the shape of a run before it starts: one
+  `suite plan` record names the selected scenarios, the agent and judge
+  invocations this pass will spend, the jobs, and the per-run timeout, and a
+  single job over several scenarios warns that they run one after another.
+  `run started`/`run finished` and `scenario started`/`scenario finished` also
+  carry a `progress="i/N"` position counted over the work the pass actually
+  executes, so a resumed suite does not overstate its denominator
 - `evalctl` records whether the with arm actually used the skill
   (`skill_use` in `result.json`, detected from the agent log) and the report
   marks scenarios whose skill was never invoked as `skill-not-exercised`,
@@ -72,6 +79,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `make eval` renders the report even when the suite fails: it captures the
+  suite's exit code, runs the report step anyway, prints the HTML path, and
+  exits with the suite's own code, so a campaign with one timed-out run no
+  longer finishes without a report. A suite that dies before writing any
+  artifact skips the report and keeps its own error
+- `make eval` accepts `OUT=<dir>` to reuse a suite directory (the report goes
+  to `<dir>/report`), `RESUME=1` to pass `--resume`, and `RESUME_POLICY` to
+  choose the policy (default `retry-failed`). `RESUME=1` requires `OUT` and
+  names the suite it is resuming before it starts, so a partial suite is
+  resumed instead of re-run
+- `summary.md` now separates the two reasons a criterion stays pending: a run
+  whose attempt was never accepted gets a copy-pasteable
+  `suite --resume --resume-policy retry-failed` command built from the
+  recorded manifest, and only an accepted but unjudged run keeps the `grade`
+  hint. The suite-level runner-failure error names the same resume flags
+- A resumed suite may change its operational caps: `JOBS` and the per-run
+  timeouts (`TIMEOUT`/`--timeout`/`--judge-timeout`) are no longer treated as
+  configuration changes, so a run that keeps hitting its cap can be retried
+  with a longer one instead of starting the suite over. The suite reports the
+  difference (`resume timeouts differ from the recorded suite`) rather than
+  refusing it; everything that defines the experiment (agent and judge command
+  and identity, arm, `RUNS`, units, credential mode) is still compared exactly
+- `make eval` now rejects an `AGENT`/`JUDGE` containing an empty quoted
+  argument — the single-dollar `$(cat)` trap — naming the cause and the
+  `$$(cat)` fix, and warns when an ambient `RUNS` is discarded instead of
+  silently ignoring it; a real run also echoes the resolved runs per arm, jobs
+  and per-run timeout
+- `make eval` accepts `TIMEOUT` (a duration such as `15m`, or seconds) beside
+  `RUNS`/`JOBS` and forwards it as `--timeout`. The legacy shell harness only
+  takes whole seconds, so `EVALCTL_LEGACY=1` forwards an integer and warns that
+  it is ignoring a duration instead of failing
+- `evalctl suite` warns while it runs, adds a `Skill not exercised` section to
+  `summary.md`, and fails under `--strict` when a with-arm run never invoked
+  the scenario's skill
 - `make eval` now routes to `evalctl` and builds `bin/evalctl` on demand; set
   `EVALCTL_LEGACY=1` to run the legacy shell harness. The shell scripts and
   jq programs remain until the documented deletion criteria are met, and the
@@ -129,6 +170,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed markdown linting issues (line length violations)
 - Fixed general linter issues across project files
 - Removed superfluous comments from codebase
+- `--pass-env` now overrides the credential deny list: an explicitly requested
+  variable such as `OPENCODE_API_KEY` reaches setup, checks, the agent, and the
+  judge instead of being silently dropped. Credential-shaped names that were
+  not requested are still stripped, and the duplicated deny list in the command
+  adapter and the workspace is now one shared helper
 - The command judge now receives the same CLI credentials and `--pass-env`
   values as the agent in both `suite` and `grade`. It previously ran in its own
   empty home, so with `--auth-cli` the agent was authenticated but every judge

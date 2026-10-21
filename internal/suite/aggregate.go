@@ -69,6 +69,7 @@ type RunRow struct {
 	JudgeUsage           model.Usage      `json:"judge_usage"`
 	CombinedUsage        model.Usage      `json:"combined_usage"`
 	Evidence             string           `json:"evidence"`
+	SkillUse             *model.SkillUse  `json:"skill_use,omitempty"`
 	Error                string           `json:"error,omitempty"`
 }
 
@@ -306,6 +307,13 @@ func (r *Runner) aggregate(selected []scenario.Selected, fingerprints map[string
 	counts["usage_known_attempts"] = usageKnown
 	counts["usage_unknown_attempts"] = usageUnknown
 	counts["usage_not_applicable_attempts"] = usageNotApplicable
+	unusedSkills := 0
+	for _, row := range stats.Scenarios {
+		if skillUnused(row) {
+			unusedSkills++
+		}
+	}
+	counts["scenarios_with_unused_skills"] = unusedSkills
 	if len(agentSeconds) > 0 {
 		counts["agent_seconds"] = int(math.Round(sum(agentSeconds)))
 	}
@@ -331,6 +339,10 @@ func (r *Runner) aggregate(selected []scenario.Selected, fingerprints map[string
 		if nonDiscriminating > 0 {
 			stats.StrictFailures = append(stats.StrictFailures,
 				fmt.Sprintf("%d scenario(s) scored no better with the unit than without", nonDiscriminating))
+		}
+		if unusedSkills > 0 {
+			stats.StrictFailures = append(stats.StrictFailures,
+				fmt.Sprintf("%d scenario(s) never invoked their skill in the with arm and cannot measure it; rerun with RUNS>=3", unusedSkills))
 		}
 	}
 	return stats
@@ -461,6 +473,7 @@ func loadRunRow(runDir, arm string, run int, rubric []model.Criterion, denominat
 		Max:           denominator,
 		Mechanical:    model.Mechanical{},
 		Evidence:      defaultEvidence(runDir, arm, run),
+		SkillUse:      recordedSkillUse(runDir),
 	}
 	info, err := os.Stat(runDir)
 	if err != nil || !info.IsDir() {
@@ -564,6 +577,62 @@ func loadRunRow(runDir, arm string, run int, rubric []model.Criterion, denominat
 		}
 	}
 	return row
+}
+
+// recordedSkillUse reads a run's accepted result.json and returns its recorded
+// skill use. A missing file (a failed run) or a record from before skill-use
+// detection returns nil; the log is never rescanned when a record exists.
+func recordedSkillUse(runDir string) *model.SkillUse {
+	data, err := os.ReadFile(filepath.Join(runDir, "result.json"))
+	if err != nil {
+		return nil
+	}
+	var record struct {
+		SkillUse *model.SkillUse `json:"skill_use"`
+	}
+	if err := json.Unmarshal(data, &record); err != nil {
+		return nil
+	}
+	return record.SkillUse
+}
+
+// skillCoverageOf summarises skill use over a scenario's with-arm runs. It is
+// nil when no run recorded skill use, so older suites keep their behaviour.
+// Unknown never counts against a scenario: only proof of non-use does.
+func skillCoverageOf(runs []RunRow) *model.SkillCoverage {
+	var coverage model.SkillCoverage
+	seen := false
+	for _, run := range runs {
+		if run.Arm != "with" || run.SkillUse == nil {
+			continue
+		}
+		seen = true
+		switch run.SkillUse.State {
+		case model.SkillInvoked:
+			coverage.Invoked++
+		case model.SkillNotInvoked:
+			coverage.NotInvoked++
+		default:
+			coverage.Unknown++
+		}
+	}
+	if !seen {
+		return nil
+	}
+	coverage.Exercised = coverage.Invoked > 0 || coverage.Unknown > 0
+	return &coverage
+}
+
+// skillUnused reports whether every with-arm run that recorded skill use shows
+// the skill unused, so the scenario compared the agent with itself and cannot
+// measure the skill. Functional scenarios are excluded, matching the report:
+// they claim no with/without contribution.
+func skillUnused(row ScenarioRow) bool {
+	if row.Functional {
+		return false
+	}
+	coverage := skillCoverageOf(row.Runs)
+	return coverage != nil && !coverage.Exercised
 }
 
 func latestExecution(list []*attempts.Attempt) *attempts.Attempt {
@@ -1081,7 +1150,93 @@ func writeGradingIndex(path string, rows []ScenarioRow) error {
 	return atomicfile.Write(path, []byte(b.String()), 0o600)
 }
 
-func renderSummary(manifest model.SuiteManifest, stats aggregateStats) string {
+// pendingCause splits pending criteria by why they are still pending. A run
+// whose latest attempt was not accepted (timed out, failed, interrupted) needs
+// a retry; grading it cannot help. An accepted run only needs a judgement.
+type pendingCause struct {
+	retry int
+	grade int
+}
+
+func pendingCauseOf(stats aggregateStats) pendingCause {
+	var cause pendingCause
+	for _, row := range stats.Scenarios {
+		for _, run := range row.Runs {
+			if run.Pending <= 0 {
+				continue
+			}
+			if run.Status == string(model.StatusOK) {
+				cause.grade++
+				continue
+			}
+			cause.retry++
+		}
+	}
+	return cause
+}
+
+// retryCommand renders the exact `suite --resume` invocation that re-attempts
+// only the runs without an accepted attempt. It is rebuilt from the recorded
+// manifest so a copy-paste reproduces the same configuration, and every value
+// that can contain shell metacharacters is single-quoted.
+func retryCommand(manifest model.SuiteManifest, suiteDir string) string {
+	config := manifest.Config
+	parts := []string{
+		"bin/evalctl", "suite",
+		"--resume", "--resume-policy", PolicyRetryFailed,
+		"--out", shellQuote(suiteDir),
+	}
+	seen := map[string]bool{}
+	for _, planned := range manifest.Scenarios {
+		if planned.Plugin == "" || seen[planned.Plugin] {
+			continue
+		}
+		seen[planned.Plugin] = true
+		parts = append(parts, "--plugin", planned.Plugin)
+	}
+	for _, unit := range config.Units {
+		parts = append(parts, "--unit", unit)
+	}
+	if config.Runs > 0 {
+		parts = append(parts, "--runs", strconv.Itoa(config.Runs))
+	}
+	if config.Arm != "" {
+		parts = append(parts, "--arm", config.Arm)
+	}
+	if config.AgentCmd != "" {
+		parts = append(parts, "--agent-cmd", shellQuote(config.AgentCmd))
+	}
+	if config.Judge.Cmd != "" {
+		parts = append(parts, "--judge-cmd", shellQuote(config.Judge.Cmd))
+	}
+	if config.AuthCLI {
+		parts = append(parts, "--auth-cli")
+	}
+	if config.Keychain {
+		parts = append(parts, "--keychain")
+	}
+	for _, path := range config.AuthPaths {
+		parts = append(parts, "--auth-path", shellQuote(path))
+	}
+	if config.UsageCmd != "" {
+		parts = append(parts, "--usage-cmd", shellQuote(config.UsageCmd))
+	}
+	if config.JudgeUsageCmd != "" {
+		parts = append(parts, "--judge-usage-cmd", shellQuote(config.JudgeUsageCmd))
+	}
+	if config.TimeoutSeconds > 0 {
+		parts = append(parts, "--timeout", strconv.Itoa(config.TimeoutSeconds)+"s")
+	}
+	return strings.Join(parts, " ")
+}
+
+// shellQuote wraps a value in single quotes so a shell reproduces it
+// byte-for-byte, including embedded single quotes.
+func shellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", `'\''`) + "'"
+}
+
+func renderSummary(manifest model.SuiteManifest, stats aggregateStats, suiteDir string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "🧪 Eval suite: %s\n\n", manifest.CreatedAt)
 	fmt.Fprintf(&b, "- Planned: %d  ·  Executed: %d  ·  Skipped: %d\n",
@@ -1091,13 +1246,23 @@ func renderSummary(manifest model.SuiteManifest, stats aggregateStats) string {
 	fmt.Fprintf(&b, "- Agent invocations: %d  ·  Judged runs: %d  ·  Timed-out runs: %d\n\n",
 		stats.Counts["agent_invocations"], stats.Counts["judged_runs"], stats.Counts["timed_out_runs"])
 
-	if stats.Counts["pending_runs"] > 0 {
-		gradeHint := "evalctl grade --suite <suite>"
-		if manifest.Config.AuthCLI {
-			gradeHint += " --auth-cli"
+	if cause := pendingCauseOf(stats); cause.retry > 0 || cause.grade > 0 {
+		if cause.retry > 0 {
+			fmt.Fprintf(&b, "**%d run(s) have pending criteria because no attempt was accepted** "+
+				"(the run failed, timed out, or was interrupted). Rerun only those runs; grading cannot judge them:\n\n",
+				cause.retry)
+			b.WriteString("```sh\n")
+			b.WriteString(retryCommand(manifest, suiteDir))
+			b.WriteString("\n```\n\n")
 		}
-		fmt.Fprintf(&b, "**%d run(s) still have pending criteria.** Grade them with `%s`.\n\n",
-			stats.Counts["pending_runs"], gradeHint)
+		if cause.grade > 0 {
+			gradeHint := "evalctl grade --suite <suite>"
+			if manifest.Config.AuthCLI {
+				gradeHint += " --auth-cli"
+			}
+			fmt.Fprintf(&b, "**%d run(s) still have pending criteria.** Grade them with `%s`.\n\n",
+				cause.grade, gradeHint)
+		}
 	}
 
 	b.WriteString("## By plugin\n\n")
@@ -1126,6 +1291,27 @@ func renderSummary(manifest model.SuiteManifest, stats aggregateStats) string {
 			}
 			fmt.Fprintf(&b, "- %s\n", line)
 		}
+	}
+	var unused []ScenarioRow
+	for _, row := range stats.Scenarios {
+		if skillUnused(row) {
+			unused = append(unused, row)
+		}
+	}
+	if len(unused) > 0 {
+		b.WriteString("\n## Skill not exercised\n\n")
+		b.WriteString("The with arm never invoked the skill in these scenarios, so a with/without delta cannot measure it. Rerun with `RUNS>=3`.\n")
+		for _, row := range unused {
+			withRuns := 0
+			for _, run := range row.Runs {
+				if run.Arm == "with" {
+					withRuns++
+				}
+			}
+			fmt.Fprintf(&b, "\n- %s/%s (0 of %d with-arm run(s) used the skill)",
+				row.Plugin, row.Scenario, withRuns)
+		}
+		b.WriteString("\n")
 	}
 	b.WriteString("\n## Counts\n\n")
 	keys := make([]string, 0, len(stats.Counts))

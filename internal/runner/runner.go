@@ -60,6 +60,12 @@ type Config struct {
 	// `evalctl run` leaves it nil.
 	SkipRun func(arm string, run int) bool
 
+	// Progress, when non-nil, returns the 1-based position of the arm/run
+	// about to execute and the total this invocation will execute, so the
+	// `run started` and `run finished` records can carry progress="i/N". The
+	// suite supplies it; direct `evalctl run` leaves it nil.
+	Progress func(arm string, run int) (position, total int)
+
 	// StoreHooks injects deterministic attempt-store failpoints. Tests use it;
 	// production leaves it zero.
 	StoreHooks attempts.Hooks
@@ -248,7 +254,14 @@ func (r *Runner) Run(ctx context.Context) (*Summary, error) {
 					"plugin", r.cfg.Plugin, "scenario", r.cfg.Scenario, "arm", arm, "run", run)
 				continue
 			}
-			outcome, err := r.runOnce(ctx, arm, run)
+			// A skipped run never consumes a position: the counter tracks
+			// executed work only, so the denominator stays honest on resume.
+			progress := ""
+			if r.cfg.Progress != nil {
+				position, total := r.cfg.Progress(arm, run)
+				progress = fmt.Sprintf("%d/%d", position, total)
+			}
+			outcome, err := r.runOnce(ctx, arm, run, progress)
 			if err != nil {
 				return nil, err
 			}
@@ -322,9 +335,14 @@ type runState struct {
 	duration     *float64
 }
 
-func (r *Runner) runOnce(ctx context.Context, arm string, run int) (outcome RunOutcome, err error) {
-	logInfo(r.cfg.Logger, "run started",
-		"plugin", r.cfg.Plugin, "scenario", r.cfg.Scenario, "arm", arm, "run", run)
+func (r *Runner) runOnce(ctx context.Context, arm string, run int, progress string) (outcome RunOutcome, err error) {
+	startedAttributes := []any{
+		"plugin", r.cfg.Plugin, "scenario", r.cfg.Scenario, "arm", arm, "run", run,
+	}
+	if progress != "" {
+		startedAttributes = append(startedAttributes, "progress", progress)
+	}
+	logInfo(r.cfg.Logger, "run started", startedAttributes...)
 	startedAt := time.Now()
 	defer func() {
 		attributes := []any{
@@ -334,6 +352,9 @@ func (r *Runner) runOnce(ctx context.Context, arm string, run int) (outcome RunO
 			"run", run,
 			"status", string(outcome.Status),
 			"duration_seconds", wholeSeconds(time.Since(startedAt)),
+		}
+		if progress != "" {
+			attributes = append(attributes, "progress", progress)
 		}
 		message := outcome.Error
 		if message == "" && err != nil {

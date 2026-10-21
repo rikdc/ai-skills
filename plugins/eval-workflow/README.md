@@ -152,7 +152,9 @@ three-scenario, three-run, both-arm suite is 18 agent invocations plus up to 18
 judge invocations; with the default `--jobs 1` those model calls run one after
 another, so an hour-long suite is expected rather than a hang. `--plan` prints
 the invocation counts and suggests `--jobs N` when scenarios would run
-sequentially. Each run is also capped by `--timeout` (agent) and
+sequentially. A real run announces the same counts before it starts — and warns
+when `--jobs 1` serialises several scenarios — so the shape of the pass is
+visible without a dry run. Each run is also capped by `--timeout` (agent) and
 `--judge-timeout` (judge).
 
 Each suite writes one directory under `results/eval-suite/`:
@@ -240,6 +242,17 @@ event (`scenario started`, `run started`, `run finished`, `judge started`,
 so a multi-minute suite is not a blank terminal. Progress never touches stdout,
 `-q` silences it, and `-v`/`--debug` add skipped-run events.
 
+Before the first run, `suite` announces the shape of the pass in one record:
+the selected scenarios, the agent and judge invocations this pass will actually
+spend (a resumed pass counts only the work it reruns), the jobs, and the
+per-run timeout in seconds. When `--jobs 1` would serialise more than one
+scenario it also warns, naming `--jobs N` (`JOBS=N` through `make`), because
+nothing else distinguishes a long serial campaign from a hang. Each record then
+carries its position: `run started`/`run finished` include `progress="i/N"`
+over the runs this pass executes, and `scenario started`/`scenario finished`
+include `progress="i/N"` over the scenarios that will run. A run skipped by
+resume consumes no position, so the denominator stays honest.
+
 ### `make eval` cutover and `EVALCTL_LEGACY=1`
 
 `make eval` keeps its existing variables and maps them to the Go suite and
@@ -250,13 +263,66 @@ report:
 | `PLUGIN` | `--plugin` |
 | `SKILL=<name>` / `UNIT=<unit>` | `--unit skills/<name>` / `--unit <unit>` |
 | `RUNS` / `JOBS` | `--runs` / `--jobs` |
+| `TIMEOUT` | `--timeout` (duration or seconds) |
 | `AGENT` / `JUDGE` | `--agent-cmd` / `--judge-cmd` |
 | `USAGE_CMD` / `JUDGE_USAGE_CMD` | `--usage-cmd` / `--judge-usage-cmd` |
 | `AUTH_CLI=1` (default) / `AUTH_CLI=0` | `--auth-cli` / no credential flag |
 | `AUTH_PATH=<relative path>...` | `--auth-path` (repeatable) |
 | `KEYCHAIN=1` | `--keychain` (evalctl backend only) |
+| `OUT=<dir>` | `--out` (reuse that suite directory; report goes to `<dir>/report`) |
+| `RESUME=1` / `RESUME_POLICY` | `--resume` / `--resume-policy` (default `retry-failed`) |
 | `DRY=1` | `suite --plan` (no agent, no writes) |
 | `REPORT` | `report --format` |
+
+`make eval` renders the report even when the suite fails. A suite with runner
+failures (a timed-out or failed agent run) still writes `manifest.json`,
+`results.jsonl`, `summary.md` and the report, and make then exits with the
+suite's exit code; only a suite that dies before writing any artifact skips
+the report, and its own error is what you see.
+
+A partial suite is resumed, not re-run. `summary.md` and the suite-level error
+both name the fix: `evalctl suite --resume --resume-policy retry-failed` with
+the suite's own recorded configuration. The summary prints the whole command
+in a copy-pasteable fence, and `make eval` takes the same thing:
+
+```bash
+make eval OUT=results/eval-suite/<stamp> RESUME=1 PLUGIN=git-workflow SKILL=pr RUNS=1 \
+  AGENT='claude -p' AUTH_CLI=0
+```
+
+`RESUME=1` requires `OUT` (a resume reuses the existing directory) and only
+re-runs the runs without an accepted attempt; every accepted run and
+judgement is reused. `RESUME_POLICY` selects the policy (`retry-failed` by
+default, or `keep-failures`/`rerun-all`) and the credential flags still apply,
+but operational caps may change: `JOBS` and the per-run timeouts (`TIMEOUT`,
+`--timeout`, `--judge-timeout`) are not part of the measured contract, so a
+retry that keeps timing out can be given a longer cap instead of starting over.
+The suite reports the difference (`resume timeouts differ from the recorded
+suite`) rather than refusing it. Everything that defines the experiment — the
+agent and judge commands with the judge identity, the arm, `RUNS`, the units
+and the credential mode — must match exactly, and a mismatch is refused with
+the differing fields named.
+
+Two traps when setting these from a shell:
+
+- `RUNS` is only read from the make command line. `RUNS=3 make eval ...` puts it
+  in the environment, where `RUNS := 1` discards it silently (Make now warns);
+  write `make eval ... RUNS=3` instead. `JOBS` and `TIMEOUT` behave the same
+  way: pass all three on the make command line.
+- `TIMEOUT` is a duration (`15m`, `90s`) or a number of seconds and defaults to
+  `15m`. The legacy shell harness only takes whole seconds, so
+  `EVALCTL_LEGACY=1` forwards `TIMEOUT` when it is a plain integer and warns
+  that it is ignoring a duration otherwise.
+- Make expands `$(...)` before the shell sees it, so `AGENT='... "$(cat)"'`
+  arrives as `""`. Use the double-dollar form `AGENT='opencode run --auto
+  "$$(cat)"'`; `make eval` rejects the empty-quoted form instead of running an
+  agent with no prompt.
+
+A with-arm run that never invokes the scenario's skill leaves the scenario
+excluded from the headline with/without delta and reported as `incomplete`,
+since the comparison then holds the agent on both sides. The suite warns as it
+runs, lists the scenario under `Skill not exercised` in `summary.md`, and fails
+under `--strict`; rerun with `RUNS>=3` to see whether it was a one-off.
 
 The legacy shell path stays available at any time:
 
@@ -330,16 +396,17 @@ the shell-parity oracles.
 `make eval` wraps the suite and the report renderer. It uses `evalctl` unless
 `EVALCTL_LEGACY=1` is set. `SKILL=<name>` is shorthand for
 `--unit skills/<name>`; `UNIT=` names any skill, command or hook. `PLUGIN`,
-`RUNS`, `JOBS`, `AGENT`, `JUDGE`, `DRY` and `REPORT` map to the suite options
-and the report format. `AGENT` is required for a real run and `JUDGE` defaults
-to it.
+`RUNS`, `JOBS`, `TIMEOUT`, `AGENT`, `JUDGE`, `DRY` and `REPORT` map to the
+suite options and the report format. `AGENT` is required for a real run and
+`JUDGE` defaults to it. `RUNS`, `JOBS` and `TIMEOUT` must be on the make
+command line; `TIMEOUT` takes a duration or seconds.
 
 ```bash
 # Plan only: no agent, no network
 make eval PLUGIN=git-workflow RUNS=1 DRY=1
 
 # A three-run per-unit experiment, judge defaulting to the agent
-make eval PLUGIN=git-workflow SKILL=pr RUNS=3 JOBS=2 AGENT='claude -p'
+make eval PLUGIN=git-workflow SKILL=pr RUNS=3 JOBS=2 TIMEOUT=20m AGENT='claude -p'
 
 # A command unit, with the agent command that needs stdin substitution
 make eval PLUGIN=git-workflow UNIT=commands/review AGENT='opencode run --auto "$$(cat)"'
@@ -516,6 +583,14 @@ bin/evalctl grade --suite results/eval-suite/<id> \
 in its own home: a judge that needs login state must be given it, exactly like
 the agent. When a suite ran with credentials, its summary prints the matching
 hint (`evalctl grade --suite <suite> --auth-cli`).
+
+The summary separates the two reasons a criterion stays pending. A run whose
+latest attempt was not accepted (the agent failed, timed out, or was
+interrupted) cannot be repaired by grading; the summary prints the
+`suite --resume --resume-policy retry-failed` invocation for it in a fenced
+block, built from the suite's recorded configuration so it can be pasted as-is.
+Only runs with an accepted attempt still awaiting a judgement get the `grade`
+hint.
 
 Usage (as agent skills): `generate-evals plugins/<name>` and
 `review-evals <pr-number>`; see `skills/*/SKILL.md`.

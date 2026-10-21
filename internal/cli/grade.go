@@ -139,7 +139,10 @@ func newGradeCommand() *cobra.Command {
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Grading: %d, graded: %d, already complete: %d, failed: %d\n",
 				suite.Total, suite.Graded, suite.AlreadyComplete, suite.Failed)
-			return err
+			if err != nil {
+				return err
+			}
+			return nil
 		},
 	}
 
@@ -156,7 +159,7 @@ func newGradeCommand() *cobra.Command {
 	flags.BoolVar(&authCLI, "auth-cli", false, "copy selected CLI credentials into the judge home")
 	flags.BoolVar(&keychain, "keychain", false, "link the macOS Keychains directory (requires --auth-cli)")
 	flags.StringArrayVar(&authPaths, "auth-path", nil, "extra credential path under the real home (requires --auth-cli)")
-	flags.StringArrayVar(&passEnv, "pass-env", nil, "environment variable to pass to the judge")
+	flags.StringArrayVar(&passEnv, "pass-env", nil, "environment variable to pass to the judge (overrides the credential filter)")
 	flags.BoolVar(&regrade, "regrade", false, "create a new judge attempt for existing judgements")
 	flags.StringVar(&pricingFile, "pricing", "", "pricing JSON file (env EVALCTL_PRICING)")
 	addNativeFlags(flags, &native)

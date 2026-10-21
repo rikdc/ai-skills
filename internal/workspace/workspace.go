@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rikdc/ai-skills/internal/platform/env"
 	"github.com/rikdc/ai-skills/internal/platform/execx"
 )
 
@@ -335,28 +336,12 @@ func (w *Workspace) environment(scenarioDir, pluginDir, criteria string) []strin
 		"PATH": true, "LANG": true, "LC_ALL": true, "LC_CTYPE": true, "LC_NUMERIC": true,
 		"TZ": true, "USER": true, "LOGNAME": true, "SHELL": true,
 	}
-	for _, name := range w.passEnv {
-		allowed[name] = true
-	}
-	values := make(map[string]string, len(allowed)+8)
-	for _, entry := range os.Environ() {
-		i := strings.IndexByte(entry, '=')
-		if i <= 0 {
-			continue
-		}
-		name, value := entry[:i], entry[i+1:]
-		if deniedEnv(name) {
-			continue
-		}
-		if allowed[name] || strings.HasPrefix(name, "EVAL_") {
-			values[name] = value
-		}
-	}
+	values := env.Filter(os.Environ(), allowed, w.passEnv)
 	values["HOME"] = w.Home
 	values["TMPDIR"] = w.TempDir
 	values["TERM"] = "dumb"
 	if _, ok := values["PATH"]; !ok {
-		values["PATH"] = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+		values["PATH"] = env.DefaultPath
 	}
 	values["EVAL_WORKSPACE"] = w.Dir
 	values["EVAL_SCENARIO_DIR"] = scenarioDir
@@ -370,26 +355,9 @@ func (w *Workspace) environment(scenarioDir, pluginDir, criteria string) []strin
 		values["CRITERIA"] = criteria
 	}
 
-	out := make([]string, 0, len(values))
-	for name, value := range values {
-		out = append(out, name+"="+value)
-	}
+	out := env.List(values)
 	sort.Strings(out)
 	return out
-}
-
-func deniedEnv(name string) bool {
-	switch {
-	case strings.HasPrefix(name, "OPENAI_"),
-		strings.HasPrefix(name, "EVALCTL_"),
-		strings.HasSuffix(name, "_KEY"),
-		strings.HasSuffix(name, "_TOKEN"),
-		strings.Contains(name, "_SECRET"),
-		strings.Contains(name, "_PASSWORD"):
-		return true
-	default:
-		return false
-	}
 }
 
 // RunSetup executes inputs/setup.sh with the workspace as cwd and the
