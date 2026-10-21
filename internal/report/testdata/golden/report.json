@@ -1,0 +1,1833 @@
+{
+  "version": 3,
+  "metadata": {
+    "suite_dir": "testdata/golden/suite",
+    "label": "skills/fixture",
+    "units": [
+      "skills/fixture"
+    ],
+    "agent_cmd": "claude -p --model fixture-model",
+    "model": "fixture-model",
+    "git_sha": "deadbee",
+    "git_dirty": false,
+    "created_at": "2026-01-02T03:04:05Z",
+    "arm": "both",
+    "n": 2,
+    "agent_invocations": 6,
+    "counts": {
+      "agent_invocations": 6
+    }
+  },
+  "totals": {
+    "with": 73.5,
+    "without": 67.25,
+    "delta": 6.25,
+    "n": 2,
+    "functional": 1,
+    "functional_with": 85,
+    "pending_points": 96,
+    "pending_criteria": 2,
+    "failures": 0,
+    "not_comparable": 0,
+    "regressions": 0,
+    "runner_failures": 0,
+    "failed_scenarios": 0,
+    "failed_runs": 0,
+    "results_failures": 0,
+    "with_min": 52,
+    "with_max": 100,
+    "without_min": 52,
+    "without_max": 85,
+    "coverage_percent": 66.66666666666667,
+    "scored_criteria_cells": 12,
+    "expected_criteria_cells": 18,
+    "won": 1,
+    "lost": 0,
+    "tied": 2
+  },
+  "timing": {
+    "total_seconds": 42.5,
+    "wall_seconds": 42.5,
+    "agent_seconds": 80,
+    "judge_seconds": null,
+    "runs": 8,
+    "timed_out_runs": 0
+  },
+  "cost": {
+    "currency": "USD",
+    "with": {
+      "runs_total": 5,
+      "agent": {
+        "runs_known": 5,
+        "runs_total": 5,
+        "cost": {
+          "total": 0.131,
+          "runs_known": 5,
+          "runs_total": 5,
+          "mean": 0.0262
+        },
+        "tokens": {
+          "total": 4100,
+          "runs_known": 5,
+          "runs_total": 5,
+          "mean": 820,
+          "input": {
+            "total": 3700,
+            "runs_known": 5,
+            "runs_total": 5,
+            "mean": 740
+          },
+          "output": {
+            "total": 400,
+            "runs_known": 5,
+            "runs_total": 5,
+            "mean": 80
+          },
+          "reasoning": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 5,
+            "mean": null
+          },
+          "cache_read": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 5,
+            "mean": null
+          },
+          "cache_write": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 5,
+            "mean": null
+          }
+        }
+      },
+      "judge": {
+        "runs_known": 4,
+        "runs_total": 5,
+        "cost": {
+          "total": 0.044,
+          "runs_known": 4,
+          "runs_total": 5,
+          "mean": 0.011
+        },
+        "tokens": {
+          "total": 300,
+          "runs_known": 4,
+          "runs_total": 5,
+          "mean": 75,
+          "input": {
+            "total": 240,
+            "runs_known": 4,
+            "runs_total": 5,
+            "mean": 60
+          },
+          "output": {
+            "total": 60,
+            "runs_known": 4,
+            "runs_total": 5,
+            "mean": 15
+          },
+          "reasoning": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 5,
+            "mean": null
+          },
+          "cache_read": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 5,
+            "mean": null
+          },
+          "cache_write": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 5,
+            "mean": null
+          }
+        }
+      },
+      "combined": {
+        "runs_known": 4,
+        "runs_total": 5,
+        "cost": {
+          "total": 0.165,
+          "runs_known": 4,
+          "runs_total": 5,
+          "mean": 0.04125
+        },
+        "tokens": {
+          "total": 3400,
+          "runs_known": 4,
+          "runs_total": 5,
+          "mean": 850,
+          "input": {
+            "total": 3040,
+            "runs_known": 4,
+            "runs_total": 5,
+            "mean": 760
+          },
+          "output": {
+            "total": 360,
+            "runs_known": 4,
+            "runs_total": 5,
+            "mean": 90
+          },
+          "reasoning": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 5,
+            "mean": null
+          },
+          "cache_read": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 5,
+            "mean": null
+          },
+          "cache_write": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 5,
+            "mean": null
+          }
+        }
+      }
+    },
+    "without": {
+      "runs_total": 3,
+      "agent": {
+        "runs_known": 3,
+        "runs_total": 3,
+        "cost": {
+          "total": 0.035,
+          "runs_known": 3,
+          "runs_total": 3,
+          "mean": 0.011666666666666667
+        },
+        "tokens": {
+          "total": 3000,
+          "runs_known": 3,
+          "runs_total": 3,
+          "mean": 1000,
+          "input": {
+            "total": 2700,
+            "runs_known": 3,
+            "runs_total": 3,
+            "mean": 900
+          },
+          "output": {
+            "total": 300,
+            "runs_known": 3,
+            "runs_total": 3,
+            "mean": 100
+          },
+          "reasoning": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 3,
+            "mean": null
+          },
+          "cache_read": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 3,
+            "mean": null
+          },
+          "cache_write": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 3,
+            "mean": null
+          }
+        }
+      },
+      "judge": {
+        "runs_known": 2,
+        "runs_total": 3,
+        "cost": {
+          "total": 0.004,
+          "runs_known": 2,
+          "runs_total": 3,
+          "mean": 0.002
+        },
+        "tokens": {
+          "total": 200,
+          "runs_known": 2,
+          "runs_total": 3,
+          "mean": 100,
+          "input": {
+            "total": 160,
+            "runs_known": 2,
+            "runs_total": 3,
+            "mean": 80
+          },
+          "output": {
+            "total": 40,
+            "runs_known": 2,
+            "runs_total": 3,
+            "mean": 20
+          },
+          "reasoning": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 3,
+            "mean": null
+          },
+          "cache_read": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 3,
+            "mean": null
+          },
+          "cache_write": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 3,
+            "mean": null
+          }
+        }
+      },
+      "combined": {
+        "runs_known": 2,
+        "runs_total": 3,
+        "cost": {
+          "total": 0.029,
+          "runs_known": 2,
+          "runs_total": 3,
+          "mean": 0.0145
+        },
+        "tokens": {
+          "total": 2200,
+          "runs_known": 2,
+          "runs_total": 3,
+          "mean": 1100,
+          "input": {
+            "total": 1960,
+            "runs_known": 2,
+            "runs_total": 3,
+            "mean": 980
+          },
+          "output": {
+            "total": 240,
+            "runs_known": 2,
+            "runs_total": 3,
+            "mean": 120
+          },
+          "reasoning": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 3,
+            "mean": null
+          },
+          "cache_read": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 3,
+            "mean": null
+          },
+          "cache_write": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 3,
+            "mean": null
+          }
+        }
+      }
+    },
+    "comparison": {
+      "with": {
+        "runs_total": 3,
+        "agent": {
+          "runs_known": 3,
+          "runs_total": 3,
+          "cost": {
+            "total": 0.031,
+            "runs_known": 3,
+            "runs_total": 3,
+            "mean": 0.010333333333333333
+          },
+          "tokens": {
+            "total": 3000,
+            "runs_known": 3,
+            "runs_total": 3,
+            "mean": 1000,
+            "input": {
+              "total": 2700,
+              "runs_known": 3,
+              "runs_total": 3,
+              "mean": 900
+            },
+            "output": {
+              "total": 300,
+              "runs_known": 3,
+              "runs_total": 3,
+              "mean": 100
+            },
+            "reasoning": {
+              "total": null,
+              "runs_known": 0,
+              "runs_total": 3,
+              "mean": null
+            },
+            "cache_read": {
+              "total": null,
+              "runs_known": 0,
+              "runs_total": 3,
+              "mean": null
+            },
+            "cache_write": {
+              "total": null,
+              "runs_known": 0,
+              "runs_total": 3,
+              "mean": null
+            }
+          }
+        },
+        "judge": {
+          "runs_known": 2,
+          "runs_total": 3,
+          "cost": {
+            "total": 0.004,
+            "runs_known": 2,
+            "runs_total": 3,
+            "mean": 0.002
+          },
+          "tokens": {
+            "total": 200,
+            "runs_known": 2,
+            "runs_total": 3,
+            "mean": 100,
+            "input": {
+              "total": 160,
+              "runs_known": 2,
+              "runs_total": 3,
+              "mean": 80
+            },
+            "output": {
+              "total": 40,
+              "runs_known": 2,
+              "runs_total": 3,
+              "mean": 20
+            },
+            "reasoning": {
+              "total": null,
+              "runs_known": 0,
+              "runs_total": 3,
+              "mean": null
+            },
+            "cache_read": {
+              "total": null,
+              "runs_known": 0,
+              "runs_total": 3,
+              "mean": null
+            },
+            "cache_write": {
+              "total": null,
+              "runs_known": 0,
+              "runs_total": 3,
+              "mean": null
+            }
+          }
+        },
+        "combined": {
+          "runs_known": 2,
+          "runs_total": 3,
+          "cost": {
+            "total": 0.025,
+            "runs_known": 2,
+            "runs_total": 3,
+            "mean": 0.0125
+          },
+          "tokens": {
+            "total": 2200,
+            "runs_known": 2,
+            "runs_total": 3,
+            "mean": 1100,
+            "input": {
+              "total": 1960,
+              "runs_known": 2,
+              "runs_total": 3,
+              "mean": 980
+            },
+            "output": {
+              "total": 240,
+              "runs_known": 2,
+              "runs_total": 3,
+              "mean": 120
+            },
+            "reasoning": {
+              "total": null,
+              "runs_known": 0,
+              "runs_total": 3,
+              "mean": null
+            },
+            "cache_read": {
+              "total": null,
+              "runs_known": 0,
+              "runs_total": 3,
+              "mean": null
+            },
+            "cache_write": {
+              "total": null,
+              "runs_known": 0,
+              "runs_total": 3,
+              "mean": null
+            }
+          }
+        }
+      },
+      "without": {
+        "runs_total": 3,
+        "agent": {
+          "runs_known": 3,
+          "runs_total": 3,
+          "cost": {
+            "total": 0.035,
+            "runs_known": 3,
+            "runs_total": 3,
+            "mean": 0.011666666666666667
+          },
+          "tokens": {
+            "total": 3000,
+            "runs_known": 3,
+            "runs_total": 3,
+            "mean": 1000,
+            "input": {
+              "total": 2700,
+              "runs_known": 3,
+              "runs_total": 3,
+              "mean": 900
+            },
+            "output": {
+              "total": 300,
+              "runs_known": 3,
+              "runs_total": 3,
+              "mean": 100
+            },
+            "reasoning": {
+              "total": null,
+              "runs_known": 0,
+              "runs_total": 3,
+              "mean": null
+            },
+            "cache_read": {
+              "total": null,
+              "runs_known": 0,
+              "runs_total": 3,
+              "mean": null
+            },
+            "cache_write": {
+              "total": null,
+              "runs_known": 0,
+              "runs_total": 3,
+              "mean": null
+            }
+          }
+        },
+        "judge": {
+          "runs_known": 2,
+          "runs_total": 3,
+          "cost": {
+            "total": 0.004,
+            "runs_known": 2,
+            "runs_total": 3,
+            "mean": 0.002
+          },
+          "tokens": {
+            "total": 200,
+            "runs_known": 2,
+            "runs_total": 3,
+            "mean": 100,
+            "input": {
+              "total": 160,
+              "runs_known": 2,
+              "runs_total": 3,
+              "mean": 80
+            },
+            "output": {
+              "total": 40,
+              "runs_known": 2,
+              "runs_total": 3,
+              "mean": 20
+            },
+            "reasoning": {
+              "total": null,
+              "runs_known": 0,
+              "runs_total": 3,
+              "mean": null
+            },
+            "cache_read": {
+              "total": null,
+              "runs_known": 0,
+              "runs_total": 3,
+              "mean": null
+            },
+            "cache_write": {
+              "total": null,
+              "runs_known": 0,
+              "runs_total": 3,
+              "mean": null
+            }
+          }
+        },
+        "combined": {
+          "runs_known": 2,
+          "runs_total": 3,
+          "cost": {
+            "total": 0.029,
+            "runs_known": 2,
+            "runs_total": 3,
+            "mean": 0.0145
+          },
+          "tokens": {
+            "total": 2200,
+            "runs_known": 2,
+            "runs_total": 3,
+            "mean": 1100,
+            "input": {
+              "total": 1960,
+              "runs_known": 2,
+              "runs_total": 3,
+              "mean": 980
+            },
+            "output": {
+              "total": 240,
+              "runs_known": 2,
+              "runs_total": 3,
+              "mean": 120
+            },
+            "reasoning": {
+              "total": null,
+              "runs_known": 0,
+              "runs_total": 3,
+              "mean": null
+            },
+            "cache_read": {
+              "total": null,
+              "runs_known": 0,
+              "runs_total": 3,
+              "mean": null
+            },
+            "cache_write": {
+              "total": null,
+              "runs_known": 0,
+              "runs_total": 3,
+              "mean": null
+            }
+          }
+        }
+      }
+    },
+    "delta_totals": {
+      "agent_cost": -0.0040000000000000036,
+      "judge_cost": 0,
+      "combined_cost": -0.004,
+      "combined_input_tokens": 0,
+      "combined_output_tokens": 0,
+      "combined_reasoning_tokens": null,
+      "combined_cache_read_tokens": null,
+      "combined_tokens": 0
+    },
+    "delta": {
+      "agent_cost": -0.001333333333333334,
+      "judge_cost": 0,
+      "combined_cost": -0.002,
+      "agent_tokens": 0,
+      "judge_tokens": 0,
+      "combined_tokens": 0,
+      "agent_input_tokens": 0,
+      "agent_output_tokens": 0,
+      "agent_reasoning_tokens": null,
+      "agent_cache_read_tokens": null,
+      "judge_input_tokens": 0,
+      "judge_output_tokens": 0,
+      "judge_reasoning_tokens": null,
+      "judge_cache_read_tokens": null,
+      "combined_input_tokens": 0,
+      "combined_output_tokens": 0,
+      "combined_reasoning_tokens": null,
+      "combined_cache_read_tokens": null
+    }
+  },
+  "usage": {
+    "currency": "USD",
+    "with": {
+      "runs_total": 5,
+      "agent": {
+        "runs_known": 5,
+        "runs_total": 5,
+        "cost": {
+          "total": 0.131,
+          "runs_known": 5,
+          "runs_total": 5,
+          "mean": 0.0262
+        },
+        "tokens": {
+          "total": 4100,
+          "runs_known": 5,
+          "runs_total": 5,
+          "mean": 820,
+          "input": {
+            "total": 3700,
+            "runs_known": 5,
+            "runs_total": 5,
+            "mean": 740
+          },
+          "output": {
+            "total": 400,
+            "runs_known": 5,
+            "runs_total": 5,
+            "mean": 80
+          },
+          "reasoning": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 5,
+            "mean": null
+          },
+          "cache_read": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 5,
+            "mean": null
+          },
+          "cache_write": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 5,
+            "mean": null
+          }
+        }
+      },
+      "judge": {
+        "runs_known": 4,
+        "runs_total": 5,
+        "cost": {
+          "total": 0.044,
+          "runs_known": 4,
+          "runs_total": 5,
+          "mean": 0.011
+        },
+        "tokens": {
+          "total": 300,
+          "runs_known": 4,
+          "runs_total": 5,
+          "mean": 75,
+          "input": {
+            "total": 240,
+            "runs_known": 4,
+            "runs_total": 5,
+            "mean": 60
+          },
+          "output": {
+            "total": 60,
+            "runs_known": 4,
+            "runs_total": 5,
+            "mean": 15
+          },
+          "reasoning": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 5,
+            "mean": null
+          },
+          "cache_read": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 5,
+            "mean": null
+          },
+          "cache_write": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 5,
+            "mean": null
+          }
+        }
+      },
+      "combined": {
+        "runs_known": 4,
+        "runs_total": 5,
+        "cost": {
+          "total": 0.165,
+          "runs_known": 4,
+          "runs_total": 5,
+          "mean": 0.04125
+        },
+        "tokens": {
+          "total": 3400,
+          "runs_known": 4,
+          "runs_total": 5,
+          "mean": 850,
+          "input": {
+            "total": 3040,
+            "runs_known": 4,
+            "runs_total": 5,
+            "mean": 760
+          },
+          "output": {
+            "total": 360,
+            "runs_known": 4,
+            "runs_total": 5,
+            "mean": 90
+          },
+          "reasoning": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 5,
+            "mean": null
+          },
+          "cache_read": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 5,
+            "mean": null
+          },
+          "cache_write": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 5,
+            "mean": null
+          }
+        }
+      }
+    },
+    "without": {
+      "runs_total": 3,
+      "agent": {
+        "runs_known": 3,
+        "runs_total": 3,
+        "cost": {
+          "total": 0.035,
+          "runs_known": 3,
+          "runs_total": 3,
+          "mean": 0.011666666666666667
+        },
+        "tokens": {
+          "total": 3000,
+          "runs_known": 3,
+          "runs_total": 3,
+          "mean": 1000,
+          "input": {
+            "total": 2700,
+            "runs_known": 3,
+            "runs_total": 3,
+            "mean": 900
+          },
+          "output": {
+            "total": 300,
+            "runs_known": 3,
+            "runs_total": 3,
+            "mean": 100
+          },
+          "reasoning": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 3,
+            "mean": null
+          },
+          "cache_read": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 3,
+            "mean": null
+          },
+          "cache_write": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 3,
+            "mean": null
+          }
+        }
+      },
+      "judge": {
+        "runs_known": 2,
+        "runs_total": 3,
+        "cost": {
+          "total": 0.004,
+          "runs_known": 2,
+          "runs_total": 3,
+          "mean": 0.002
+        },
+        "tokens": {
+          "total": 200,
+          "runs_known": 2,
+          "runs_total": 3,
+          "mean": 100,
+          "input": {
+            "total": 160,
+            "runs_known": 2,
+            "runs_total": 3,
+            "mean": 80
+          },
+          "output": {
+            "total": 40,
+            "runs_known": 2,
+            "runs_total": 3,
+            "mean": 20
+          },
+          "reasoning": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 3,
+            "mean": null
+          },
+          "cache_read": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 3,
+            "mean": null
+          },
+          "cache_write": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 3,
+            "mean": null
+          }
+        }
+      },
+      "combined": {
+        "runs_known": 2,
+        "runs_total": 3,
+        "cost": {
+          "total": 0.029,
+          "runs_known": 2,
+          "runs_total": 3,
+          "mean": 0.0145
+        },
+        "tokens": {
+          "total": 2200,
+          "runs_known": 2,
+          "runs_total": 3,
+          "mean": 1100,
+          "input": {
+            "total": 1960,
+            "runs_known": 2,
+            "runs_total": 3,
+            "mean": 980
+          },
+          "output": {
+            "total": 240,
+            "runs_known": 2,
+            "runs_total": 3,
+            "mean": 120
+          },
+          "reasoning": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 3,
+            "mean": null
+          },
+          "cache_read": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 3,
+            "mean": null
+          },
+          "cache_write": {
+            "total": null,
+            "runs_known": 0,
+            "runs_total": 3,
+            "mean": null
+          }
+        }
+      }
+    },
+    "delta": {
+      "agent_cost": -0.001333333333333334,
+      "judge_cost": 0,
+      "combined_cost": -0.002,
+      "agent_tokens": 0,
+      "judge_tokens": 0,
+      "combined_tokens": 0,
+      "agent_input_tokens": 0,
+      "agent_output_tokens": 0,
+      "agent_reasoning_tokens": null,
+      "agent_cache_read_tokens": null,
+      "judge_input_tokens": 0,
+      "judge_output_tokens": 0,
+      "judge_reasoning_tokens": null,
+      "judge_cache_read_tokens": null,
+      "combined_input_tokens": 0,
+      "combined_output_tokens": 0,
+      "combined_reasoning_tokens": null,
+      "combined_cache_read_tokens": null
+    }
+  },
+  "expenditure": {
+    "currency": "USD",
+    "known_total": {
+      "state": "unknown",
+      "known": false,
+      "source": "expenditure",
+      "input_tokens": 980,
+      "output_tokens": 120,
+      "total_tokens": 1100,
+      "cost_usd": 0.012,
+      "currency": "USD"
+    },
+    "complete": false,
+    "total_attempts": 4,
+    "known_attempts": 2,
+    "unknown_attempts": 1,
+    "not_applicable_attempts": 1,
+    "agent_attempts": 2,
+    "hook_attempts": 0,
+    "judge_attempts": 2
+  },
+  "verdict": {
+    "state": "incomplete",
+    "reason": "runner failures or unjudged criteria remain; a verdict would be made up"
+  },
+  "criteria": [
+    {
+      "plugin": "demo",
+      "scenario": "compare",
+      "name": "A",
+      "max": 60,
+      "with": 55,
+      "without": 42.5,
+      "delta": 12.5,
+      "paired_runs": 2,
+      "status": "comparable"
+    },
+    {
+      "plugin": "demo",
+      "scenario": "compare",
+      "name": "B",
+      "max": 40,
+      "with": 40,
+      "without": 40,
+      "delta": 0,
+      "paired_runs": 2,
+      "status": "comparable"
+    },
+    {
+      "plugin": "demo",
+      "scenario": "functional",
+      "name": "A",
+      "max": 100,
+      "with": 85,
+      "without": null,
+      "delta": null,
+      "paired_runs": 2,
+      "status": "scored"
+    },
+    {
+      "plugin": "demo",
+      "scenario": "pending",
+      "name": "Scored",
+      "max": 52,
+      "with": 52,
+      "without": 52,
+      "delta": 0,
+      "paired_runs": 1,
+      "status": "comparable"
+    },
+    {
+      "plugin": "demo",
+      "scenario": "pending",
+      "name": "Unjudged",
+      "max": 48,
+      "with": null,
+      "without": null,
+      "delta": null,
+      "paired_runs": 0,
+      "status": "pending"
+    }
+  ],
+  "scenarios": [
+    {
+      "plugin": "demo",
+      "scenario": "compare",
+      "units": [
+        "skills/fixture"
+      ],
+      "mode": "comparison",
+      "functional": false,
+      "arm_count": 2,
+      "denominator": 100,
+      "criteria_count": 2,
+      "configured_runs": 2,
+      "status": "ok",
+      "runs": [
+        {
+          "arm": "with",
+          "run": 1,
+          "status": "ok",
+          "complete": true,
+          "agent_exit": null,
+          "timed_out": false,
+          "duration_seconds": 10,
+          "judge_duration_seconds": null,
+          "mechanical": {
+            "items": [
+              {
+                "name": "A",
+                "score": 50,
+                "max": 60
+              },
+              {
+                "name": "B",
+                "score": 40,
+                "max": 40
+              }
+            ]
+          },
+          "judged": null,
+          "usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 900,
+            "output_tokens": 100,
+            "total_tokens": 1000,
+            "cost_usd": 0.01,
+            "currency": "USD"
+          },
+          "agent_usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 900,
+            "output_tokens": 100,
+            "total_tokens": 1000,
+            "cost_usd": 0.01,
+            "currency": "USD"
+          },
+          "judge_usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 80,
+            "output_tokens": 20,
+            "total_tokens": 100,
+            "cost_usd": 0.002,
+            "currency": "USD"
+          },
+          "combined_usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 980,
+            "output_tokens": 120,
+            "total_tokens": 1100,
+            "cost_usd": 0.012,
+            "currency": "USD"
+          },
+          "evidence": "runs/demo/case/with/run",
+          "max": 100,
+          "score": 90,
+          "percent": 90,
+          "pending_points": 0,
+          "pending_count": 0,
+          "scored": {
+            "A": 50,
+            "B": 40
+          }
+        },
+        {
+          "arm": "with",
+          "run": 2,
+          "status": "ok",
+          "complete": true,
+          "agent_exit": null,
+          "timed_out": false,
+          "duration_seconds": 10,
+          "judge_duration_seconds": null,
+          "mechanical": {
+            "items": [
+              {
+                "name": "A",
+                "score": 60,
+                "max": 60
+              },
+              {
+                "name": "B",
+                "score": 40,
+                "max": 40
+              }
+            ]
+          },
+          "judged": null,
+          "usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 900,
+            "output_tokens": 100,
+            "total_tokens": 1000,
+            "cost_usd": 0.011,
+            "currency": "USD"
+          },
+          "agent_usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 900,
+            "output_tokens": 100,
+            "total_tokens": 1000,
+            "cost_usd": 0.011,
+            "currency": "USD"
+          },
+          "judge_usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 80,
+            "output_tokens": 20,
+            "total_tokens": 100,
+            "cost_usd": 0.002,
+            "currency": "USD"
+          },
+          "combined_usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 980,
+            "output_tokens": 120,
+            "total_tokens": 1100,
+            "cost_usd": 0.013000000000000001,
+            "currency": "USD"
+          },
+          "evidence": "runs/demo/case/with/run",
+          "max": 100,
+          "score": 100,
+          "percent": 100,
+          "pending_points": 0,
+          "pending_count": 0,
+          "scored": {
+            "A": 60,
+            "B": 40
+          }
+        },
+        {
+          "arm": "without",
+          "run": 1,
+          "status": "ok",
+          "complete": true,
+          "agent_exit": null,
+          "timed_out": false,
+          "duration_seconds": 10,
+          "judge_duration_seconds": null,
+          "mechanical": {
+            "items": [
+              {
+                "name": "A",
+                "score": 40,
+                "max": 60
+              },
+              {
+                "name": "B",
+                "score": 40,
+                "max": 40
+              }
+            ]
+          },
+          "judged": null,
+          "usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 900,
+            "output_tokens": 100,
+            "total_tokens": 1000,
+            "cost_usd": 0.012,
+            "currency": "USD"
+          },
+          "agent_usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 900,
+            "output_tokens": 100,
+            "total_tokens": 1000,
+            "cost_usd": 0.012,
+            "currency": "USD"
+          },
+          "judge_usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 80,
+            "output_tokens": 20,
+            "total_tokens": 100,
+            "cost_usd": 0.002,
+            "currency": "USD"
+          },
+          "combined_usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 980,
+            "output_tokens": 120,
+            "total_tokens": 1100,
+            "cost_usd": 0.014,
+            "currency": "USD"
+          },
+          "evidence": "runs/demo/case/without/run",
+          "max": 100,
+          "score": 80,
+          "percent": 80,
+          "pending_points": 0,
+          "pending_count": 0,
+          "scored": {
+            "A": 40,
+            "B": 40
+          }
+        },
+        {
+          "arm": "without",
+          "run": 2,
+          "status": "ok",
+          "complete": true,
+          "agent_exit": null,
+          "timed_out": false,
+          "duration_seconds": 10,
+          "judge_duration_seconds": null,
+          "mechanical": {
+            "items": [
+              {
+                "name": "A",
+                "score": 45,
+                "max": 60
+              },
+              {
+                "name": "B",
+                "score": 40,
+                "max": 40
+              }
+            ]
+          },
+          "judged": null,
+          "usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 900,
+            "output_tokens": 100,
+            "total_tokens": 1000,
+            "cost_usd": 0.013000000000000001,
+            "currency": "USD"
+          },
+          "agent_usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 900,
+            "output_tokens": 100,
+            "total_tokens": 1000,
+            "cost_usd": 0.013000000000000001,
+            "currency": "USD"
+          },
+          "judge_usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 80,
+            "output_tokens": 20,
+            "total_tokens": 100,
+            "cost_usd": 0.002,
+            "currency": "USD"
+          },
+          "combined_usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 980,
+            "output_tokens": 120,
+            "total_tokens": 1100,
+            "cost_usd": 0.015,
+            "currency": "USD"
+          },
+          "evidence": "runs/demo/case/without/run",
+          "max": 100,
+          "score": 85,
+          "percent": 85,
+          "pending_points": 0,
+          "pending_count": 0,
+          "scored": {
+            "A": 45,
+            "B": 40
+          }
+        }
+      ],
+      "arms": {
+        "with": {
+          "runs": 2,
+          "score_mean": 95,
+          "percent_mean": 95,
+          "percent_min": 90,
+          "percent_max": 100,
+          "pending_points": 0,
+          "failures": 0,
+          "timing": {
+            "agent_seconds": 20,
+            "judge_seconds": null,
+            "timed_out_runs": 0
+          }
+        },
+        "without": {
+          "runs": 2,
+          "score_mean": 82.5,
+          "percent_mean": 82.5,
+          "percent_min": 80,
+          "percent_max": 85,
+          "pending_points": 0,
+          "failures": 0,
+          "timing": {
+            "agent_seconds": 20,
+            "judge_seconds": null,
+            "timed_out_runs": 0
+          }
+        }
+      },
+      "delta": 12.5,
+      "pending_points": 0,
+      "pending_criteria": 0,
+      "criteria": [
+        {
+          "name": "A",
+          "max": 60,
+          "with": 55,
+          "without": 42.5,
+          "delta": 12.5,
+          "paired_runs": 2,
+          "status": "comparable"
+        },
+        {
+          "name": "B",
+          "max": 40,
+          "with": 40,
+          "without": 40,
+          "delta": 0,
+          "paired_runs": 2,
+          "status": "comparable"
+        }
+      ],
+      "regressions": []
+    },
+    {
+      "plugin": "demo",
+      "scenario": "functional",
+      "units": [
+        "skills/fixture"
+      ],
+      "mode": "functional",
+      "functional": true,
+      "arm_count": 1,
+      "denominator": 100,
+      "criteria_count": 1,
+      "configured_runs": 2,
+      "status": "functional",
+      "runs": [
+        {
+          "arm": "with",
+          "run": 1,
+          "status": "ok",
+          "complete": true,
+          "agent_exit": null,
+          "timed_out": false,
+          "duration_seconds": 10,
+          "judge_duration_seconds": null,
+          "mechanical": {
+            "items": [
+              {
+                "name": "A",
+                "score": 80,
+                "max": 100
+              }
+            ]
+          },
+          "judged": null,
+          "usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 500,
+            "output_tokens": 50,
+            "total_tokens": 550,
+            "cost_usd": 0.05,
+            "currency": "USD"
+          },
+          "agent_usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 500,
+            "output_tokens": 50,
+            "total_tokens": 550,
+            "cost_usd": 0.05,
+            "currency": "USD"
+          },
+          "judge_usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 40,
+            "output_tokens": 10,
+            "total_tokens": 50,
+            "cost_usd": 0.02,
+            "currency": "USD"
+          },
+          "combined_usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 540,
+            "output_tokens": 60,
+            "total_tokens": 600,
+            "cost_usd": 0.07,
+            "currency": "USD"
+          },
+          "evidence": "runs/demo/case/with/run",
+          "max": 100,
+          "score": 80,
+          "percent": 80,
+          "pending_points": 0,
+          "pending_count": 0,
+          "scored": {
+            "A": 80
+          }
+        },
+        {
+          "arm": "with",
+          "run": 2,
+          "status": "ok",
+          "complete": true,
+          "agent_exit": null,
+          "timed_out": false,
+          "duration_seconds": 10,
+          "judge_duration_seconds": null,
+          "mechanical": {
+            "items": [
+              {
+                "name": "A",
+                "score": 90,
+                "max": 100
+              }
+            ]
+          },
+          "judged": null,
+          "usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 500,
+            "output_tokens": 50,
+            "total_tokens": 550,
+            "cost_usd": 0.05,
+            "currency": "USD"
+          },
+          "agent_usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 500,
+            "output_tokens": 50,
+            "total_tokens": 550,
+            "cost_usd": 0.05,
+            "currency": "USD"
+          },
+          "judge_usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 40,
+            "output_tokens": 10,
+            "total_tokens": 50,
+            "cost_usd": 0.02,
+            "currency": "USD"
+          },
+          "combined_usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 540,
+            "output_tokens": 60,
+            "total_tokens": 600,
+            "cost_usd": 0.07,
+            "currency": "USD"
+          },
+          "evidence": "runs/demo/case/with/run",
+          "max": 100,
+          "score": 90,
+          "percent": 90,
+          "pending_points": 0,
+          "pending_count": 0,
+          "scored": {
+            "A": 90
+          }
+        }
+      ],
+      "arms": {
+        "with": {
+          "runs": 2,
+          "score_mean": 85,
+          "percent_mean": 85,
+          "percent_min": 80,
+          "percent_max": 90,
+          "pending_points": 0,
+          "failures": 0,
+          "timing": {
+            "agent_seconds": 20,
+            "judge_seconds": null,
+            "timed_out_runs": 0
+          }
+        },
+        "without": {
+          "runs": 0,
+          "score_mean": null,
+          "percent_mean": null,
+          "percent_min": null,
+          "percent_max": null,
+          "pending_points": 0,
+          "failures": 0,
+          "timing": {
+            "agent_seconds": null,
+            "judge_seconds": null,
+            "timed_out_runs": 0
+          }
+        }
+      },
+      "delta": null,
+      "pending_points": 0,
+      "pending_criteria": 0,
+      "criteria": [
+        {
+          "name": "A",
+          "max": 100,
+          "with": 85,
+          "without": null,
+          "delta": null,
+          "paired_runs": 2,
+          "status": "scored"
+        }
+      ],
+      "regressions": []
+    },
+    {
+      "plugin": "demo",
+      "scenario": "pending",
+      "units": [
+        "skills/fixture"
+      ],
+      "mode": "comparison",
+      "functional": false,
+      "arm_count": 2,
+      "denominator": 100,
+      "criteria_count": 2,
+      "configured_runs": 2,
+      "status": "ok",
+      "runs": [
+        {
+          "arm": "with",
+          "run": 1,
+          "status": "ok",
+          "complete": true,
+          "agent_exit": null,
+          "timed_out": false,
+          "duration_seconds": 10,
+          "judge_duration_seconds": null,
+          "mechanical": {
+            "items": [
+              {
+                "name": "Scored",
+                "score": 52,
+                "max": 52
+              }
+            ]
+          },
+          "judged": null,
+          "usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 900,
+            "output_tokens": 100,
+            "total_tokens": 1000,
+            "cost_usd": 0.01,
+            "currency": "USD"
+          },
+          "agent_usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 900,
+            "output_tokens": 100,
+            "total_tokens": 1000,
+            "cost_usd": 0.01,
+            "currency": "USD"
+          },
+          "judge_usage": {
+            "state": "unknown",
+            "known": false,
+            "source": ""
+          },
+          "combined_usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 980,
+            "output_tokens": 120,
+            "total_tokens": 1100,
+            "cost_usd": 0.012,
+            "currency": "USD"
+          },
+          "evidence": "runs/demo/case/with/run",
+          "max": 100,
+          "score": 52,
+          "percent": 52,
+          "pending_points": 48,
+          "pending_count": 1,
+          "scored": {
+            "Scored": 52
+          }
+        },
+        {
+          "arm": "without",
+          "run": 1,
+          "status": "ok",
+          "complete": true,
+          "agent_exit": null,
+          "timed_out": false,
+          "duration_seconds": 10,
+          "judge_duration_seconds": null,
+          "mechanical": {
+            "items": [
+              {
+                "name": "Scored",
+                "score": 52,
+                "max": 52
+              }
+            ]
+          },
+          "judged": null,
+          "usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 900,
+            "output_tokens": 100,
+            "total_tokens": 1000,
+            "cost_usd": 0.01,
+            "currency": "USD"
+          },
+          "agent_usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 900,
+            "output_tokens": 100,
+            "total_tokens": 1000,
+            "cost_usd": 0.01,
+            "currency": "USD"
+          },
+          "judge_usage": {
+            "state": "unknown",
+            "known": false,
+            "source": ""
+          },
+          "combined_usage": {
+            "state": "known",
+            "known": true,
+            "source": "fixture",
+            "input_tokens": 980,
+            "output_tokens": 120,
+            "total_tokens": 1100,
+            "cost_usd": 0.012,
+            "currency": "USD"
+          },
+          "evidence": "runs/demo/case/without/run",
+          "max": 100,
+          "score": 52,
+          "percent": 52,
+          "pending_points": 48,
+          "pending_count": 1,
+          "scored": {
+            "Scored": 52
+          }
+        }
+      ],
+      "arms": {
+        "with": {
+          "runs": 1,
+          "score_mean": 52,
+          "percent_mean": 52,
+          "percent_min": 52,
+          "percent_max": 52,
+          "pending_points": 48,
+          "failures": 0,
+          "timing": {
+            "agent_seconds": 10,
+            "judge_seconds": null,
+            "timed_out_runs": 0
+          }
+        },
+        "without": {
+          "runs": 1,
+          "score_mean": 52,
+          "percent_mean": 52,
+          "percent_min": 52,
+          "percent_max": 52,
+          "pending_points": 48,
+          "failures": 0,
+          "timing": {
+            "agent_seconds": 10,
+            "judge_seconds": null,
+            "timed_out_runs": 0
+          }
+        }
+      },
+      "delta": 0,
+      "pending_points": 96,
+      "pending_criteria": 2,
+      "criteria": [
+        {
+          "name": "Scored",
+          "max": 52,
+          "with": 52,
+          "without": 52,
+          "delta": 0,
+          "paired_runs": 1,
+          "status": "comparable"
+        },
+        {
+          "name": "Unjudged",
+          "max": 48,
+          "with": null,
+          "without": null,
+          "delta": null,
+          "paired_runs": 0,
+          "status": "pending"
+        }
+      ],
+      "regressions": []
+    }
+  ],
+  "links": {
+    "json": "report.json",
+    "markdown": "report.md",
+    "html": "report.html",
+    "evidence": [
+      {
+        "plugin": "demo",
+        "scenario": "compare",
+        "path": "runs/demo/case/with/run"
+      },
+      {
+        "plugin": "demo",
+        "scenario": "functional",
+        "path": "runs/demo/case/with/run"
+      },
+      {
+        "plugin": "demo",
+        "scenario": "pending",
+        "path": "runs/demo/case/with/run"
+      }
+    ]
+  }
+}
