@@ -49,9 +49,12 @@ func validPrice(p ModelPrice) bool {
 	return true
 }
 
-// CostFor computes the documented OpenAI-style cost for an exact model match.
-// It reports false when the model is absent, the usage is not known, or input
-// or output tokens are missing (missing components are never treated as zero).
+// CostFor computes the cost for an exact model match. Claude and opencode logs
+// report input tokens excluding cache reads, so all four components are billed
+// as disjoint; other sources follow OpenAI semantics, where input includes the
+// cache reads billed separately. It reports false when the model is absent,
+// the usage is not known, or input or output tokens are missing (missing
+// components are never treated as zero).
 func (p Pricing) CostFor(modelName string, u model.Usage) (float64, bool) {
 	price, ok := p.Models[modelName]
 	if !ok {
@@ -71,15 +74,20 @@ func (p Pricing) CostFor(modelName string, u model.Usage) (float64, bool) {
 	if u.CacheWriteTokens != nil {
 		cacheWrite = float64(*u.CacheWriteTokens)
 	}
-	billableInput := input - cacheRead
-	if billableInput < 0 {
-		billableInput = 0
+	billableInput := input
+	if !inputExcludesCache(u.Source) {
+		billableInput = math.Max(input-cacheRead, 0)
 	}
 	cost := billableInput/1e6*price.Input +
 		cacheRead/1e6*price.CacheRead +
 		cacheWrite/1e6*price.CacheWrite +
 		output/1e6*price.Output
 	return cost, true
+}
+
+// inputExcludesCache reports whether source counts cache reads outside input.
+func inputExcludesCache(source string) bool {
+	return source == SourceClaude || source == SourceOpencode
 }
 
 // Apply sets CostUSD when an exact pricing entry exists. Existing costs are

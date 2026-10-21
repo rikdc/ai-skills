@@ -806,6 +806,42 @@ func TestGradeSuiteScansRunsAndCounts(t *testing.T) {
 	}
 }
 
+func TestGradeSuiteStopsAfterCancellation(t *testing.T) {
+	suite := t.TempDir()
+	var fixtures []*fixture
+	for _, run := range []string{"run-1", "run-2", "run-3"} {
+		fixtures = append(fixtures, newFixtureAt(t,
+			filepath.Join(suite, "runs", "demo", "basic", "with", run), standardPending()))
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	fake := newFake(testCommand)
+	result, err := GradeSuite(ctx, Config{
+		SuiteDir: suite,
+		Command:  testCommand,
+		Timeout:  time.Minute,
+		Executor: fake,
+	})
+	if errs.Code(err) != errs.CodeOperational || !strings.Contains(err.Error(), "cancelled") {
+		t.Fatalf("err = %v, want operational cancellation", err)
+	}
+	if result.Total != 0 || fake.calls != 0 {
+		t.Fatalf("graded after cancellation: %+v (calls %d)", result, fake.calls)
+	}
+	for _, f := range fixtures {
+		list, err := f.store.Enumerate()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, attempt := range list {
+			if attempt.Kind == model.KindJudge {
+				t.Fatalf("judge attempt %s recorded after cancellation", attempt.ID)
+			}
+		}
+	}
+}
+
 func TestRegradeWithPrunedEvidenceFails(t *testing.T) {
 	f := newFixture(t, standardPending())
 	if _, err := gradeRun(t, f, newFake(testCommand), testCommand, false); err != nil {

@@ -300,6 +300,13 @@ func (s *Store) CheckReusable(fingerprint string) error {
 	if agent.Finished.Status != model.StatusOK {
 		return fmt.Errorf("accepted attempt %s has status %q", agent.ID, agent.Finished.Status)
 	}
+	list, err := s.Enumerate()
+	if err != nil {
+		return err
+	}
+	if failed := FailedAfter(list, agent); failed != nil {
+		return fmt.Errorf("attempt %s after accepted attempt %s did not finish ok", failed.ID, agent.ID)
+	}
 	gotFingerprint := agent.Finished.Fingerprint
 	if gotFingerprint == "" && agent.Started != nil {
 		gotFingerprint = agent.Started.Fingerprint
@@ -332,6 +339,29 @@ func (s *Store) CheckReusable(fingerprint string) error {
 		}
 	}
 	return nil
+}
+
+// FailedAfter returns the newest agent or hook attempt in list when it is newer
+// than accepted and did not finish ok, otherwise nil. Such an attempt is a
+// failed rerun of an accepted run: the accepted result stays current, but the
+// run is no longer complete for reuse.
+func FailedAfter(list []*Attempt, accepted *Attempt) *Attempt {
+	var latest *Attempt
+	for _, attempt := range list {
+		if attempt.Kind != model.KindAgent && attempt.Kind != model.KindHook {
+			continue
+		}
+		if latest == nil || attempt.Sequence > latest.Sequence {
+			latest = attempt
+		}
+	}
+	if latest == nil || accepted == nil || latest.Sequence <= accepted.Sequence {
+		return nil
+	}
+	if latest.Finished != nil && latest.Finished.Status == model.StatusOK {
+		return nil
+	}
+	return latest
 }
 
 // Reusable reports whether the completion predicate holds for fingerprint.

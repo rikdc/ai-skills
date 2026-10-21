@@ -194,7 +194,6 @@ func Run(ctx context.Context, spec Spec) (Result, error) {
 
 	if cancel {
 		if gotWait {
-			result.ExitCode = killedAfterSignaled + int(syscall.SIGKILL)
 			if timedOut {
 				result.ExitCode = 124
 			} else {

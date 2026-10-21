@@ -247,8 +247,14 @@ func (r *Runner) Run(ctx context.Context) (*Summary, error) {
 		Mode:     string(r.scenario.Mode()),
 	}
 	var failed int
+runs:
 	for _, arm := range r.arms {
 		for run := 1; run <= r.cfg.Runs; run++ {
+			// After cancellation, stop: starting more runs only records
+			// cancelled attempts that were never attempted.
+			if ctx.Err() != nil {
+				break runs
+			}
 			if r.cfg.SkipRun != nil && r.cfg.SkipRun(arm, run) {
 				logDebug(r.cfg.Logger, "run skipped",
 					"plugin", r.cfg.Plugin, "scenario", r.cfg.Scenario, "arm", arm, "run", run)
@@ -278,6 +284,9 @@ func (r *Runner) Run(ctx context.Context) (*Summary, error) {
 	if failed > 0 {
 		return summary, errs.Operational("%s/%s: %d run(s) did not complete ok; see %s",
 			r.cfg.Plugin, r.cfg.Scenario, failed, summary.Path)
+	}
+	if err := ctx.Err(); err != nil {
+		return summary, errs.Operational("%s/%s: cancelled: %v", r.cfg.Plugin, r.cfg.Scenario, err)
 	}
 	return summary, nil
 }
@@ -532,10 +541,19 @@ func (r *Runner) runOnce(ctx context.Context, arm string, run int, progress stri
 				state.mechanicalOK = true
 				state.checksStatus = model.ChecksOK
 			} else {
-				status = model.StatusChecksFailed
-				stopReason = model.StopChecksError
-				message = checksResult.error
 				state.checksStatus = model.ChecksFailed
+				// A failed or timed-out agent keeps its own status: checks
+				// over a partial workspace failing is a consequence, not the
+				// cause.
+				if status == model.StatusOK {
+					status = model.StatusChecksFailed
+					stopReason = model.StopChecksError
+					message = checksResult.error
+				} else if message == "" {
+					message = "checks: " + checksResult.error
+				} else {
+					message += "; checks: " + checksResult.error
+				}
 			}
 		} else {
 			state.checksStatus = model.ChecksNotApplicable

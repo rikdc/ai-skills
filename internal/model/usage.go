@@ -87,9 +87,10 @@ func (u Usage) NormalizeState() Usage {
 //   - both known          -> known, numeric components summed
 //   - any applicable unknown -> unknown, retaining partial numeric components
 //
-// A summed cost is present only when both sides carry a cost. Components that
-// only one side carries are retained; they are a partial lower bound when the
-// combined state is unknown. Unknown is never treated as zero.
+// A known result carries only components both sides report, and a summed cost
+// needs both costs: a one-sided total would look exact while omitting the
+// other invocation. An unknown result retains one-sided token components as a
+// partial lower bound. Unknown is never treated as zero.
 func Combine(a, b Usage) Usage {
 	a = a.NormalizeState()
 	b = b.NormalizeState()
@@ -101,17 +102,22 @@ func Combine(a, b Usage) Usage {
 		return a
 	}
 
+	known := a.State == UsageKnown && b.State == UsageKnown
+	sum := sumInt64
+	if known {
+		sum = sumBothInt64
+	}
 	out := Usage{
 		State:            UsageKnown,
 		Source:           combineSource(a.Source, b.Source),
-		InputTokens:      sumInt64(a.InputTokens, b.InputTokens),
-		OutputTokens:     sumInt64(a.OutputTokens, b.OutputTokens),
-		ReasoningTokens:  sumInt64(a.ReasoningTokens, b.ReasoningTokens),
-		CacheReadTokens:  sumInt64(a.CacheReadTokens, b.CacheReadTokens),
-		CacheWriteTokens: sumInt64(a.CacheWriteTokens, b.CacheWriteTokens),
-		TotalTokens:      sumInt64(a.TotalTokens, b.TotalTokens),
+		InputTokens:      sum(a.InputTokens, b.InputTokens),
+		OutputTokens:     sum(a.OutputTokens, b.OutputTokens),
+		ReasoningTokens:  sum(a.ReasoningTokens, b.ReasoningTokens),
+		CacheReadTokens:  sum(a.CacheReadTokens, b.CacheReadTokens),
+		CacheWriteTokens: sum(a.CacheWriteTokens, b.CacheWriteTokens),
+		TotalTokens:      sum(a.TotalTokens, b.TotalTokens),
 	}
-	if a.State != UsageKnown || b.State != UsageKnown {
+	if !known {
 		out.State = UsageUnknown
 		out.Reason = combineReason(a.Reason, b.Reason)
 	}
@@ -162,6 +168,14 @@ func sumInt64(a, b *int64) *int64 {
 	}
 	if b == nil {
 		return a
+	}
+	v := *a + *b
+	return &v
+}
+
+func sumBothInt64(a, b *int64) *int64 {
+	if a == nil || b == nil {
+		return nil
 	}
 	v := *a + *b
 	return &v

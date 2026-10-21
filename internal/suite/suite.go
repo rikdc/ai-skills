@@ -800,6 +800,9 @@ func (r *Runner) runScenario(ctx context.Context, item scenario.Selected,
 	// Inline judging runs only for runs that finished ok in this pass.
 	if r.cfg.JudgeCmd != "" && summary != nil && ctx.Err() == nil {
 		for _, run := range summary.Runs {
+			if ctx.Err() != nil {
+				break
+			}
 			if run.Status != model.StatusOK {
 				continue
 			}
@@ -930,6 +933,11 @@ func (r *Runner) finalGrading(ctx context.Context, selected []scenario.Selected,
 	for _, item := range selected {
 		for _, arm := range armsFor(item.Mode(), r.cfg.Arm) {
 			for n := 1; n <= r.cfg.Runs; n++ {
+				// The caller reports the cancellation; grading more runs would
+				// only record cancelled judge attempts.
+				if ctx.Err() != nil {
+					return nil
+				}
 				key := runKey{item.Scenario.Plugin, item.Scenario.Name, arm, n}
 				dir := key.runDir(r.cfg.Out)
 				store := attempts.New(dir)
@@ -1172,6 +1180,9 @@ func compareConfigs(old, current model.SuiteConfig, regrade bool) []string {
 	add("units", strings.Join(old.Units, ","), strings.Join(current.Units, ","))
 	add("usage_cmd", old.UsageCmd, current.UsageCmd)
 	add("judge_usage_cmd", old.JudgeUsageCmd, current.JudgeUsageCmd)
+	// Reused runs keep their recorded cost, so a different price sheet would
+	// mix cost bases within one suite.
+	add("pricing_sha256", old.PricingSHA256, current.PricingSHA256)
 	add("harness_version", old.HarnessVersion, current.HarnessVersion)
 	if !regrade {
 		add("judge.backend", old.Judge.Backend, current.Judge.Backend)

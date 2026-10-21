@@ -71,6 +71,9 @@ type RunRow struct {
 	Evidence             string           `json:"evidence"`
 	SkillUse             *model.SkillUse  `json:"skill_use,omitempty"`
 	Error                string           `json:"error,omitempty"`
+	// FailedRerun describes a newer attempt that did not finish ok. The row
+	// still reports the accepted attempt, but the run counts as a failure.
+	FailedRerun string `json:"failed_rerun,omitempty"`
 }
 
 // JudgedBlock is the accepted judgement for one run.
@@ -257,18 +260,6 @@ func (r *Runner) aggregate(selected []scenario.Selected, fingerprints map[string
 			usageKnown += list.known
 			usageUnknown += list.unknown
 			usageNotApplicable += list.notApplicable
-			for _, run := range row.Runs {
-				if run.Status != "ok" {
-					stats.RunnerFailures += 0
-				}
-			}
-		}
-	}
-	// RunnerFailures counts scenarios, not runs; recompute explicitly.
-	stats.RunnerFailures = 0
-	for _, row := range stats.Scenarios {
-		if row.Status != "ok" {
-			stats.RunnerFailures++
 		}
 	}
 	stats.PendingRuns = pendingRuns
@@ -354,13 +345,16 @@ func runFailureLines(stats aggregateStats) []string {
 	var lines []string
 	for _, row := range stats.Scenarios {
 		for _, run := range row.Runs {
-			if run.Status == string(model.StatusOK) {
+			if run.Status == string(model.StatusOK) && run.FailedRerun == "" {
 				continue
 			}
 			line := fmt.Sprintf("%s/%s %s/run-%d: %s",
 				row.Plugin, row.Scenario, run.Arm, run.Run, run.Status)
 			if run.Error != "" {
 				line += ": " + run.Error
+			}
+			if run.FailedRerun != "" {
+				line += " (" + run.FailedRerun + ")"
 			}
 			lines = append(lines, line)
 		}
@@ -434,7 +428,7 @@ func (r *Runner) buildScenarioRow(item scenario.Selected, fingerprint string) Sc
 	}
 	row.Status = "ok"
 	for _, run := range row.Runs {
-		if run.Status != string(model.StatusOK) {
+		if run.Status != string(model.StatusOK) || run.FailedRerun != "" {
 			row.Status = "runner-failed"
 			break
 		}
@@ -493,6 +487,9 @@ func loadRunRow(runDir, arm string, run int, rubric []model.Criterion, denominat
 	execution := latestExecution(list)
 	if currentErr == nil {
 		if agent, err := store.LoadAttempt(pointer.AgentAttempt); err == nil {
+			if failed := attempts.FailedAfter(list, agent); failed != nil {
+				row.FailedRerun = failedRerunText(failed, agent)
+			}
 			execution = agent
 		}
 	}
@@ -633,6 +630,16 @@ func skillUnused(row ScenarioRow) bool {
 	}
 	coverage := skillCoverageOf(row.Runs)
 	return coverage != nil && !coverage.Exercised
+}
+
+// failedRerunText names a failed rerun and why it failed, for the summary.
+func failedRerunText(failed, accepted *attempts.Attempt) string {
+	text := fmt.Sprintf("newer attempt %s %s; showing accepted %s", failed.ID, failed.Status, accepted.ID)
+	if failed.Finished != nil && failed.Finished.Error != "" {
+		text = fmt.Sprintf("newer attempt %s %s: %s; showing accepted %s",
+			failed.ID, failed.Status, failed.Finished.Error, accepted.ID)
+	}
+	return text
 }
 
 func latestExecution(list []*attempts.Attempt) *attempts.Attempt {

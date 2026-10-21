@@ -79,67 +79,10 @@ func normalizeUsage(usage model.Usage) model.Usage {
 	}
 }
 
-func addInt64(a, b *int64) *int64 {
-	if a == nil && b == nil {
-		return nil
-	}
-	var value int64
-	if a != nil {
-		value += *a
-	}
-	if b != nil {
-		value += *b
-	}
-	return &value
-}
-
-func addFloat64(a, b *float64) *float64 {
-	if a == nil && b == nil {
-		return nil
-	}
-	var value float64
-	if a != nil {
-		value += *a
-	}
-	if b != nil {
-		value += *b
-	}
-	return &value
-}
-
 // combineUsage merges accepted agent and judge usage with the three-state
-// rules. Unknown is never converted to zero.
+// rules shared with the report. Unknown is never converted to zero.
 func combineUsage(agent, judge model.Usage) model.Usage {
-	agent = normalizeUsage(agent)
-	judge = normalizeUsage(judge)
-	if agent.State == model.UsageNotApplicable {
-		return judge
-	}
-	if judge.State == model.UsageNotApplicable {
-		return agent
-	}
-	combined := model.Usage{
-		State:            model.UsageKnown,
-		Known:            true,
-		Source:           "combined",
-		InputTokens:      addInt64(agent.InputTokens, judge.InputTokens),
-		OutputTokens:     addInt64(agent.OutputTokens, judge.OutputTokens),
-		ReasoningTokens:  addInt64(agent.ReasoningTokens, judge.ReasoningTokens),
-		CacheReadTokens:  addInt64(agent.CacheReadTokens, judge.CacheReadTokens),
-		CacheWriteTokens: addInt64(agent.CacheWriteTokens, judge.CacheWriteTokens),
-		TotalTokens:      addInt64(agent.TotalTokens, judge.TotalTokens),
-		CostUSD:          addFloat64(agent.CostUSD, judge.CostUSD),
-	}
-	if agent.Currency != "" {
-		combined.Currency = agent.Currency
-	} else {
-		combined.Currency = judge.Currency
-	}
-	if agent.State == model.UsageUnknown || judge.State == model.UsageUnknown {
-		combined = combined.WithState(model.UsageUnknown)
-		combined.Reason = "at least one attempt has unknown usage"
-	}
-	return combined
+	return model.Combine(normalizeUsage(agent), normalizeUsage(judge))
 }
 
 // BuildResult derives the result projection from current.json and the accepted

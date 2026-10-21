@@ -470,6 +470,54 @@ func TestResumeRerunAllCreatesNewAttempts(t *testing.T) {
 	}
 }
 
+func TestFailedRerunOfAcceptedRunIsReportedAndRetried(t *testing.T) {
+	fx := newFixture(t)
+	out := filepath.Join(t.TempDir(), "suite")
+	if _, _, err := runSuite(t, fx.suiteConfig(t, out)); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, fx.agentScript, fmt.Sprintf(
+		"#!/usr/bin/env bash\nprintf 'call\\n' >> %q\nexit 1\n", fx.agentCalls), 0o755)
+
+	cfg := fx.suiteConfig(t, out)
+	cfg.Resume = true
+	cfg.ResumePolicy = PolicyRerunAll
+	if _, _, err := runSuite(t, cfg); errs.Code(err) != 1 {
+		t.Fatalf("failed rerun-all exit = %v, want runner failure (1)", err)
+	}
+	if doc := readSuiteJSON(t, out); doc.Counts["runner_failures"] != 2 {
+		t.Fatalf("runner_failures = %+v, want 2", doc.Counts)
+	}
+	for _, row := range readResults(t, out) {
+		if row.Status != "runner-failed" {
+			t.Fatalf("%s status = %q, want runner-failed", row.Scenario, row.Status)
+		}
+		for _, run := range row.Runs {
+			if !strings.Contains(run.FailedRerun, "showing accepted") {
+				t.Fatalf("%s %s/run-%d failed_rerun = %q", row.Scenario, run.Arm, run.Run, run.FailedRerun)
+			}
+		}
+	}
+
+	before := fx.callCount(t, fx.agentCalls)
+	writeFile(t, fx.agentScript, fmt.Sprintf(
+		"#!/usr/bin/env bash\nprintf 'call\\n' >> %q\n", fx.agentCalls), 0o755)
+	cfg = fx.suiteConfig(t, out)
+	cfg.Resume = true
+	cfg.ResumePolicy = PolicyRetryFailed
+	if _, _, err := runSuite(t, cfg); err != nil {
+		t.Fatalf("retry after failed rerun: %v", err)
+	}
+	if got := fx.callCount(t, fx.agentCalls); got != before+3 {
+		t.Fatalf("failed reruns were not retried: %d → %d", before, got)
+	}
+	for _, row := range readResults(t, out) {
+		if row.Status != "ok" {
+			t.Fatalf("%s status = %q after retry", row.Scenario, row.Status)
+		}
+	}
+}
+
 func TestFingerprintInvalidationReruns(t *testing.T) {
 	fx := newFixture(t)
 	out := filepath.Join(t.TempDir(), "suite")
@@ -1332,5 +1380,10 @@ func TestResumeAllowsTimeoutChangesButNotContractChanges(t *testing.T) {
 	changed.Runs = 1
 	if problems := compareConfigs(base, changed, false); len(problems) == 0 {
 		t.Fatal("a RUNS change must still be refused")
+	}
+	changed = base
+	changed.PricingSHA256 = "b"
+	if problems := compareConfigs(base, changed, false); len(problems) == 0 {
+		t.Fatal("a pricing change must be refused")
 	}
 }

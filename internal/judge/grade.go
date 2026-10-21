@@ -644,6 +644,11 @@ func GradeSuite(ctx context.Context, cfg Config) (SuiteResult, error) {
 	provenance := false
 	firstProvenance := ""
 	for _, runDir := range matches {
+		// Grading more runs after cancellation would only record cancelled
+		// judge attempts, which later read as judge history.
+		if ctx.Err() != nil {
+			break
+		}
 		runCfg := cfg
 		runCfg.RunDir = runDir
 		runCfg.SuiteDir = ""
@@ -667,6 +672,9 @@ func GradeSuite(ctx context.Context, cfg Config) (SuiteResult, error) {
 		}
 	}
 	switch {
+	case ctx.Err() != nil:
+		return suite, errs.Operational("grading cancelled after %d of %d runs: %v",
+			suite.Total, len(matches), ctx.Err())
 	case provenance:
 		return suite, errs.WithCode(errs.CodeUsage, fmt.Errorf(
 			"%s (graded: %d, already complete: %d, failed: %d)",

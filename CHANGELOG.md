@@ -157,6 +157,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   replaced but not yet durable" from "not written".
 - A usage record's `known` flag is now always derived from its `state` when
   serialised or updated, so the two can no longer disagree.
+- A failed rerun of an accepted run (`--resume-policy rerun-all`, for example)
+  no longer exits 0: the suite counts it as a runner failure and names the
+  newer attempt in `summary.md` (`failed_rerun` in `results.jsonl`), while the
+  accepted result stays current. The next `--resume` retries the run instead
+  of reusing it.
+- After an interrupt, `evalctl run`, `suite`, and `grade --suite` stop
+  starting new runs and judge calls instead of recording a cancelled attempt
+  for every remaining one.
+- A failed `checks.sh` no longer replaces the status of a failed or timed-out
+  agent run with `checks-failed`; the checks error is appended to the run's
+  error instead.
+- Pricing no longer subtracts cache-read tokens from input tokens for Claude
+  and opencode logs, which already count them separately; that undercharged
+  input and could price it at zero.
+- `evalctl suite --resume` refuses a different pricing file, so one suite never
+  mixes cost bases.
+- Combining two known usage records keeps only components both report, so a
+  combined total never looks exact while omitting one invocation. The
+  attempt store's `result.json` projection now uses the same combination as
+  the report.
 - `evalctl grade` now refreshes `summary.md`, `suite.json` counts,
   `results.jsonl` and the grading index after grading, so a suite graded after
   the run no longer reports 0% and every run pending.
