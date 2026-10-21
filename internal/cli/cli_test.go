@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -117,20 +118,152 @@ func TestDoctorReportsMissingRoot(t *testing.T) {
 	}
 }
 
-func TestStubCommandsExitTwo(t *testing.T) {
-	for _, name := range []string{"selftest"} {
-		t.Run(name, func(t *testing.T) {
-			_, _, err := executeCommand(t, name)
-			if err == nil {
-				t.Fatalf("%s: expected an error", name)
-			}
-			if code := errs.Code(err); code != 2 {
-				t.Fatalf("%s: exit code = %d, want 2", name, code)
-			}
-			if !strings.Contains(err.Error(), "not implemented in this increment") {
-				t.Fatalf("%s: message = %q", name, err)
-			}
-		})
+func TestSelftestQuick(t *testing.T) {
+	stdout, _, err := executeCommand(t, "selftest", "--quick")
+	if err != nil {
+		t.Fatalf("selftest --quick: %v", err)
+	}
+	if !strings.Contains(stdout, "selftest passed") {
+		t.Fatalf("selftest output = %q", stdout)
+	}
+	if strings.Contains(stdout, "not implemented in this increment") {
+		t.Fatalf("selftest is still a stub: %q", stdout)
+	}
+}
+
+func TestSelftestRejectsBadJobs(t *testing.T) {
+	_, _, err := executeCommand(t, "selftest", "--quick", "--jobs", "0")
+	if code := errs.Code(err); code != 2 {
+		t.Fatalf("exit code = %d, want 2 (err=%v)", code, err)
+	}
+}
+
+func TestMilestoneBBackendErrors(t *testing.T) {
+	for _, args := range [][]string{
+		{"run", "--backend", "openai", "--agent-cmd", "true"},
+		{"suite", "--backend", "openai", "--agent-cmd", "true"},
+	} {
+		_, _, err := executeCommand(t, append([]string{"--root", t.TempDir()}, args...)...)
+		if errs.Code(err) != 2 || !strings.Contains(err.Error(), "milestone B") {
+			t.Fatalf("%v: err = %v (code %d)", args, err, errs.Code(err))
+		}
+	}
+}
+
+func TestMilestoneBJudgeErrors(t *testing.T) {
+	root := t.TempDir()
+	for _, args := range [][]string{
+		{"suite", "--judge-backend", "openai", "--agent-cmd", "true"},
+		{"suite", "--judge-model", "gpt-4o", "--agent-cmd", "true"},
+		{"suite", "--judge-base-url", "http://localhost", "--agent-cmd", "true"},
+		{"grade", "--judge-backend", "openai", "--judge-cmd", "true", "--run-dir", root},
+		{"grade", "--judge-model", "gpt-4o", "--judge-cmd", "true", "--run-dir", root},
+	} {
+		_, _, err := executeCommand(t, append([]string{"--root", root}, args...)...)
+		if errs.Code(err) != 2 || !strings.Contains(err.Error(), "milestone B") {
+			t.Fatalf("%v: err = %v (code %d)", args, err, errs.Code(err))
+		}
+	}
+}
+
+func TestMilestoneBNativeRuntimeFlags(t *testing.T) {
+	root := t.TempDir()
+	for arg := range map[string]bool{
+		"--base-url=http://localhost": true,
+		"--api-key-env=KEY":           true,
+		"--no-api-key=true":           true,
+		"--temperature=0.5":           true,
+		"--seed=1":                    true,
+		"--max-output-tokens=1":       true,
+		"--max-steps=1":               true,
+		"--max-total-tokens=1":        true,
+		"--context-window=1":          true,
+		"--keep-recent-groups=1":      true,
+		"--request-timeout=1s":        true,
+		"--max-prompt-bytes=1":        true,
+		"--max-tool-output-bytes=1":   true,
+		"--max-archive-entries=1":     true,
+		"--max-archive-path-bytes=1":  true,
+	} {
+		_, _, err := executeCommand(t, "--root", root, "run", arg, "--agent-cmd", "true")
+		if errs.Code(err) != 2 || !strings.Contains(err.Error(), "not implemented") {
+			t.Fatalf("%s: err = %v (code %d)", arg, err, errs.Code(err))
+		}
+	}
+}
+
+func TestMilestoneCErrors(t *testing.T) {
+	root := cliRoot(t)
+	for _, args := range [][]string{
+		{"run", "--plugin", "beta", "--scenario", "direct", "--agent-cmd", "true"},
+		{"suite", "--plugin", "beta", "--scenario", "direct", "--agent-cmd", "true", "--out", filepath.Join(t.TempDir(), "suite")},
+	} {
+		_, _, err := executeCommand(t, append([]string{"--root", root}, args...)...)
+		if errs.Code(err) != 2 || !strings.Contains(err.Error(), "milestone C") {
+			t.Fatalf("%v: err = %v (code %d)", args, err, errs.Code(err))
+		}
+	}
+}
+
+func TestBackendEnvFallback(t *testing.T) {
+	t.Setenv("EVALCTL_BACKEND", "openai")
+	for _, args := range [][]string{
+		{"run", "--agent-cmd", "true"},
+		{"suite", "--agent-cmd", "true"},
+	} {
+		_, _, err := executeCommand(t, append([]string{"--root", t.TempDir()}, args...)...)
+		if errs.Code(err) != 2 || !strings.Contains(err.Error(), "milestone B") {
+			t.Fatalf("%v: err = %v (code %d)", args, err, errs.Code(err))
+		}
+	}
+}
+
+func TestAuthPathRequiresAuthCLI(t *testing.T) {
+	root := cliRoot(t)
+	_, _, err := executeCommand(t, "--root", root, "run",
+		"--plugin", "alpha", "--scenario", "compare", "--agent-cmd", "true",
+		"--auth-path", ".claude.json")
+	if errs.Code(err) != 2 || !strings.Contains(err.Error(), "--auth-path requires --auth-cli") {
+		t.Fatalf("err = %v (code %d)", err, errs.Code(err))
+	}
+}
+
+func TestAuthPathRejectsEscape(t *testing.T) {
+	root := cliRoot(t)
+	_, _, err := executeCommand(t, "--root", root, "run",
+		"--plugin", "alpha", "--scenario", "compare", "--agent-cmd", "true",
+		"--auth-cli", "--auth-path", "../secret")
+	if errs.Code(err) != 2 || !strings.Contains(err.Error(), "must stay under the home directory") {
+		t.Fatalf("err = %v (code %d)", err, errs.Code(err))
+	}
+}
+
+func TestModelEnvFallback(t *testing.T) {
+	root := cliRoot(t)
+	t.Setenv("EVALCTL_MODEL", "selftest-model")
+	out := filepath.Join(t.TempDir(), "run")
+	_, stderr, err := executeCommand(t, "--root", root, "run",
+		"--plugin", "alpha", "--scenario", "compare", "--arm", "with",
+		"--agent-cmd", "true", "--out", out)
+	if err != nil {
+		t.Fatalf("run: %v (stderr %s)", err, stderr)
+	}
+	data, err := os.ReadFile(filepath.Join(out, "alpha", "compare", "with", "run-1", "attempts", "agent-000001", "started.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"model": "selftest-model"`) {
+		t.Fatalf("started.json did not record EVALCTL_MODEL: %s", data)
+	}
+}
+
+func TestAttemptArtifactsValidation(t *testing.T) {
+	root := cliRoot(t)
+	_, _, err := executeCommand(t, "--root", root, "run",
+		"--plugin", "alpha", "--scenario", "compare", "--agent-cmd", "true",
+		"--attempt-artifacts", "sometimes")
+	if errs.Code(err) != 2 || !strings.Contains(err.Error(), "--attempt-artifacts") {
+		t.Fatalf("err = %v (code %d)", err, errs.Code(err))
 	}
 }
 

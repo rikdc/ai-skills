@@ -52,7 +52,6 @@ func newSuiteCommand() *cobra.Command {
 		backend          string
 		agentCmd         string
 		modelName        string
-		baseURL          string
 		pricingFile      string
 		maxSnapshotMB    int
 		attemptArtifacts string
@@ -60,6 +59,8 @@ func newSuiteCommand() *cobra.Command {
 		judgeBackend     string
 		judgeModel       string
 		judgeBaseURL     string
+
+		native nativeFlags
 	)
 
 	cmd := &cobra.Command{
@@ -114,16 +115,15 @@ func newSuiteCommand() *cobra.Command {
 				return nil
 			}
 
-			switch backend {
-			case "", "command":
-			case "openai":
-				return errs.Usage("--backend openai is milestone B and not implemented")
-			default:
-				return errs.Usage("--backend must be command or openai")
+			if err := validateBackend(resolveBackend(cmd, backend)); err != nil {
+				return err
 			}
-			if strings.TrimSpace(agentCmd) == "" {
-				return errs.Usage("--agent-cmd is required for the command backend, e.g. --agent-cmd 'claude -p'")
+			if err := native.nativeErrors(cmd); err != nil {
+				return err
 			}
+			modelName = resolveModel(cmd, modelName)
+			pricingFile = resolvePricing(cmd, pricingFile)
+
 			switch judgeBackend {
 			case "", "command":
 			case "openai":
@@ -139,6 +139,26 @@ func newSuiteCommand() *cobra.Command {
 			}
 			if maxSnapshotMB < 1 {
 				return errs.Usage("--max-snapshot-mb must be a positive integer")
+			}
+
+			preflight, _, err := suite.BuildPlan(root, suite.PlanOptions{
+				Selection:       selection,
+				Runs:            runs,
+				Arm:             arm,
+				Jobs:            jobs,
+				TimeoutSeconds:  int(agentDuration / time.Second),
+				JudgeConfigured: strings.TrimSpace(judgeCmd) != "",
+			})
+			if err != nil {
+				return selectionError(err)
+			}
+			if len(preflight.Unsupported) > 0 {
+				return errs.Usage(
+					"direct-hook execution is milestone C and not implemented (%d selected scenario(s)); rerun with --plan to list them",
+					len(preflight.Unsupported))
+			}
+			if strings.TrimSpace(agentCmd) == "" {
+				return errs.Usage("--agent-cmd is required for the command backend, e.g. --agent-cmd 'claude -p'")
 			}
 
 			flags := cmd.Flags()
@@ -303,15 +323,15 @@ func newSuiteCommand() *cobra.Command {
 	flags.StringVar(&judgeUsageCmd, "judge-usage-cmd", "", "judge usage normalization hook")
 	flags.StringVar(&backend, "backend", "command", "agent runtime: command|openai")
 	flags.StringVar(&agentCmd, "agent-cmd", "", "command adapter command")
-	flags.StringVar(&modelName, "model", "", "model name for identity and pricing")
-	flags.StringVar(&baseURL, "base-url", "", "native endpoint (milestone B; command backend ignores it)")
-	flags.StringVar(&pricingFile, "pricing", "", "pricing JSON file")
+	flags.StringVar(&modelName, "model", "", "model name for identity and pricing (env EVALCTL_MODEL)")
+	flags.StringVar(&pricingFile, "pricing", "", "pricing JSON file (env EVALCTL_PRICING)")
 	flags.IntVar(&maxSnapshotMB, "max-snapshot-mb", 256, "evidence archive limit in MiB")
 	flags.StringVar(&attemptArtifacts, "attempt-artifacts", "failed", "attempt evidence retention: failed|all|none")
 	flags.StringVar(&judgeCmd, "judge-cmd", "", "command that reads the judge prompt on stdin and writes judgement.json")
 	flags.StringVar(&judgeBackend, "judge-backend", "", "judge backend: command|openai")
 	flags.StringVar(&judgeModel, "judge-model", "", "native judge model (milestone B)")
 	flags.StringVar(&judgeBaseURL, "judge-base-url", "", "native judge base URL (milestone B)")
+	addNativeFlags(flags, &native)
 	return cmd
 }
 

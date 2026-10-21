@@ -12,6 +12,7 @@ import (
 	"github.com/rikdc/ai-skills/internal/platform/errs"
 	"github.com/rikdc/ai-skills/internal/provider/command"
 	"github.com/rikdc/ai-skills/internal/runner"
+	"github.com/rikdc/ai-skills/internal/scenario"
 	"github.com/rikdc/ai-skills/internal/usage"
 )
 
@@ -41,6 +42,8 @@ func newRunCommand() *cobra.Command {
 		pricingFile      string
 		maxSnapshotMB    int
 		attemptArtifacts string
+
+		native nativeFlags
 	)
 	cmd := &cobra.Command{
 		Use:   "run",
@@ -63,11 +66,16 @@ func newRunCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if backend != "command" {
-				if backend == "openai" {
-					return errs.Usage("--backend openai is milestone B and not implemented")
+			if err := validateBackend(resolveBackend(cmd, backend)); err != nil {
+				return err
+			}
+			if err := native.nativeErrors(cmd); err != nil {
+				return err
+			}
+			if plugin != "" && scenarioName != "" {
+				if sc, err := scenario.Load(root, plugin, scenarioName); err == nil && sc.DirectHook() {
+					return errs.Usage("%s: direct-hook execution is milestone C and not implemented", sc.Pair())
 				}
-				return errs.Usage("--backend must be command or openai")
 			}
 			if strings.TrimSpace(agentCmd) == "" {
 				return errs.Usage("--agent-cmd is required for the command backend, e.g. --agent-cmd 'claude -p'")
@@ -75,6 +83,8 @@ func newRunCommand() *cobra.Command {
 			if maxSnapshotMB < 1 {
 				return errs.Usage("--max-snapshot-mb must be a positive integer")
 			}
+			pricingFile = resolvePricing(cmd, pricingFile)
+			modelName = resolveModel(cmd, modelName)
 			var pricing usage.Pricing
 			if pricingFile != "" {
 				pricing, err = usage.LoadPricing(pricingFile)
@@ -153,10 +163,11 @@ func newRunCommand() *cobra.Command {
 	flags.StringVar(&usageCmd, "usage-cmd", "", "usage normalization hook")
 	flags.StringVar(&backend, "backend", "command", "agent runtime: command|openai")
 	flags.StringVar(&agentCmd, "agent-cmd", "", "command adapter command")
-	flags.StringVar(&modelName, "model", "", "model name for identity and pricing")
-	flags.StringVar(&pricingFile, "pricing", "", "pricing JSON file")
+	flags.StringVar(&modelName, "model", "", "model name for identity and pricing (env EVALCTL_MODEL)")
+	flags.StringVar(&pricingFile, "pricing", "", "pricing JSON file (env EVALCTL_PRICING)")
 	flags.IntVar(&maxSnapshotMB, "max-snapshot-mb", 256, "evidence archive limit in MiB")
 	flags.StringVar(&attemptArtifacts, "attempt-artifacts", "failed", "attempt evidence retention: failed|all|none")
+	addNativeFlags(flags, &native)
 	return cmd
 }
 

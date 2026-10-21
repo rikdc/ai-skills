@@ -12,6 +12,7 @@ import (
 	"github.com/rikdc/ai-skills/internal/judge"
 	"github.com/rikdc/ai-skills/internal/platform/errs"
 	"github.com/rikdc/ai-skills/internal/provider/command"
+	"github.com/rikdc/ai-skills/internal/usage"
 )
 
 func newGradeCommand() *cobra.Command {
@@ -27,7 +28,10 @@ func newGradeCommand() *cobra.Command {
 		judgeUsage   string
 		usageCmd     string
 
-		regrade bool
+		regrade     bool
+		pricingFile string
+
+		native nativeFlags
 	)
 	cmd := &cobra.Command{
 		Use:   "grade",
@@ -50,6 +54,10 @@ func newGradeCommand() *cobra.Command {
 			default:
 				return errs.Usage("--judge-backend must be command or openai")
 			}
+			if err := native.nativeErrors(cmd); err != nil {
+				return err
+			}
+			pricingFile = resolvePricing(cmd, pricingFile)
 			if judgeModel != "" || judgeBaseURL != "" {
 				return errs.Usage("native judge flags (--judge-model/--judge-base-url) are milestone B and not implemented")
 			}
@@ -64,10 +72,18 @@ func newGradeCommand() *cobra.Command {
 			if usageCommand == "" {
 				usageCommand = usageCmd
 			}
+			var pricing usage.Pricing
+			if pricingFile != "" {
+				pricing, err = usage.LoadPricing(pricingFile)
+				if err != nil {
+					return errs.Usage("%v", err)
+				}
+			}
 			exec, err := command.New(command.Config{
 				Command:  judgeCmd,
 				Timeout:  timeout,
 				UsageCmd: usageCommand,
+				Pricing:  pricing,
 			})
 			if err != nil {
 				return err
@@ -122,6 +138,8 @@ func newGradeCommand() *cobra.Command {
 	flags.StringVar(&judgeUsage, "judge-usage-cmd", "", "judge usage normalization hook")
 	flags.StringVar(&usageCmd, "usage-cmd", "", "alias for --judge-usage-cmd")
 	flags.BoolVar(&regrade, "regrade", false, "create a new judge attempt for existing judgements")
+	flags.StringVar(&pricingFile, "pricing", "", "pricing JSON file (env EVALCTL_PRICING)")
+	addNativeFlags(flags, &native)
 	return cmd
 }
 
