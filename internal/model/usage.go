@@ -1,5 +1,7 @@
 package model
 
+import "encoding/json"
+
 // UsageState is the three-state accounting contract. Unknown is never zero.
 type UsageState string
 
@@ -10,7 +12,8 @@ const (
 )
 
 // Usage records token and cost usage for one invocation. Missing numeric
-// components are omitted, never written as zero.
+// components are omitted, never written as zero. State is authoritative; Known
+// is a compatibility flag derived from it, so set state with WithState.
 type Usage struct {
 	State            UsageState `json:"state"`
 	Known            bool       `json:"known"`
@@ -46,6 +49,23 @@ func (u Usage) IsApplicable() bool { return u.State != UsageNotApplicable }
 
 // IsUnknown reports whether the invocation happened without usable usage.
 func (u Usage) IsUnknown() bool { return u.State == UsageUnknown }
+
+// WithState returns u with State set to state and Known derived from it.
+func (u Usage) WithState(state UsageState) Usage {
+	u.State = state
+	u.Known = state == UsageKnown
+	return u
+}
+
+// MarshalJSON writes Known derived from State, so a serialised record never
+// disagrees with itself. A legacy record with no State keeps its Known flag.
+func (u Usage) MarshalJSON() ([]byte, error) {
+	type wire Usage
+	if u.State != "" {
+		u.Known = u.State == UsageKnown
+	}
+	return json.Marshal(wire(u))
+}
 
 // NormalizeState fills State from the compatibility Known flag when the state
 // is empty. It never invents numerics.

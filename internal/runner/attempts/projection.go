@@ -136,8 +136,7 @@ func combineUsage(agent, judge model.Usage) model.Usage {
 		combined.Currency = judge.Currency
 	}
 	if agent.State == model.UsageUnknown || judge.State == model.UsageUnknown {
-		combined.State = model.UsageUnknown
-		combined.Known = false
+		combined = combined.WithState(model.UsageUnknown)
 		combined.Reason = "at least one attempt has unknown usage"
 	}
 	return combined

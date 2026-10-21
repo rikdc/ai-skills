@@ -4,9 +4,9 @@ package cli
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -22,17 +22,8 @@ type GlobalOptions struct {
 	Verbose   bool
 	Quiet     bool
 	LogFormat string
-	NoColor   bool
 	Debug     bool
 	Logger    *slog.Logger
-}
-
-// RequireRoot returns the discovered repository root or a usage error.
-func (o *GlobalOptions) RequireRoot() (string, error) {
-	if o.RootErr != nil {
-		return "", errs.Usage("resolve repository root: %v", o.RootErr)
-	}
-	return o.Root, nil
 }
 
 // loggerOf returns the global logger, or nil when no options were supplied.
@@ -51,7 +42,7 @@ func NewRootCommand() *cobra.Command {
 		flagVerbose   bool
 		flagQuiet     bool
 		flagLogFormat string
-		flagNoColor   bool
+		flagNoColor   bool // read directly by reportColor
 		flagDebug     bool
 	)
 
@@ -60,21 +51,24 @@ func NewRootCommand() *cobra.Command {
 		Short:         "Run and report AI skill eval scenarios",
 		SilenceErrors: true,
 		SilenceUsage:  true,
+		// Runnable so cobra validates root args through rootArgs instead of
+		// its untyped unknown-command error.
+		Args:                       rootArgs,
+		SuggestionsMinimumDistance: 2, // cobra's default, which SuggestionsFor does not apply
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return cmd.Help()
+		},
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			flags := cmd.Flags()
-			cwd, err := os.Getwd()
-			if err != nil {
-				return errs.Usage("get working directory: %v", err)
-			}
+			// An unreadable cwd only matters when discovery needs it; ResolveRoot
+			// then reports it through RootErr like any other missing root.
+			cwd, _ := os.Getwd()
 			opts.Root, opts.RootErr = config.ResolveRoot(flagRoot, flags.Changed("root"), cwd, os.Getenv)
 			opts.Verbose = flagVerbose
 			opts.Quiet = flagQuiet
 			opts.LogFormat = config.ResolveString(flagLogFormat, flags.Changed("log-format"), "text", os.Getenv, "EVALCTL_LOG_FORMAT")
-			if opts.LogFormat != "text" && opts.LogFormat != "json" {
-				return errs.Usage("unsupported --log-format %q (want text or json)", opts.LogFormat)
-			}
-			opts.NoColor = config.ResolveBool(flagNoColor, flags.Changed("no-color"), false, os.Getenv, "NO_COLOR")
 			opts.Debug = config.ResolveBool(flagDebug, flags.Changed("debug"), false, os.Getenv, "EVALCTL_DEBUG")
+			var err error
 			opts.Logger, err = logging.New(os.Stderr, logging.Options{
 				Format:    opts.LogFormat,
 				Level:     logging.Level(opts.Verbose, opts.Quiet, opts.Debug),
@@ -110,32 +104,52 @@ func NewRootCommand() *cobra.Command {
 		newDoctorCommand(opts),
 		newVersionCommand(),
 	)
+	// cobra adds these lazily; add them now so their validators are wrapped.
+	root.InitDefaultHelpCmd()
+	root.InitDefaultCompletionCmd()
+	wrapArgsAsUsage(root)
 	return root
 }
 
-// Execute runs the command tree with args and maps otherwise unclassified
-// command-line errors to exit code 2.
+// Execute runs the command tree with args. Flag and positional-argument
+// errors carry exit code 2.
 func Execute(ctx context.Context, args []string) error {
 	root := NewRootCommand()
 	root.SetArgs(args)
 	root.SetContext(ctx)
-	err := root.Execute()
-	if err == nil {
-		return nil
-	}
-	var exitErr *errs.ExitError
-	if errors.As(err, &exitErr) {
-		return err
-	}
-	if isUsageError(err) {
-		return errs.WithCode(errs.CodeUsage, err)
-	}
-	return err
+	return root.Execute()
 }
 
-func isUsageError(err error) bool {
-	msg := err.Error()
-	return strings.HasPrefix(msg, "unknown command") ||
-		strings.HasPrefix(msg, "unknown flag") ||
-		strings.HasPrefix(msg, "flag needs an argument")
+// rootArgs rejects positional args on the root command, which only reach it
+// when they name no subcommand.
+func rootArgs(cmd *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		return nil
+	}
+	msg := fmt.Sprintf("unknown command %q for %q", args[0], cmd.CommandPath())
+	if suggestions := cmd.SuggestionsFor(args[0]); len(suggestions) > 0 {
+		msg += "\n\nDid you mean this?"
+		for _, s := range suggestions {
+			msg += "\n\t" + s
+		}
+	}
+	return errs.Usage("%s", msg)
+}
+
+// wrapArgsAsUsage makes every positional-argument validator in the tree
+// return a usage error.
+func wrapArgsAsUsage(cmd *cobra.Command) {
+	if validate := cmd.Args; validate != nil {
+		cmd.Args = func(c *cobra.Command, args []string) error {
+			err := validate(c, args)
+			var exitErr *errs.ExitError
+			if err == nil || errors.As(err, &exitErr) {
+				return err
+			}
+			return errs.WithCode(errs.CodeUsage, err)
+		}
+	}
+	for _, sub := range cmd.Commands() {
+		wrapArgsAsUsage(sub)
+	}
 }

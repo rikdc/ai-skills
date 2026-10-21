@@ -386,3 +386,40 @@ func TestSameJudgeModel(t *testing.T) {
 		}
 	}
 }
+
+func TestUsageWithStateDerivesKnown(t *testing.T) {
+	u := Unknown("x", "missing").WithState(UsageKnown)
+	if u.State != UsageKnown || !u.Known {
+		t.Fatalf("known: %+v", u)
+	}
+	u = u.WithState(UsageUnknown)
+	if u.State != UsageUnknown || u.Known {
+		t.Fatalf("unknown: %+v", u)
+	}
+}
+
+func TestUsageMarshalDerivesKnownFromState(t *testing.T) {
+	for _, test := range []struct {
+		usage Usage
+		want  string
+	}{
+		{Usage{State: UsageKnown, Known: false}, `"known":true`},
+		{Usage{State: UsageUnknown, Known: true}, `"known":false`},
+		{Usage{Known: true}, `"known":true`},
+	} {
+		data, err := json.Marshal(test.usage)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(data), test.want) {
+			t.Errorf("%+v marshalled to %s, want %s", test.usage, data, test.want)
+		}
+		var round Usage
+		if err := json.Unmarshal(data, &round); err != nil {
+			t.Fatal(err)
+		}
+		if round.State != test.usage.State {
+			t.Errorf("round trip state = %q, want %q", round.State, test.usage.State)
+		}
+	}
+}

@@ -227,7 +227,7 @@ func combinedMetric(agent, judge model.Usage, get func(model.Usage) *float64) *f
 }
 
 func usageKnown(usage model.Usage) bool {
-	return usage.State == model.UsageKnown && usage.Known
+	return usage.NormalizeState().State == model.UsageKnown
 }
 
 func usageMetric(usage model.Usage, value *float64) *float64 {
@@ -251,17 +251,13 @@ func buildExpenditure(attempts []model.AttemptInput) model.Expenditure {
 		case model.KindJudge:
 			out.JudgeAttempts++
 		}
-		usage := attempt.Usage
+		usage := attempt.Usage.NormalizeState()
 		switch usage.State {
 		case model.UsageNotApplicable:
 			out.NotApplicableAttempts++
 			continue
 		case model.UsageKnown:
-			if usage.Known {
-				out.KnownAttempts++
-			} else {
-				out.UnknownAttempts++
-			}
+			out.KnownAttempts++
 		default:
 			out.UnknownAttempts++
 		}
@@ -291,11 +287,9 @@ func buildExpenditure(attempts []model.AttemptInput) model.Expenditure {
 	}
 	out.Complete = out.UnknownAttempts == 0
 	if out.Complete {
-		known.State = model.UsageKnown
-		known.Known = true
+		known = known.WithState(model.UsageKnown)
 	} else {
-		known.State = model.UsageUnknown
-		known.Known = false
+		known = known.WithState(model.UsageUnknown)
 	}
 	out.KnownTotal = known
 	return out

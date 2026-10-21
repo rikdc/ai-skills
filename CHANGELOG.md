@@ -145,6 +145,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `evalctl` now exits 2 for every positional-argument error (for example
+  `evalctl report a b`), not only the ones whose cobra message happened to
+  start with "unknown command", and no longer matches error text to choose an
+  exit code.
+- `evalctl` no longer fails every command when the working directory is gone;
+  the missing directory surfaces as a missing repository root only for
+  commands that need one, so `evalctl version` still works.
+- An atomic write whose directory fsync fails after the rename now returns an
+  error wrapping `atomicfile.ErrNotDurable`, so callers can tell "content
+  replaced but not yet durable" from "not written".
+- A usage record's `known` flag is now always derived from its `state` when
+  serialised or updated, so the two can no longer disagree.
 - `evalctl grade` now refreshes `summary.md`, `suite.json` counts,
   `results.jsonl` and the grading index after grading, so a suite graded after
   the run no longer reports 0% and every run pending.
