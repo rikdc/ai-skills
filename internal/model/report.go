@@ -15,6 +15,45 @@ type Report struct {
 	Scenarios   []ScenarioResult  `json:"scenarios"`
 	Comparison  *Comparison       `json:"comparison,omitempty"`
 	Links       Links             `json:"links"`
+
+	// Warnings are conditions that weaken the verdict: skills never used,
+	// retried or failed attempts, a judge that shares the agent's model, and
+	// too few runs. Each is also rendered prominently by every format.
+	Warnings []Warning `json:"warnings,omitempty"`
+	// AttemptFailures summarises failed or interrupted attempts, which the
+	// accepted run results otherwise hide.
+	AttemptFailures *AttemptFailures `json:"attempt_failures,omitempty"`
+}
+
+// Warning codes.
+const (
+	WarnSkillNotExercised = "skill-not-exercised"
+	WarnSkillUnknown      = "skill-use-unknown"
+	WarnSameModelJudge    = "same-model-judge"
+	WarnAttemptFailures   = "attempt-failures"
+	WarnLowN              = "low-n"
+)
+
+// Warning is one report-level caveat.
+type Warning struct {
+	Code     string `json:"code"`
+	Scenario string `json:"scenario,omitempty"`
+	Message  string `json:"message"`
+}
+
+// AttemptFailureGroup counts the failed attempts of one kind.
+type AttemptFailureGroup struct {
+	Kind       AttemptKind `json:"kind"`
+	Failed     int         `json:"failed"`
+	Total      int         `json:"total"`
+	FirstError string      `json:"first_error,omitempty"`
+}
+
+// AttemptFailures lists the attempt kinds that had failed or interrupted
+// attempts. It is empty when every attempt succeeded.
+type AttemptFailures struct {
+	Failed int                   `json:"failed"`
+	Groups []AttemptFailureGroup `json:"groups"`
 }
 
 // ReportMetadata identifies the suite a report was built from.
@@ -50,6 +89,10 @@ type Totals struct {
 	NotComparable   int            `json:"not_comparable"`
 	Regressions     int            `json:"regressions"`
 	Counts          map[string]int `json:"counts,omitempty"`
+	// SkillNotExercised counts comparison scenarios left out of With, Without,
+	// Delta and the criterion tallies because the with arm never used the
+	// skill, so they measure nothing about it.
+	SkillNotExercised int `json:"skill_not_exercised,omitempty"`
 
 	// Legacy v1 report counters retained for shell parity. Nilable numbers
 	// stay pointers so an unavailable range emits null rather than zero.
@@ -242,6 +285,7 @@ type RunRow struct {
 	PendingPoints        float64            `json:"pending_points"`
 	PendingCount         int                `json:"pending_count"`
 	Scored               map[string]float64 `json:"scored,omitempty"`
+	SkillUse             *SkillUse          `json:"skill_use,omitempty"`
 }
 
 // ArmStats summarises one arm of one scenario.
@@ -288,6 +332,9 @@ type ScenarioResult struct {
 	PendingCriteria int               `json:"pending_criteria"`
 	Criteria        []CriterionResult `json:"criteria"`
 	Regressions     []CriterionResult `json:"regressions"`
+	// Skill summarises skill use over the with-arm runs; absent when the
+	// scenario installs no skills.
+	Skill *SkillCoverage `json:"skill,omitempty"`
 }
 
 // ComparisonExclusion records why a scenario did not contribute a delta.
@@ -465,12 +512,17 @@ type RunInput struct {
 	JudgeUsage           Usage
 	CombinedUsage        Usage
 	Evidence             string
+	SkillUse             *SkillUse
 }
 
 // AttemptInput is one attempt's usage for expenditure accounting.
 type AttemptInput struct {
 	Kind  AttemptKind
 	Usage Usage
+	// Status is the finished status, or interrupted when no finished record
+	// exists. Error is the recorded failure text, if any.
+	Status RunStatus
+	Error  string
 }
 
 // ReportInput is the read-only suite view reportio hands to the pure analysis.

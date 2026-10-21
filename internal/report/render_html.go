@@ -29,6 +29,9 @@ th,td{text-align:left;padding:.45rem .55rem;border-bottom:1px solid var(--line);
 th{color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em}
 td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
 ul.links{columns:2}
+.warnings{margin-top:1rem;border:1px solid var(--line);border-left:6px solid var(--bad);background:var(--card);padding:.75rem 1.25rem;border-radius:8px}
+.warnings .state{font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--bad)}
+.warnings ul{margin:.4rem 0 0;padding-left:1.1rem}
 `
 
 // RenderHTML renders one self-contained HTML document: inline CSS, no
@@ -62,6 +65,7 @@ func RenderHTML(report model.Report) string {
 		"never renormalised to <code>52/52</code>.</p>\n")
 	fmt.Fprintf(&b, "<section class=\"verdict %s\"><div class=\"state\">%s</div><div class=\"reason\">%s</div></section>\n",
 		esc(strings.ReplaceAll(report.Verdict.Status, " ", "-")), esc(report.Verdict.Status), esc(report.Verdict.Reason))
+	b.WriteString(renderCaveatsHTML(report))
 
 	b.WriteString("<div class=\"cards\">\n")
 	card(&b, "With", fmtScore(report.Totals.With), "")
@@ -151,6 +155,7 @@ func RenderHTML(report model.Report) string {
 			b.WriteString("<p class=\"note\">Efficiency: — (partial cost coverage or no positive score delta).</p>\n")
 		}
 	}
+	b.WriteString(renderDetailsHTML(report))
 	b.WriteString(renderExpenditureHTML(report))
 	b.WriteString(renderComparisonHTML(report))
 

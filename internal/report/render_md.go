@@ -27,6 +27,7 @@ func RenderMarkdown(report model.Report) string {
 	}
 	b.WriteString("- Fixed denominator: the rubric sum; unjudged criteria remain pending and are never renormalised.\n")
 	fmt.Fprintf(&b, "\n## Verdict: %s\n\n%s\n\n", mdEscape(report.Verdict.Status), mdEscape(report.Verdict.Reason))
+	b.WriteString(renderCaveatsMarkdown(report))
 	b.WriteString("| With | Without | Delta | Won | Lost | Tied | Pending | Coverage | Failures |\n")
 	b.WriteString("| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n")
 	fmt.Fprintf(&b, "| %s | %s | %s | %d | %d | %d | %s | %s%% | %d |\n",
@@ -99,6 +100,7 @@ func RenderMarkdown(report model.Report) string {
 			b.WriteString("\nCost totals include functional runs; delta and efficiency use comparison scenarios only.\n")
 		}
 	}
+	b.WriteString(renderDetailsMarkdown(report))
 	b.WriteString(renderExpenditureMarkdown(report))
 	b.WriteString(renderComparisonMarkdown(report))
 

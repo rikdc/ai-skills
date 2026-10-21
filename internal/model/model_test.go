@@ -362,3 +362,27 @@ func TestAttemptKindAndChecksConstants(t *testing.T) {
 		}
 	}
 }
+
+func TestSameJudgeModel(t *testing.T) {
+	cases := []struct {
+		name                                         string
+		agentCmd, agentModel, judgeCmd, judgeModelIn string
+		wantName                                     string
+		wantSame                                     bool
+	}{
+		{"flags match", "opencode run -m p/m1 x", "", "opencode run --model p/m1 y", "", "p/m1", true},
+		{"flags differ", "opencode run -m p/m1", "", "opencode run -m p/m2", "", "p/m1", false},
+		{"explicit names", "a", "m", "b", "m", "m", true},
+		{"explicit overrides flag", "x -m p/m1", "m2", "y -m p/m1", "", "m2", false},
+		{"identical commands without model", "claude -p", "", "claude -p", "", "", true},
+		{"different commands without model", "claude -p", "", "codex exec", "", "", false},
+		{"one side unknown", "claude -p", "", "judge -m p/m1", "", "", false},
+		{"empty", "", "", "", "", "", false},
+	}
+	for _, tc := range cases {
+		name, same := SameJudgeModel(tc.agentCmd, tc.agentModel, tc.judgeCmd, tc.judgeModelIn)
+		if same != tc.wantSame || (same && name != tc.wantName) {
+			t.Errorf("%s: got (%q, %v), want (%q, %v)", tc.name, name, same, tc.wantName, tc.wantSame)
+		}
+	}
+}

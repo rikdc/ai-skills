@@ -25,6 +25,9 @@ th,td{text-align:left;padding:.45rem .55rem;border-bottom:1px solid var(--line);
 th{color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em}
 td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
 ul.links{columns:2}
+.warnings{margin-top:1rem;border:1px solid var(--line);border-left:6px solid var(--bad);background:var(--card);padding:.75rem 1.25rem;border-radius:8px}
+.warnings .state{font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--bad)}
+.warnings ul{margin:.4rem 0 0;padding-left:1.1rem}
 </style>
 </head>
 <body>
@@ -32,6 +35,9 @@ ul.links{columns:2}
 <p class="meta">Suite: <code>testdata/golden/suite</code><br>Agent: <code>claude -p --model fixture-model</code> · Model: <code>fixture-model</code><br>Git: <code>deadbee</code> · Created: 2026-01-02T03:04:05Z · n: 2 · Agent invocations: 6</p>
 <p class="note"><strong>Fixed denominator.</strong> Scores use the full rubric max_score sum; a run with only part of its checklist judged is reported as <code>52/100 + 48 pending</code>, never renormalised to <code>52/52</code>.</p>
 <section class="verdict incomplete"><div class="state">incomplete</div><div class="reason">runner failures or unjudged criteria remain; a verdict would be made up</div></section>
+<section class="warnings"><div class="state">Warnings</div><ul>
+<li><code>low-n</code> n=2: fewer than 3 runs per arm, so run-to-run variance cannot be estimated reliably; treat the delta as indicative, not conclusive.</li>
+</ul></section>
 <div class="cards">
 <div class="card"><div class="k">With</div><div class="v">73.5</div></div>
 <div class="card"><div class="k">Without</div><div class="v">67.2</div></div>

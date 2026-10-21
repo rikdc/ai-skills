@@ -28,6 +28,7 @@ import (
 	"github.com/rikdc/ai-skills/internal/runner"
 	"github.com/rikdc/ai-skills/internal/runner/attempts"
 	"github.com/rikdc/ai-skills/internal/scenario"
+	"github.com/rikdc/ai-skills/internal/skilluse"
 )
 
 // Resume policies.
@@ -555,6 +556,11 @@ func (r *Runner) ensureProjections(dir string, item scenario.Selected, arm strin
 		Mode:           string(item.Mode()),
 		Run:            run,
 		ChecksRequired: checksRequired,
+		SkillDir:       r.cfg.SkillDir,
+	}
+	if arm == "with" {
+		runCtx.Skills = skilluse.Installed(
+			filepath.Join(r.cfg.Root, "plugins", item.Scenario.Plugin), item.InstallUnits())
 	}
 	if _, err := os.Stat(store.ResultPath()); errors.Is(err, os.ErrNotExist) {
 		_, _ = store.EnsureResultProjection(runCtx)

@@ -987,3 +987,35 @@ func TestRunNilLoggerDoesNotPanic(t *testing.T) {
 		t.Fatalf("outcome = %+v", summary.Runs)
 	}
 }
+
+func TestRunRecordsSkillUseInResult(t *testing.T) {
+	fx := newFixture(t, fixtureOptions{})
+	used := `echo '{"type":"tool_use","part":{"tool":"skill","state":{"input":{"name":"good"}}}}'`
+	idle := `echo '{"type":"text","part":{"text":"no skill here"}}'`
+	cases := []struct {
+		name    string
+		arm     string
+		command string
+		want    string
+	}{
+		{"skill invoked", "with", used, model.SkillInvoked},
+		{"skill not invoked", "with", idle, model.SkillNotInvoked},
+		{"unrecognised log", "with", "echo hello", model.SkillUnknown},
+		{"without arm records nothing", "without", used, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			out := t.TempDir()
+			if _, err := execute(t, fx, runOptions{out: out, arm: tc.arm, command: tc.command}); err != nil {
+				t.Fatalf("run: %v", err)
+			}
+			result := readJSON[model.RunResult](t, filepath.Join(runPath(out, tc.arm, 1), "result.json"))
+			switch {
+			case tc.want == "" && result.SkillUse != nil:
+				t.Fatalf("skill_use = %+v, want none", result.SkillUse)
+			case tc.want != "" && (result.SkillUse == nil || result.SkillUse.State != tc.want):
+				t.Fatalf("skill_use = %+v, want %s", result.SkillUse, tc.want)
+			}
+		})
+	}
+}

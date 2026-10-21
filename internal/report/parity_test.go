@@ -153,6 +153,8 @@ func semanticScenarios(t *testing.T, raw any) []any {
 			switch key {
 			case "runs":
 				copy[key] = semanticRuns(t, value)
+			case "skill":
+				// Additive: skill coverage postdates the shell report.
 			default:
 				copy[key] = value
 			}
@@ -171,7 +173,7 @@ func semanticRuns(t *testing.T, raw any) []any {
 	additive := map[string]bool{
 		"agent_usage": true, "combined_usage": true, "complete": true,
 		"max": true, "current_sha256": true, "stop_reason": true,
-		"error": true, "agent_attempt": true, "judge_attempt": true,
+		"error": true, "agent_attempt": true, "judge_attempt": true, "skill_use": true,
 	}
 	out := make([]any, 0, len(runs))
 	for _, item := range runs {

@@ -4,6 +4,7 @@
 package report
 
 import (
+	"fmt"
 	"math"
 	"sort"
 
@@ -73,6 +74,8 @@ func Build(in *model.ReportInput) model.Report {
 	report.Criteria = flattenCriteria(report.Scenarios)
 	report.Expenditure = buildExpenditure(in.Attempts)
 	report.Verdict = buildVerdict(report.Totals)
+	report.AttemptFailures = buildAttemptFailures(in.Attempts)
+	report.Warnings = buildWarnings(report, in)
 	for _, sc := range report.Scenarios {
 		for _, run := range sc.Runs {
 			if run.Evidence != "" {
@@ -129,6 +132,7 @@ func buildScenario(sc model.ScenarioInput, configuredRuns int, arm string) model
 	if out.Regressions == nil {
 		out.Regressions = []model.CriterionResult{}
 	}
+	out.Skill = skillCoverage(runs)
 	switch {
 	case anyRunFailed(runs):
 		out.Status = "runner-failed"
@@ -136,6 +140,8 @@ func buildScenario(sc model.ScenarioInput, configuredRuns int, arm string) model
 		out.Status = "functional"
 	case out.Arms.With.Runs == 0 || out.Arms.Without.Runs == 0:
 		out.Status = "not-comparable"
+	case out.Skill != nil && !out.Skill.Exercised:
+		out.Status = StatusSkillNotExercised
 	default:
 		out.Status = "ok"
 	}
@@ -155,6 +161,7 @@ func buildRun(ri model.RunInput, rubric []model.Criterion, names map[string]bool
 		}
 	}
 	row := model.RunRow{
+		SkillUse:             ri.SkillUse,
 		Arm:                  ri.Arm,
 		Run:                  ri.Run,
 		Status:               ri.Status,
@@ -318,6 +325,13 @@ func buildTotals(scenarios []model.ScenarioResult, in *model.ReportInput) model.
 			}
 			continue
 		}
+		if skillNotExercised(sc) {
+			// The with arm never used the skill, so this scenario compares
+			// the agent with itself. Its rows stay visible; the headline
+			// leaves it out.
+			totals.SkillNotExercised++
+			continue
+		}
 		if sc.Arms.With.PercentMean != nil {
 			withValues = append(withValues, *sc.Arms.With.PercentMean)
 		}
@@ -383,6 +397,9 @@ func buildTotals(scenarios []model.ScenarioResult, in *model.ReportInput) model.
 	totals.Failures = totals.RunnerFailures
 
 	for _, sc := range scenarios {
+		if skillNotExercised(sc) {
+			continue
+		}
 		for _, criterion := range sc.Criteria {
 			if criterion.Delta == nil {
 				continue
@@ -429,7 +446,22 @@ func buildTiming(scenarios []model.ScenarioResult, in *model.ReportInput) model.
 }
 
 func buildVerdict(totals model.Totals) model.Verdict {
+	verdict := coreVerdict(totals)
+	if totals.SkillNotExercised > 0 {
+		verdict.Reason += fmt.Sprintf("; %d scenario(s) excluded because the skill was never invoked in their with arm",
+			totals.SkillNotExercised)
+	}
+	return verdict
+}
+
+func coreVerdict(totals model.Totals) model.Verdict {
 	if totals.Delta == nil {
+		if totals.SkillNotExercised > 0 && totals.Functional == 0 {
+			return model.Verdict{
+				Status: "incomplete",
+				Reason: "the skill was never invoked in any with arm, so nothing measures its effect",
+			}
+		}
 		switch {
 		case totals.Functional > 0 && totals.RunnerFailures == 0 && totals.FailedRuns == 0 &&
 			totals.PendingPoints == 0 && totals.NotComparable == 0:
@@ -461,6 +493,19 @@ func buildVerdict(totals model.Totals) model.Verdict {
 			Reason: "one run per arm; variance cannot be estimated",
 		}
 	}
+	if totals.N == 2 {
+		return withLowN(coreVerdictFor(totals))
+	}
+	return coreVerdictFor(totals)
+}
+
+// withLowN notes that two runs per arm is too few for a stable range.
+func withLowN(verdict model.Verdict) model.Verdict {
+	verdict.Reason += "; only two runs per arm, fewer than the three needed to trust the min/max ranges"
+	return verdict
+}
+
+func coreVerdictFor(totals model.Totals) model.Verdict {
 	delta := *totals.Delta
 	if math.Abs(delta) <= Epsilon {
 		return model.Verdict{

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/rikdc/ai-skills/internal/model"
+	"github.com/rikdc/ai-skills/internal/skilluse"
 )
 
 // Options controls loading. RepoRoot is only used for the legacy rubric
@@ -103,6 +104,7 @@ type legacyResult struct {
 	JudgeUsage      model.Usage      `json:"judge_usage"`
 	CombinedUsage   model.Usage      `json:"combined_usage"`
 	Evidence        string           `json:"evidence"`
+	SkillUse        *model.SkillUse  `json:"skill_use"`
 }
 
 type judgeResultFile struct {
@@ -124,6 +126,7 @@ type finishedFile struct {
 	FinishedAt           string            `json:"finished_at"`
 	Status               model.RunStatus   `json:"status"`
 	StopReason           string            `json:"stop_reason"`
+	Error                string            `json:"error"`
 	Usage                model.Usage       `json:"usage"`
 	AgentExit            *int              `json:"agent_exit"`
 	TimedOut             bool              `json:"timed_out"`
@@ -255,7 +258,8 @@ func Load(suiteDir string, opts Options) (*model.ReportInput, error) {
 		}
 		for _, runArm := range armsFor(mode, arm) {
 			for run := 1; run <= declaredRuns; run++ {
-				ri, err := loadRun(abs, p.Plugin, p.Scenario, runArm, run, rubric.Checklist)
+				ri, err := loadRun(abs, p.Plugin, p.Scenario, runArm, run, rubric.Checklist,
+					skillScope{names: skilluse.SkillNames(p.Units), dir: mf.Config.SkillDir})
 				if err != nil {
 					return nil, err
 				}
@@ -339,7 +343,14 @@ func findCriteria(suiteDir, repoRoot, plugin, scenario string) (string, error) {
 	return "", fmt.Errorf("no criteria.json for %s/%s (looked in the suite and the repository)", plugin, scenario)
 }
 
-func loadRun(suiteDir, plugin, scenario, arm string, run int, rubric []model.Criterion) (model.RunInput, error) {
+// skillScope names the skill units a scenario installs for the with arm and
+// the workspace directory they were installed under.
+type skillScope struct {
+	names []string
+	dir   string
+}
+
+func loadRun(suiteDir, plugin, scenario, arm string, run int, rubric []model.Criterion, skills skillScope) (model.RunInput, error) {
 	ri := model.RunInput{
 		Arm:           arm,
 		Run:           run,
@@ -356,7 +367,7 @@ func loadRun(suiteDir, plugin, scenario, arm string, run int, rubric []model.Cri
 		return ri, nil
 	}
 	if _, err := os.Stat(filepath.Join(runDir, "current.json")); err == nil {
-		return loadV3Run(runDir, rel, ri, rubric)
+		return loadV3Run(runDir, rel, ri, rubric, skills)
 	}
 	if _, err := os.Stat(filepath.Join(runDir, "attempts")); err == nil {
 		// v3 run without an acceptance pointer: unaccepted, incomplete.
@@ -421,7 +432,7 @@ func loadLegacyRun(runDir, rel string, ri model.RunInput, rubric []model.Criteri
 	return ri, nil
 }
 
-func loadV3Run(runDir, rel string, ri model.RunInput, rubric []model.Criterion) (model.RunInput, error) {
+func loadV3Run(runDir, rel string, ri model.RunInput, rubric []model.Criterion, skills skillScope) (model.RunInput, error) {
 	currentBytes, err := os.ReadFile(filepath.Join(runDir, "current.json"))
 	if err != nil {
 		return ri, fmt.Errorf("read current.json in %s: %w", runDir, err)
@@ -495,6 +506,18 @@ func loadV3Run(runDir, rel string, ri model.RunInput, rubric []model.Criterion) 
 		}
 		if projection.Evidence != "" {
 			ri.Evidence = projection.Evidence
+		}
+	}
+
+	// The recorded answer wins: the log may have been pruned since. Without
+	// one, read the accepted attempt's own log.
+	if ri.Arm == "with" && len(skills.names) > 0 {
+		if projectionValid && projection.SkillUse != nil {
+			recorded := *projection.SkillUse
+			ri.SkillUse = &recorded
+		} else {
+			detected := skilluse.DetectPath(filepath.Join(agentDir, "agent.log"), skills.names, skills.dir)
+			ri.SkillUse = &detected
 		}
 	}
 
@@ -708,14 +731,16 @@ func loadAttempts(runDir string) ([]model.AttemptInput, error) {
 		usage := model.Usage{State: model.UsageUnknown, Known: false, Source: "attempt"}
 		if finished == nil {
 			// Started without finished: interrupted, unknown, never zero.
-			out = append(out, model.AttemptInput{Kind: kind, Usage: usage})
+			out = append(out, model.AttemptInput{Kind: kind, Usage: usage, Status: model.StatusInterrupted})
 			continue
 		}
 		usage = readAttemptUsage(dir, kind, finished)
 		if usage.State == "" {
 			usage = unknownUsage(string(kind))
 		}
-		out = append(out, model.AttemptInput{Kind: kind, Usage: usage})
+		out = append(out, model.AttemptInput{
+			Kind: kind, Usage: usage, Status: finished.Status, Error: finished.Error,
+		})
 	}
 	return out, nil
 }

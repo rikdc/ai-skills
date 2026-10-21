@@ -12,6 +12,7 @@ import (
 	"github.com/rikdc/ai-skills/internal/judge"
 	"github.com/rikdc/ai-skills/internal/platform/errs"
 	"github.com/rikdc/ai-skills/internal/provider/command"
+	suitepkg "github.com/rikdc/ai-skills/internal/suite"
 	"github.com/rikdc/ai-skills/internal/usage"
 )
 
@@ -109,7 +110,10 @@ func newGradeCommand() *cobra.Command {
 					return err
 				}
 				cfg.RunDir = resolved
+				agentCmd, agentModel := suiteAgent(resolved)
+				warnSameModelJudge(cmd, agentCmd, agentModel, judgeCmd, "")
 				result, err := judge.Grade(cmd.Context(), cfg)
+				refreshSuite(cmd, suiteRootOf(resolved))
 				if err != nil {
 					return err
 				}
@@ -122,7 +126,10 @@ func newGradeCommand() *cobra.Command {
 				return err
 			}
 			cfg.SuiteDir = resolved
+			agentCmd, agentModel := suiteAgent(resolved)
+			warnSameModelJudge(cmd, agentCmd, agentModel, judgeCmd, "")
 			suite, err := judge.GradeSuite(cmd.Context(), cfg)
+			refreshSuite(cmd, resolved)
 			for _, run := range suite.Runs {
 				if run.Err != nil {
 					fmt.Fprintf(cmd.ErrOrStderr(), "  failed: %s: %v\n", run.Result.RunDir, run.Err)
@@ -154,6 +161,19 @@ func newGradeCommand() *cobra.Command {
 	flags.StringVar(&pricingFile, "pricing", "", "pricing JSON file (env EVALCTL_PRICING)")
 	addNativeFlags(flags, &native)
 	return cmd
+}
+
+// refreshSuite rewrites the suite's summary and counts after grading added
+// judge attempts. It is best effort: grading already succeeded or failed on
+// its own terms, so a refresh problem is reported but never changes the exit
+// status. A directory that is not a suite has nothing to refresh.
+func refreshSuite(cmd *cobra.Command, suiteDir string) {
+	if suiteDir == "" {
+		return
+	}
+	if err := suitepkg.Refresh(discoverRoot(cmd), suiteDir); err != nil && !suitepkg.IsNotSuite(err) {
+		fmt.Fprintf(cmd.ErrOrStderr(), "warning: could not refresh summary.md and suite.json: %v\n", err)
+	}
 }
 
 func absoluteDir(dir string) (string, error) {

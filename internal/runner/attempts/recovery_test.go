@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/rikdc/ai-skills/internal/model"
@@ -629,5 +630,70 @@ func TestWriteCurrentValidatesAndHashes(t *testing.T) {
 	invalid := model.CurrentPointer{SchemaVersion: model.SchemaVersion, AgentAttempt: attempt.ID}
 	if err := store.WriteCurrent(invalid); !errors.Is(err, ErrInvalidCurrent) {
 		t.Fatalf("invalid pointer error = %v", err)
+	}
+}
+
+func TestResultProjectionRecordsSkillUseFromAgentLog(t *testing.T) {
+	invoked := `{"type":"tool_use","part":{"tool":"skill","state":{"input":{"name":"nix-expert"}}}}` + "\n"
+	idle := `{"type":"text","part":{"text":"hello"}}` + "\n"
+	cases := []struct {
+		name string
+		arm  string
+		log  string
+		want string
+	}{
+		{"invoked", "with", invoked, model.SkillInvoked},
+		{"not invoked", "with", idle, model.SkillNotInvoked},
+		{"no log", "with", "", model.SkillUnknown},
+		{"without arm", "without", invoked, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			store := testStore(t)
+			agent := mustAllocate(t, store, model.KindAgent, "fp")
+			ev, reqSHA := addExecutionArtifactsWithLog(t, store, agent, tc.log)
+			finishExecutionOK(t, store, agent, ev, reqSHA)
+			if _, err := store.Accept(agent.ID, AcceptOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			result, err := store.EnsureResultProjection(RunContext{
+				Plugin: "p", Scenario: "s", Arm: tc.arm, Mode: "comparison", Run: 1,
+				Skills: []string{"nix-expert"},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.want == "" {
+				if result.SkillUse != nil {
+					t.Fatalf("skill_use = %+v, want none", result.SkillUse)
+				}
+				return
+			}
+			if result.SkillUse == nil || result.SkillUse.State != tc.want {
+				t.Fatalf("skill_use = %+v, want %s", result.SkillUse, tc.want)
+			}
+			data, err := os.ReadFile(store.ResultPath())
+			if err != nil || !strings.Contains(string(data), `"skill_use"`) {
+				t.Fatalf("result.json lacks skill_use: %v\n%s", err, data)
+			}
+		})
+	}
+}
+
+func TestResultProjectionKeepsRecordedSkillUse(t *testing.T) {
+	store := testStore(t)
+	agent := mustAllocate(t, store, model.KindAgent, "fp")
+	ev, reqSHA := addExecutionArtifacts(t, store, agent)
+	finishExecutionOK(t, store, agent, ev, reqSHA)
+	if _, err := store.Accept(agent.ID, AcceptOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	recorded := &model.SkillUse{State: model.SkillInvoked, Skills: map[string]string{"x": model.SkillInvoked}}
+	result, err := store.EnsureResultProjection(RunContext{Arm: "with", Skills: []string{"x"}, SkillUse: recorded})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.SkillUse == nil || result.SkillUse.State != model.SkillInvoked {
+		t.Fatalf("a carried skill_use must win over a missing log: %+v", result.SkillUse)
 	}
 }

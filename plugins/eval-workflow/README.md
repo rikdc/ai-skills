@@ -386,6 +386,42 @@ The report's `timing` block separates wall clock, agent time and judge time,
 and counts timed-out runs. New runs record `judge-result.json` beside
 `result.json`, so the report can show where a slow suite spent its time.
 
+### Caveats the report states up front
+
+`evalctl report` prints a **Warnings** block directly under the verdict (and a
+`warnings` array in `report.json`) for conditions that weaken a score:
+
+- **Skill never used.** For the with arm, `evalctl` reads the accepted agent
+  log and records `skill_use` in each run's `result.json` (`invoked`,
+  `not-invoked` or `unknown`, plus the answer per installed skill). A skill
+  counts as used when a `skill` tool call names it, or a tool call touches a
+  path under `<skill-dir>/<name>/`. Recognised logs are opencode JSON and
+  Claude `stream-json`; a missing, pruned or unrecognised log is `unknown`,
+  never `not-invoked`. A scenario whose with-arm runs all proved
+  `not-invoked` gets status `skill-not-exercised` and is left out of the
+  headline With, Without, Delta and criterion tallies (`totals.skill_not_exercised`
+  counts them); its own rows stay visible. A scenario that used the skill in
+  only some runs is flagged `skill-partially-exercised` but kept. The report
+  adds a **Skill use** table with one row per with-arm run.
+- **Failed or retried attempts.** `attempt_failures` lists, per attempt kind
+  (agent, hook, judge), how many attempts failed or were interrupted, how many
+  there were in total, and the first error string. The accepted run results
+  hide these because a later attempt supersedes them, so `failures: 0` can sit
+  beside a dozen failed judge calls.
+- **Same-model judge.** When the judge command names the same model as the
+  agent (`--model`/`-m`, or identical commands), scores may be lenient. The
+  report warns, and `evalctl suite` and `evalctl grade` print the same warning
+  on stderr. It never blocks a run.
+- **Low n.** With fewer than 3 runs per arm the report warns that variance
+  cannot be estimated reliably. The verdict reason says so for n=1 (`one run
+  per arm; variance cannot be estimated`) and n=2.
+
+`evalctl grade` rewrites `summary.md`, `suite.json` (including `counts`),
+`results.jsonl` and `grading/index.tsv` once it finishes, so a suite graded
+after the fact reports its judged runs, scores and attempt totals instead of
+the pre-grade state. The recorded duration and planned/executed counts are
+kept.
+
 The largest jq programs live in `scripts/jq/` and load with `jq -f`; the shell
 scripts keep selection, staging and rendering. Both use `set -u`/`pipefail` to
 match the rest of the harness.

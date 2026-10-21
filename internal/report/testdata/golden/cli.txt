@@ -8,6 +8,9 @@ Invocations: 6
 Verdict: incomplete
   runner failures or unjudged criteria remain; a verdict would be made up
 
+Warnings
+  ! [low-n] n=2: fewer than 3 runs per arm, so run-to-run variance cannot be estimated reliably; treat the delta as indicative, not conclusive.
+
 With: 73.5/100    Without: 67.2/100    Delta: +6.2
 Criteria: 1 won, 0 lost, 2 tied    Coverage: 66.7%    Pending: 96 points (both arms)    Failures: 0
 
