@@ -1,6 +1,9 @@
 package model
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
 // UsageState is the three-state accounting contract. Unknown is never zero.
 type UsageState string
@@ -87,10 +90,10 @@ func (u Usage) NormalizeState() Usage {
 //   - both known          -> known, numeric components summed
 //   - any applicable unknown -> unknown, retaining partial numeric components
 //
-// A known result carries only components both sides report, and a summed cost
-// needs both costs: a one-sided total would look exact while omitting the
-// other invocation. An unknown result retains one-sided token components as a
-// partial lower bound. Unknown is never treated as zero.
+// Two known records that do not report the same components combine to unknown:
+// a one-sided component is a partial sum, never an exact total. An unknown
+// result retains one-sided token components as a partial lower bound; a
+// summed cost needs both costs. Unknown is never treated as zero.
 func Combine(a, b Usage) Usage {
 	a = a.NormalizeState()
 	b = b.NormalizeState()
@@ -102,24 +105,25 @@ func Combine(a, b Usage) Usage {
 		return a
 	}
 
-	known := a.State == UsageKnown && b.State == UsageKnown
-	sum := sumInt64
-	if known {
-		sum = sumBothInt64
-	}
 	out := Usage{
 		State:            UsageKnown,
 		Source:           combineSource(a.Source, b.Source),
-		InputTokens:      sum(a.InputTokens, b.InputTokens),
-		OutputTokens:     sum(a.OutputTokens, b.OutputTokens),
-		ReasoningTokens:  sum(a.ReasoningTokens, b.ReasoningTokens),
-		CacheReadTokens:  sum(a.CacheReadTokens, b.CacheReadTokens),
-		CacheWriteTokens: sum(a.CacheWriteTokens, b.CacheWriteTokens),
-		TotalTokens:      sum(a.TotalTokens, b.TotalTokens),
+		InputTokens:      sumInt64(a.InputTokens, b.InputTokens),
+		OutputTokens:     sumInt64(a.OutputTokens, b.OutputTokens),
+		ReasoningTokens:  sumInt64(a.ReasoningTokens, b.ReasoningTokens),
+		CacheReadTokens:  sumInt64(a.CacheReadTokens, b.CacheReadTokens),
+		CacheWriteTokens: sumInt64(a.CacheWriteTokens, b.CacheWriteTokens),
+		TotalTokens:      sumInt64(a.TotalTokens, b.TotalTokens),
 	}
-	if !known {
+	switch {
+	case a.State != UsageKnown || b.State != UsageKnown:
 		out.State = UsageUnknown
 		out.Reason = combineReason(a.Reason, b.Reason)
+	default:
+		if missing := oneSided(a, b); len(missing) > 0 {
+			out.State = UsageUnknown
+			out.Reason = "not reported by every invocation: " + strings.Join(missing, ", ")
+		}
 	}
 	out.Known = out.State == UsageKnown
 	out.CostUSD = sumFloat64(a.CostUSD, b.CostUSD)
@@ -173,7 +177,7 @@ func sumInt64(a, b *int64) *int64 {
 	return &v
 }
 
-func sumBothInt64(a, b *int64) *int64 {
+func sumFloat64(a, b *float64) *float64 {
 	if a == nil || b == nil {
 		return nil
 	}
@@ -181,10 +185,117 @@ func sumBothInt64(a, b *int64) *int64 {
 	return &v
 }
 
-func sumFloat64(a, b *float64) *float64 {
-	if a == nil || b == nil {
-		return nil
+// usageComponents lists the numeric components by their JSON names.
+func usageComponents(u Usage) []struct {
+	name  string
+	value *int64
+} {
+	return []struct {
+		name  string
+		value *int64
+	}{
+		{"input_tokens", u.InputTokens},
+		{"output_tokens", u.OutputTokens},
+		{"reasoning_tokens", u.ReasoningTokens},
+		{"cache_read_tokens", u.CacheReadTokens},
+		{"cache_write_tokens", u.CacheWriteTokens},
+		{"total_tokens", u.TotalTokens},
 	}
-	v := *a + *b
-	return &v
+}
+
+// oneSided names the components exactly one of a and b reports, cost included.
+func oneSided(a, b Usage) []string {
+	var names []string
+	bc := usageComponents(b)
+	for i, component := range usageComponents(a) {
+		if (component.value == nil) != (bc[i].value == nil) {
+			names = append(names, component.name)
+		}
+	}
+	if (a.CostUSD == nil) != (b.CostUSD == nil) {
+		names = append(names, "cost_usd")
+	}
+	return names
+}
+
+// SumUsage totals the applicable records for a comparison. A component is
+// present only when every applicable record is known and reports it, so a sum
+// over a subset never reads as a total. The result is unknown when any
+// applicable record is unknown or a component is missing from some records.
+// With no applicable records it is not applicable.
+func SumUsage(source string, records []Usage) Usage {
+	total, complete, applicable := sumRecords(source, records, true)
+	if applicable == 0 {
+		return NotApplicable(source)
+	}
+	if !complete {
+		return total.WithState(UsageUnknown)
+	}
+	return total
+}
+
+// SumLowerBound totals every component any applicable record reports,
+// including partial components of unknown records, for expenditure: the sum
+// is a lower bound unless complete, which holds only when every applicable
+// record is known and reports every component in the total.
+func SumLowerBound(source string, records []Usage) (Usage, bool) {
+	total, complete, _ := sumRecords(source, records, false)
+	return total, complete
+}
+
+func sumRecords(source string, records []Usage, everyRecord bool) (Usage, bool, int) {
+	out := KnownUsage(source)
+	type acc struct {
+		sum  int64
+		seen int
+	}
+	var tokens [6]acc
+	var cost float64
+	costSeen := 0
+	applicable, known := 0, 0
+	for _, record := range records {
+		record = record.NormalizeState()
+		if record.State == UsageNotApplicable {
+			continue
+		}
+		applicable++
+		if record.State == UsageKnown {
+			known++
+		} else if everyRecord {
+			continue
+		}
+		for i, component := range usageComponents(record) {
+			if component.value != nil {
+				tokens[i].sum += *component.value
+				tokens[i].seen++
+			}
+		}
+		if record.CostUSD != nil {
+			cost += *record.CostUSD
+			costSeen++
+		}
+	}
+	complete := known == applicable
+	present := func(seen int) bool {
+		if seen > 0 && seen != applicable {
+			complete = false
+		}
+		if everyRecord {
+			return seen > 0 && seen == applicable
+		}
+		return seen > 0
+	}
+	targets := []**int64{&out.InputTokens, &out.OutputTokens, &out.ReasoningTokens,
+		&out.CacheReadTokens, &out.CacheWriteTokens, &out.TotalTokens}
+	for i, target := range targets {
+		if present(tokens[i].seen) {
+			v := tokens[i].sum
+			*target = &v
+		}
+	}
+	if present(costSeen) {
+		out.CostUSD = &cost
+		out.Currency = "USD"
+	}
+	return out, complete, applicable
 }

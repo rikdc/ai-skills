@@ -54,6 +54,7 @@ type SuiteConfig struct {
 	UsageCmd             string      `json:"usage_cmd,omitempty"`
 	JudgeUsageCmd        string      `json:"judge_usage_cmd,omitempty"`
 	PricingSHA256        string      `json:"pricing_sha256,omitempty"`
+	PricingFormula       string      `json:"pricing_formula,omitempty"`
 	AttemptArtifacts     string      `json:"attempt_artifacts"`
 	HarnessVersion       string      `json:"harness_version"`
 }

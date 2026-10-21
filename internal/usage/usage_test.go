@@ -281,7 +281,7 @@ func TestCombine(t *testing.T) {
 		{"known sum", known, known, model.UsageKnown, int64Ptr(20), int64Ptr(8), float64Ptr(0.5)},
 		{"known plus unknown", known, unknown, model.UsageUnknown, int64Ptr(13), int64Ptr(4), nil},
 		{"unknown plus not applicable", unknown, na, model.UsageUnknown, int64Ptr(3), nil, nil},
-		{"known with one-sided components", known, costOnly, model.UsageKnown, nil, nil, float64Ptr(0.75)},
+		{"known with one-sided components", known, costOnly, model.UsageUnknown, int64Ptr(10), int64Ptr(4), float64Ptr(0.75)},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

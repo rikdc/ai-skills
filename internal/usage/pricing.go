@@ -9,6 +9,10 @@ import (
 	"github.com/rikdc/ai-skills/internal/model"
 )
 
+// PricingFormula names how CostFor turns tokens into cost. Bump it whenever
+// the formula changes, so a resumed suite never mixes costs from two formulas.
+const PricingFormula = "cache-split.1"
+
 // ModelPrice is USD per million tokens.
 type ModelPrice struct {
 	Input      float64 `json:"input"`

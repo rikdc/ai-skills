@@ -112,7 +112,7 @@ func RenderCLI(report model.Report, color bool) string {
 		if e.Complete {
 			b.WriteString(" (complete)\n")
 		} else {
-			b.WriteString(" (lower bound; unknown usage is never zero)\n")
+			b.WriteString(" (lower bound; missing usage is never zero)\n")
 		}
 		if report.Totals.Functional > 0 {
 			b.WriteString("  Includes functional runs and superseded/regraded attempts.\n")

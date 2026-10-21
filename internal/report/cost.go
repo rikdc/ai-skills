@@ -131,6 +131,9 @@ func fieldStats(runs []model.RunRow, get func(model.RunRow) model.Usage) model.F
 	return stats
 }
 
+// metricStats summarises one metric. The mean covers the runs that reported
+// it (runs_known of runs_total); the total is present only when every run
+// reported it, so a sum over a subset never reads as a total.
 func metricStats(values []float64, runsTotal int) model.MetricStats {
 	out := model.MetricStats{RunsKnown: len(values), RunsTotal: runsTotal}
 	if len(values) == 0 {
@@ -141,8 +144,10 @@ func metricStats(values []float64, runsTotal int) model.MetricStats {
 		total += value
 	}
 	mean := total / float64(len(values))
-	out.Total = &total
 	out.Mean = &mean
+	if len(values) == runsTotal {
+		out.Total = &total
+	}
 	return out
 }
 
@@ -239,8 +244,7 @@ func usageMetric(usage model.Usage, value *float64) *float64 {
 
 func buildExpenditure(attempts []model.AttemptInput) model.Expenditure {
 	out := model.Expenditure{Currency: "USD"}
-	known := model.Usage{State: model.UsageUnknown, Known: false, Source: "expenditure"}
-	known.Currency = "USD"
+	usages := make([]model.Usage, 0, len(attempts))
 	for _, attempt := range attempts {
 		out.TotalAttempts++
 		switch attempt.Kind {
@@ -252,46 +256,26 @@ func buildExpenditure(attempts []model.AttemptInput) model.Expenditure {
 			out.JudgeAttempts++
 		}
 		usage := attempt.Usage.NormalizeState()
+		usages = append(usages, usage)
 		switch usage.State {
 		case model.UsageNotApplicable:
 			out.NotApplicableAttempts++
-			continue
 		case model.UsageKnown:
 			out.KnownAttempts++
 		default:
 			out.UnknownAttempts++
 		}
-		// Known totals include every numeric component, including a partial
-		// component carried by an otherwise unknown attempt.
-		if usage.CostUSD != nil {
-			known.CostUSD = addFloat(known.CostUSD, *usage.CostUSD)
-		}
-		if usage.InputTokens != nil {
-			known.InputTokens = addInt(known.InputTokens, *usage.InputTokens)
-		}
-		if usage.OutputTokens != nil {
-			known.OutputTokens = addInt(known.OutputTokens, *usage.OutputTokens)
-		}
-		if usage.ReasoningTokens != nil {
-			known.ReasoningTokens = addInt(known.ReasoningTokens, *usage.ReasoningTokens)
-		}
-		if usage.CacheReadTokens != nil {
-			known.CacheReadTokens = addInt(known.CacheReadTokens, *usage.CacheReadTokens)
-		}
-		if usage.CacheWriteTokens != nil {
-			known.CacheWriteTokens = addInt(known.CacheWriteTokens, *usage.CacheWriteTokens)
-		}
-		if usage.TotalTokens != nil {
-			known.TotalTokens = addInt(known.TotalTokens, *usage.TotalTokens)
-		}
 	}
-	out.Complete = out.UnknownAttempts == 0
-	if out.Complete {
-		known = known.WithState(model.UsageKnown)
+	// The known total includes partial components of unknown attempts; it is
+	// complete only when every applicable attempt reports every component.
+	known, complete := model.SumLowerBound("expenditure", usages)
+	out.Complete = complete
+	if complete {
+		out.KnownTotal = known
 	} else {
-		known = known.WithState(model.UsageUnknown)
+		out.KnownTotal = known.WithState(model.UsageUnknown)
 	}
-	out.KnownTotal = known
+	out.KnownTotal.Currency = "USD"
 	return out
 }
 

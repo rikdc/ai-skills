@@ -188,9 +188,9 @@ func renderExpenditureHTML(report model.Report) string {
 		e.KnownAttempts, e.UnknownAttempts, e.NotApplicableAttempts, fmtMoney(e.KnownTotal.CostUSD))
 	b.WriteString("</tbody></table>\n")
 	if e.Complete {
-		b.WriteString("<p class=\"note\">Every applicable attempt has known usage. Expenditure includes superseded, failed and regraded attempts.</p>\n")
+		b.WriteString("<p class=\"note\">Every applicable attempt reported every usage component. Expenditure includes superseded, failed and regraded attempts.</p>\n")
 	} else {
-		b.WriteString("<p class=\"note\">The known total is a lower bound: at least one applicable attempt has unknown usage. Unknown is never counted as zero.</p>\n")
+		b.WriteString("<p class=\"note\">The known total is a lower bound: at least one applicable attempt has unknown usage or did not report every component. Missing usage is never counted as zero.</p>\n")
 	}
 	return b.String()
 }

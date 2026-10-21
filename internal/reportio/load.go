@@ -455,6 +455,14 @@ func loadV3Run(runDir, rel string, ri model.RunInput, rubric []model.Criterion, 
 		return ri, nil
 	}
 
+	// A newer failed or interrupted execution attempt is the run's outcome;
+	// the accepted pointer is then provenance only.
+	if id, started, finished, err := supersedingAttempt(runDir, current.AgentAttempt); err != nil {
+		return ri, err
+	} else if id != "" {
+		return supersededRun(ri, id, started, finished), nil
+	}
+
 	agentDir := filepath.Join(runDir, "attempts", current.AgentAttempt)
 	started, finished, err := readAttempt(agentDir)
 	if err != nil {
@@ -582,6 +590,73 @@ func loadV3Run(runDir, rel string, ri model.RunInput, rubric []model.Criterion, 
 		ri.CombinedUsage = notApplicableUsage()
 	}
 	return ri, nil
+}
+
+// supersedingAttempt returns the newest agent or hook attempt newer than the
+// accepted one when it finished with a non-ok status, or "" when the accepted
+// attempt is still the run's outcome. An unfinished attempt (in flight or
+// crashed) never supersedes.
+func supersedingAttempt(runDir, accepted string) (string, *startedFile, *finishedFile, error) {
+	acceptedSeq, ok := attemptSequence(accepted)
+	if !ok {
+		return "", nil, nil, nil
+	}
+	entries, err := os.ReadDir(filepath.Join(runDir, "attempts"))
+	if err != nil {
+		return "", nil, nil, nil
+	}
+	newest, newestSeq := "", acceptedSeq
+	for _, entry := range entries {
+		kind := kindFromDirName(entry.Name())
+		if !entry.IsDir() || (kind != model.KindAgent && kind != model.KindHook) {
+			continue
+		}
+		if seq, ok := attemptSequence(entry.Name()); ok && seq > newestSeq {
+			newest, newestSeq = entry.Name(), seq
+		}
+	}
+	if newest == "" {
+		return "", nil, nil, nil
+	}
+	started, finished, err := readAttempt(filepath.Join(runDir, "attempts", newest))
+	if err != nil {
+		return "", nil, nil, err
+	}
+	if started == nil || finished == nil || finished.Status == model.StatusOK {
+		return "", nil, nil, nil
+	}
+	return newest, started, finished, nil
+}
+
+func attemptSequence(id string) (int, bool) {
+	i := strings.LastIndex(id, "-")
+	if i < 0 {
+		return 0, false
+	}
+	seq, err := strconv.Atoi(id[i+1:])
+	return seq, err == nil
+}
+
+// supersededRun reports a failed rerun as the run's outcome.
+// Like any failed run, it has no accepted usage or judgement.
+func supersededRun(ri model.RunInput, id string, started *startedFile, finished *finishedFile) model.RunInput {
+	ri.AgentAttempt = id
+	ri.JudgeAttempt = ""
+	ri.Complete = false
+	ri.Status = string(finished.Status)
+	ri.StopReason = finished.StopReason
+	ri.TimedOut = finished.TimedOut || finished.Status == model.StatusTimedOut ||
+		finished.StopReason == model.StopTimeout
+	ri.AgentExit = finished.AgentExit
+	ri.DurationSeconds = finished.DurationSeconds
+	if ri.DurationSeconds == nil {
+		ri.DurationSeconds = durationBetween(started, finished)
+	}
+	ri.Usage = notApplicableUsage()
+	ri.AgentUsage = notApplicableUsage()
+	ri.JudgeUsage = notApplicableUsage()
+	ri.CombinedUsage = notApplicableUsage()
+	return ri
 }
 
 // readProjection returns result.json only when it is bound to the accepted

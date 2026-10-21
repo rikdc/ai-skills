@@ -240,6 +240,23 @@ func TestExpenditureClassifiesEveryAttemptOnce(t *testing.T) {
 	}
 }
 
+func TestExpenditureIncompleteWhenAKnownAttemptLacksCost(t *testing.T) {
+	in := input([]model.Criterion{{Name: "A", MaxScore: 100}}, nil, "comparison", 1)
+	costless := knownAttempt(0, 50, 5, model.KindJudge)
+	costless.Usage.CostUSD = nil
+	in.Attempts = []model.AttemptInput{knownAttempt(0.01, 100, 10, model.KindAgent), costless}
+	expenditure := report.Build(in).Expenditure
+	if expenditure.UnknownAttempts != 0 {
+		t.Fatalf("expenditure = %+v", expenditure)
+	}
+	if expenditure.Complete || expenditure.KnownTotal.State != model.UsageUnknown {
+		t.Fatalf("a known attempt without cost left expenditure complete: %+v", expenditure)
+	}
+	if expenditure.KnownTotal.CostUSD == nil || *expenditure.KnownTotal.CostUSD != 0.01 {
+		t.Fatalf("lower bound cost = %v, want 0.01", expenditure.KnownTotal.CostUSD)
+	}
+}
+
 func TestCompareMatchesByNameAndRubric(t *testing.T) {
 	rubric := []model.Criterion{{Name: "A", MaxScore: 100}}
 	build := func(withScore, withoutScore float64, extra bool) model.Report {

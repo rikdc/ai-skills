@@ -157,11 +157,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   replaced but not yet durable" from "not written".
 - A usage record's `known` flag is now always derived from its `state` when
   serialised or updated, so the two can no longer disagree.
-- A failed rerun of an accepted run (`--resume-policy rerun-all`, for example)
-  no longer exits 0: the suite counts it as a runner failure and names the
-  newer attempt in `summary.md` (`failed_rerun` in `results.jsonl`), while the
-  accepted result stays current. The next `--resume` retries the run instead
-  of reusing it.
+- A rerun of an accepted run that finishes with a non-ok status
+  (`--resume-policy rerun-all`, a changed scenario, a cancel or a timeout)
+  is now the run's result everywhere: `summary.md`, `results.jsonl`
+  (`superseded_attempt` names the replaced attempt) and `evalctl report` show
+  the failure with no score, and the suite exits 1. Previously the old
+  accepted score was reported and the suite exited 0. `current.json` is kept
+  only as provenance; the run is no longer reusable or adoptable, so
+  `--resume` retries it and `keep-failures` keeps it. An unfinished newer
+  attempt (in flight or crashed) does not replace the accepted result.
 - After an interrupt, `evalctl run`, `suite`, and `grade --suite` stop
   starting new runs and judge calls instead of recording a cancelled attempt
   for every remaining one.
@@ -171,12 +175,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pricing no longer subtracts cache-read tokens from input tokens for Claude
   and opencode logs, which already count them separately; that undercharged
   input and could price it at zero.
-- `evalctl suite --resume` refuses a different pricing file, so one suite never
-  mixes cost bases.
-- Combining two known usage records keeps only components both report, so a
-  combined total never looks exact while omitting one invocation. The
-  attempt store's `result.json` projection now uses the same combination as
-  the report.
+- `evalctl suite --resume` refuses a different pricing file or pricing formula
+  (`pricing_formula` in the manifest), so one suite never mixes cost bases. A
+  priced suite started before this release cannot be resumed.
+- Usage totals are never reported over incomplete data. Combining agent and
+  judge usage that do not report the same components is unknown (a labelled
+  partial), not known. Report cost and token totals, and the deltas between
+  them, are shown only when every run reported the metric (otherwise "—",
+  with the existing coverage line); means still cover the runs that
+  reported. Expenditure is complete only when every applicable attempt
+  reported every component, so a known attempt without a cost now makes the
+  total a lower bound. The attempt store's `result.json` projection and the
+  suite's accepted-usage totals use the same rules as the report.
 - `evalctl grade` now refreshes `summary.md`, `suite.json` counts,
   `results.jsonl` and the grading index after grading, so a suite graded after
   the run no longer reports 0% and every run pending.

@@ -423,3 +423,71 @@ func TestUsageMarshalDerivesKnownFromState(t *testing.T) {
 		}
 	}
 }
+
+func usageWith(state UsageState, total *int64, cost *float64) Usage {
+	u := Usage{Source: "t", TotalTokens: total, CostUSD: cost}.WithState(state)
+	return u
+}
+
+func TestSumUsageRequiresEveryRecord(t *testing.T) {
+	n := func(v int64) *int64 { return &v }
+	c := func(v float64) *float64 { return &v }
+
+	all := SumUsage("t", []Usage{
+		usageWith(UsageKnown, n(10), c(0.1)),
+		usageWith(UsageKnown, n(20), c(0.2)),
+		NotApplicable("judge"),
+	})
+	if all.State != UsageKnown || all.TotalTokens == nil || *all.TotalTokens != 30 || all.CostUSD == nil {
+		t.Fatalf("complete sum = %+v", all)
+	}
+
+	// One record without cost: tokens stay exact, cost is not a total.
+	partialCost := SumUsage("t", []Usage{
+		usageWith(UsageKnown, n(10), c(0.1)),
+		usageWith(UsageKnown, n(20), nil),
+	})
+	if partialCost.State != UsageUnknown || partialCost.CostUSD != nil ||
+		partialCost.TotalTokens == nil || *partialCost.TotalTokens != 30 {
+		t.Fatalf("partial cost sum = %+v", partialCost)
+	}
+
+	withUnknown := SumUsage("t", []Usage{usageWith(UsageKnown, n(10), c(0.1)), Unknown("t", "")})
+	if withUnknown.State != UsageUnknown || withUnknown.TotalTokens != nil || withUnknown.CostUSD != nil {
+		t.Fatalf("sum with an unknown record = %+v", withUnknown)
+	}
+
+	if none := SumUsage("t", []Usage{NotApplicable("t")}); none.State != UsageNotApplicable {
+		t.Fatalf("sum of nothing applicable = %+v", none)
+	}
+}
+
+func TestSumLowerBoundCompleteness(t *testing.T) {
+	n := func(v int64) *int64 { return &v }
+	c := func(v float64) *float64 { return &v }
+
+	total, complete := SumLowerBound("t", []Usage{
+		usageWith(UsageKnown, n(10), c(0.1)),
+		usageWith(UsageKnown, n(20), c(0.2)),
+	})
+	if !complete || total.CostUSD == nil || *total.CostUSD < 0.3-1e-9 {
+		t.Fatalf("complete lower bound = %+v, %v", total, complete)
+	}
+
+	// A known record that reports no cost leaves the cost a lower bound.
+	total, complete = SumLowerBound("t", []Usage{
+		usageWith(UsageKnown, n(10), c(0.1)),
+		usageWith(UsageKnown, n(20), nil),
+	})
+	if complete || total.CostUSD == nil || *total.CostUSD != 0.1 {
+		t.Fatalf("missing cost lower bound = %+v, %v", total, complete)
+	}
+
+	// Partial components of an unknown record still count toward the bound.
+	partial := Unknown("t", "no cost")
+	partial.TotalTokens = n(5)
+	total, complete = SumLowerBound("t", []Usage{usageWith(UsageKnown, n(10), nil), partial})
+	if complete || total.TotalTokens == nil || *total.TotalTokens != 15 {
+		t.Fatalf("unknown partial lower bound = %+v, %v", total, complete)
+	}
+}

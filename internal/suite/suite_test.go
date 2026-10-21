@@ -19,6 +19,7 @@ import (
 	"github.com/rikdc/ai-skills/internal/model"
 	"github.com/rikdc/ai-skills/internal/platform/errs"
 	"github.com/rikdc/ai-skills/internal/provider/command"
+	"github.com/rikdc/ai-skills/internal/reportio"
 	"github.com/rikdc/ai-skills/internal/runner/attempts"
 	"github.com/rikdc/ai-skills/internal/scenario"
 )
@@ -493,8 +494,21 @@ func TestFailedRerunOfAcceptedRunIsReportedAndRetried(t *testing.T) {
 			t.Fatalf("%s status = %q, want runner-failed", row.Scenario, row.Status)
 		}
 		for _, run := range row.Runs {
-			if !strings.Contains(run.FailedRerun, "showing accepted") {
-				t.Fatalf("%s %s/run-%d failed_rerun = %q", row.Scenario, run.Arm, run.Run, run.FailedRerun)
+			if run.Status != string(model.StatusAgentFailed) || run.Score != nil ||
+				run.SupersededAttempt == "" || run.AgentAttempt == run.SupersededAttempt {
+				t.Fatalf("%s %s/run-%d = %+v, want the failed rerun without a score",
+					row.Scenario, run.Arm, run.Run, run)
+			}
+		}
+	}
+	loaded, err := reportio.Load(out, reportio.Options{RepoRoot: fx.root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, sc := range loaded.Scenarios {
+		for _, run := range sc.Runs {
+			if run.Status != string(model.StatusAgentFailed) || run.Complete || len(run.JudgedItems) != 0 {
+				t.Fatalf("report %s %s/run-%d = %+v, want the failed rerun", sc.Scenario, run.Arm, run.Run, run)
 			}
 		}
 	}
@@ -515,6 +529,38 @@ func TestFailedRerunOfAcceptedRunIsReportedAndRetried(t *testing.T) {
 		if row.Status != "ok" {
 			t.Fatalf("%s status = %q after retry", row.Scenario, row.Status)
 		}
+	}
+}
+
+func TestKeepFailuresRetainsFailedRerunOfAcceptedRun(t *testing.T) {
+	fx := newFixture(t)
+	out := filepath.Join(t.TempDir(), "suite")
+	if _, _, err := runSuite(t, fx.suiteConfig(t, out)); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, fx.agentScript, fmt.Sprintf(
+		"#!/usr/bin/env bash\nprintf 'call\\n' >> %q\nexit 1\n", fx.agentCalls), 0o755)
+	cfg := fx.suiteConfig(t, out)
+	cfg.Resume = true
+	cfg.ResumePolicy = PolicyRerunAll
+	if _, _, err := runSuite(t, cfg); errs.Code(err) != 1 {
+		t.Fatalf("failed rerun-all exit = %v, want 1", err)
+	}
+
+	before := fx.callCount(t, fx.agentCalls)
+	writeFile(t, fx.agentScript, fmt.Sprintf(
+		"#!/usr/bin/env bash\nprintf 'call\\n' >> %q\n", fx.agentCalls), 0o755)
+	cfg = fx.suiteConfig(t, out)
+	cfg.Resume = true
+	cfg.ResumePolicy = PolicyKeepFailures
+	if _, _, err := runSuite(t, cfg); errs.Code(err) != 1 {
+		t.Fatalf("keep-failures exit = %v, want the kept failures (1)", err)
+	}
+	if got := fx.callCount(t, fx.agentCalls); got != before {
+		t.Fatalf("keep-failures reran a failed rerun: %d → %d calls", before, got)
+	}
+	if doc := readSuiteJSON(t, out); doc.Counts["kept_failures"] != 3 {
+		t.Fatalf("kept_failures = %+v, want 3", doc.Counts)
 	}
 }
 
@@ -1385,5 +1431,16 @@ func TestResumeAllowsTimeoutChangesButNotContractChanges(t *testing.T) {
 	changed.PricingSHA256 = "b"
 	if problems := compareConfigs(base, changed, false); len(problems) == 0 {
 		t.Fatal("a pricing change must be refused")
+	}
+	// A suite priced before the formula was versioned has no pricing_formula.
+	priced := base
+	priced.PricingSHA256 = "a"
+	upgraded := priced
+	upgraded.PricingFormula = pricingFormula(priced.PricingSHA256)
+	if problems := compareConfigs(priced, upgraded, false); len(problems) == 0 {
+		t.Fatal("a pricing formula change must be refused")
+	}
+	if pricingFormula("") != "" {
+		t.Fatal("an unpriced suite must not record a formula")
 	}
 }

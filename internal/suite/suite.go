@@ -29,6 +29,7 @@ import (
 	"github.com/rikdc/ai-skills/internal/runner/attempts"
 	"github.com/rikdc/ai-skills/internal/scenario"
 	"github.com/rikdc/ai-skills/internal/skilluse"
+	"github.com/rikdc/ai-skills/internal/usage"
 )
 
 // Resume policies.
@@ -616,15 +617,13 @@ func (r *Runner) planRuns(selected []scenario.Selected, fingerprints map[string]
 					if err != nil {
 						return nil, errs.Operational("enumerate %s: %v", dir, err)
 					}
-					// Retain interrupted and non-ok work; stale successful
-					// work is retained but rerun (it is not a failure).
-					_, _, currentErr := store.LoadCurrent()
-					if currentErr != nil && len(list) > 0 {
-						if latest := latestExecution(list); latest != nil &&
-							(latest.Finished == nil || latest.Finished.Status != model.StatusOK) {
-							decisions[key] = decision{retain: true, reason: "kept-failure"}
-							continue
-						}
+					// Retain interrupted and non-ok work, including a failed
+					// rerun of an accepted run; stale successful work is
+					// rerun (it is not a failure).
+					if latest := attempts.LatestExecution(list); latest != nil &&
+						(latest.Finished == nil || latest.Finished.Status != model.StatusOK) {
+						decisions[key] = decision{retain: true, reason: "kept-failure"}
+						continue
 					}
 				}
 				if r.cfg.ResumePolicy == PolicyRetryFailed {
@@ -1128,6 +1127,7 @@ func (r *Runner) suiteConfig() (model.SuiteConfig, error) {
 		UsageCmd:             r.cfg.UsageCmd,
 		JudgeUsageCmd:        r.cfg.JudgeUsageCmd,
 		PricingSHA256:        r.cfg.PricingSHA256,
+		PricingFormula:       pricingFormula(r.cfg.PricingSHA256),
 		AttemptArtifacts:     r.cfg.AttemptArtifacts,
 		HarnessVersion:       model.Version,
 	}, nil
@@ -1147,6 +1147,14 @@ func resumeTimeoutNotice(old, current model.SuiteConfig) string {
 	add("checks", old.ChecksTimeoutSeconds, current.ChecksTimeoutSeconds)
 	add("judge", old.JudgeTimeoutSeconds, current.JudgeTimeoutSeconds)
 	return strings.Join(parts, ", ")
+}
+
+// pricingFormula records the cost formula only when a price sheet is in use.
+func pricingFormula(pricingSHA256 string) string {
+	if pricingSHA256 == "" {
+		return ""
+	}
+	return usage.PricingFormula
 }
 
 func compareConfigs(old, current model.SuiteConfig, regrade bool) []string {
@@ -1183,6 +1191,7 @@ func compareConfigs(old, current model.SuiteConfig, regrade bool) []string {
 	// Reused runs keep their recorded cost, so a different price sheet would
 	// mix cost bases within one suite.
 	add("pricing_sha256", old.PricingSHA256, current.PricingSHA256)
+	add("pricing_formula", old.PricingFormula, current.PricingFormula)
 	add("harness_version", old.HarnessVersion, current.HarnessVersion)
 	if !regrade {
 		add("judge.backend", old.Judge.Backend, current.Judge.Backend)

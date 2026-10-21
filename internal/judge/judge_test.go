@@ -33,8 +33,17 @@ func knownJudgeUsage() model.Usage {
 }
 
 func knownAgentUsage() model.Usage {
-	input := int64(10)
-	return model.Usage{State: model.UsageKnown, Known: true, Source: "test-agent", InputTokens: &input}
+	input, output, total := int64(10), int64(5), int64(15)
+	cost := 0.01
+	return model.Usage{
+		State:        model.UsageKnown,
+		Known:        true,
+		Source:       "test-agent",
+		InputTokens:  &input,
+		OutputTokens: &output,
+		TotalTokens:  &total,
+		CostUSD:      &cost,
+	}
 }
 
 // fixture is an accepted agent run ready for grading.

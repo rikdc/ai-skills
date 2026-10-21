@@ -147,9 +147,9 @@ func renderExpenditureMarkdown(report model.Report) string {
 		e.TotalAttempts, e.AgentAttempts, e.HookAttempts, e.JudgeAttempts,
 		e.KnownAttempts, e.UnknownAttempts, e.NotApplicableAttempts, fmtMoney(e.KnownTotal.CostUSD))
 	if e.Complete {
-		b.WriteString("\nEvery applicable attempt has known usage. Expenditure includes superseded, failed and regraded attempts.\n")
+		b.WriteString("\nEvery applicable attempt reported every usage component. Expenditure includes superseded, failed and regraded attempts.\n")
 	} else {
-		b.WriteString("\nThe known total is a lower bound: at least one applicable attempt has unknown usage. Unknown is never counted as zero.\n")
+		b.WriteString("\nThe known total is a lower bound: at least one applicable attempt has unknown usage or did not report every component. Missing usage is never counted as zero.\n")
 	}
 	return b.String()
 }
