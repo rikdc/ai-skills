@@ -3,6 +3,8 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"sync/atomic"
@@ -17,6 +19,10 @@ func main() {
 }
 
 func run(args []string) int {
+	return runWithStderr(args, os.Stderr)
+}
+
+func runWithStderr(args []string, stderr io.Writer) int {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -38,6 +44,9 @@ func run(args []string) int {
 	err := cli.Execute(ctx, args)
 	close(done)
 
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+	}
 	if code := signalCode.Load(); code != 0 {
 		return int(code)
 	}
