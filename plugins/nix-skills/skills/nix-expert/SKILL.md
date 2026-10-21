@@ -1,15 +1,15 @@
 ---
 name: nix-expert
 description: >
-  Expert guidance on Nix, NixOS, home-manager, flakes, and Nix packaging. Use
-  when writing or debugging Nix expressions, configuring NixOS or home-manager,
-  authoring derivations, managing flake inputs, encrypting secrets with agenix
-  or sops-nix, or hardening a NixOS host. Triggers on Nix, NixOS, nixpkgs,
-  home-manager, flake.nix, nixos-rebuild, nix build, nix develop, devShell,
-  derivation, overlay, agenix, and on Nix errors such as hash mismatches,
-  infinite recursion, or evaluation failures. Advisory rather than generative:
-  it explains, reviews, and debugs. If the repository provides its own skill for
-  authoring host configurations, prefer that for writing config.
+  Expert guidance on Nix, NixOS, home-manager, flakes, and Nix packaging. Use when writing or debugging Nix
+  expressions, configuring NixOS or home-manager, authoring derivations, managing flake inputs, encrypting
+  secrets with agenix or sops-nix, or hardening a NixOS host. Also use when committing or reviewing a flake.lock
+  or `nix flake update` result, pinning or overriding a flake input, and when reviewing or deploying a NixOS
+  config change (especially to a remote host) before it is applied. Triggers on Nix, NixOS, nixpkgs,
+  home-manager, flake.nix, flake.lock, nix flake update, nixos-rebuild, nix build, nix develop, devShell, derivation,
+  overlay, agenix, and on Nix errors such as hash mismatches, infinite recursion, or evaluation failures.
+  Advisory rather than generative: it explains, reviews, and debugs. If the repository provides its own skill
+  for authoring host configurations, prefer that for writing config.
 ---
 
 # Nix Expert
@@ -295,37 +295,37 @@ systemd.user.services.myservice = {
 
 ## Secrets Management
 
-Never put plaintext secrets in a `.nix` file — everything in the Nix store is
-world-readable. Use `agenix` or `sops-nix`, and reference the decrypted path at
-runtime.
+Never put plaintext secrets in a `.nix` file: everything in the Nix store is
+world-readable. Use `agenix` or `sops-nix` and reference the decrypted path.
+
+An untracked `chmod 600 secrets.env` is not a fix: it is still plaintext,
+outside the declarative, versioned configuration. Commit the **encrypted**
+file, and declare one `age.secrets.<name>` per secret with its own `.age` file.
 
 ```nix
-# secrets.nix
+# secrets.nix — committed; declares the keys that may decrypt each file
 let
   user   = "ssh-ed25519 AAAAC3...";
   system = "ssh-ed25519 AAAAC3...";
 in {
-  "secret.age".publicKeys = [ user system ];
+  "mySecret.age".publicKeys   = [ user system ];
+  "turnSecret.age".publicKeys = [ user system ];
 }
 ```
 
 ```nix
 {
-  age.secrets.mySecret = {
-    file = ../secrets/mySecret.age;
-    owner = "myuser";
-    group = "mygroup";
-  };
-
+  age.secrets.mySecret   = { file = ../secrets/mySecret.age;   owner = "myuser"; };
+  age.secrets.turnSecret = { file = ../secrets/turnSecret.age; owner = "myuser"; };
   # Pass the path, never the value
   services.myservice.passwordFile = config.age.secrets.mySecret.path;
 }
 ```
 
-```bash
-agenix -e secrets/mySecret.age   # Edit or create
-agenix -r                        # Re-key after adding a host
-```
+1. Create each encrypted file with `agenix -e secrets/<name>.age`.
+2. Add the host and user keys that decrypt them to `secrets.nix`.
+3. Re-key after a host or user changes with `agenix -r`; treat anything ever
+   committed or pasted in plaintext as compromised, and rotate it.
 
 See [references/Secrets.md](references/Secrets.md) for the full treatment.
 
