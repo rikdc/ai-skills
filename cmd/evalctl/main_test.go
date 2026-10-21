@@ -25,7 +25,7 @@ func TestRunExitCodes(t *testing.T) {
 
 func TestRunPrintsCommandErrorsOnce(t *testing.T) {
 	var stderr bytes.Buffer
-	if code := runWithStderr([]string{"run"}, &stderr); code != 2 {
+	if code := runWithStderr([]string{"suite"}, &stderr); code != 2 {
 		t.Fatalf("exit code = %d, want 2", code)
 	}
 	message := stderr.String()
