@@ -152,12 +152,34 @@ suite directories and no model or network:
 ./tests/test-eval-report.sh
 ```
 
-## Related Checks
+### `test-evalctl-parity.sh`
 
-`make test` covers the suites above. Two other checks run separately, and in
-CI:
+Deterministic shell-vs-Go parity for the Milestone A cutover, with no model,
+network, or credentials. It builds `bin/evalctl` if `EVALCTL_BIN` is not set,
+then compares scenario selection, plan output, the authoring gate, and two
+stub-agent campaigns against `scripts/eval-suite.sh`:
+
+- `--list` for every scenario and for plugin, unit, scenario, and shard filters
+- `--plan` counts for full and filtered selections
+- `tests/test-evals.sh` vs `evalctl check`, including `--changes HEAD`
+- comparison (`git-workflow/pr-draft-read-replica`) and functional
+  (`security-hooks/scanner-clean-payload-allowed`) runs: statuses, arm/run
+  results, mechanical scores, pending counts, suite counts, criteria, and the
+  grading index
 
 ```bash
+./tests/test-evalctl-parity.sh
+make evalctl-parity
+```
+
+## Related Checks
+
+`make test` covers the shell suites above plus the Go tests, `go vet`, and the
+`evalctl check` gate. These checks run separately, and in CI:
+
+```bash
+make check         # evalctl-check + the deterministic evalctl selftest
+make evalctl-parity # shell-vs-Go selection, plan, gate, and stub campaigns
 make lint          # ShellCheck, markdownlint, and claudelint
 make validate      # Plugin manifest, hook scripts, and dependencies
 ```

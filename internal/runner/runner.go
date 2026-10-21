@@ -89,6 +89,7 @@ type RunOutcome struct {
 	Run        int             `json:"run"`
 	Status     model.RunStatus `json:"status"`
 	StopReason string          `json:"stop_reason,omitempty"`
+	Error      string          `json:"error,omitempty"`
 	Score      float64         `json:"score"`
 	Max        float64         `json:"max"`
 	Dir        string          `json:"dir"`
@@ -242,6 +243,8 @@ func (r *Runner) Run(ctx context.Context) (*Summary, error) {
 	for _, arm := range r.arms {
 		for run := 1; run <= r.cfg.Runs; run++ {
 			if r.cfg.SkipRun != nil && r.cfg.SkipRun(arm, run) {
+				logDebug(r.cfg.Logger, "run skipped",
+					"plugin", r.cfg.Plugin, "scenario", r.cfg.Scenario, "arm", arm, "run", run)
 				continue
 			}
 			outcome, err := r.runOnce(ctx, arm, run)
@@ -286,6 +289,25 @@ func (r *Runner) runDir(arm string, run int) string {
 	return filepath.Join(r.outputDir(), arm, fmt.Sprintf("run-%d", run))
 }
 
+// logInfo and logDebug emit one-line progress records through the configured
+// logger. Progress never goes to stdout, and a nil logger is a no-op.
+func logInfo(logger *slog.Logger, msg string, args ...any) {
+	if logger != nil {
+		logger.Info(msg, args...)
+	}
+}
+
+func logDebug(logger *slog.Logger, msg string, args ...any) {
+	if logger != nil {
+		logger.Debug(msg, args...)
+	}
+}
+
+// wholeSeconds rounds a measured duration to whole seconds for progress logs.
+func wholeSeconds(d time.Duration) int64 {
+	return int64(math.Round(d.Seconds()))
+}
+
 type runState struct {
 	store        *attempts.Store
 	attempt      *attempts.Attempt
@@ -299,7 +321,29 @@ type runState struct {
 	duration     *float64
 }
 
-func (r *Runner) runOnce(ctx context.Context, arm string, run int) (RunOutcome, error) {
+func (r *Runner) runOnce(ctx context.Context, arm string, run int) (outcome RunOutcome, err error) {
+	logInfo(r.cfg.Logger, "run started",
+		"plugin", r.cfg.Plugin, "scenario", r.cfg.Scenario, "arm", arm, "run", run)
+	startedAt := time.Now()
+	defer func() {
+		attributes := []any{
+			"plugin", r.cfg.Plugin,
+			"scenario", r.cfg.Scenario,
+			"arm", arm,
+			"run", run,
+			"status", string(outcome.Status),
+			"duration_seconds", wholeSeconds(time.Since(startedAt)),
+		}
+		message := outcome.Error
+		if message == "" && err != nil {
+			message = err.Error()
+		}
+		if message != "" {
+			attributes = append(attributes, "error", message)
+		}
+		logInfo(r.cfg.Logger, "run finished", attributes...)
+	}()
+
 	runDir := r.runDir(arm, run)
 	if err := os.MkdirAll(runDir, 0o700); err != nil {
 		return RunOutcome{}, errs.Operational("create run directory: %v", err)
@@ -519,11 +563,12 @@ func (r *Runner) runOnce(ctx context.Context, arm string, run int) (RunOutcome, 
 	}
 	state.attempt = finishedAttempt
 
-	outcome := RunOutcome{
+	outcome = RunOutcome{
 		Arm:        arm,
 		Run:        run,
 		Status:     status,
 		StopReason: stopReason,
+		Error:      message,
 		Score:      state.mechanical.Score,
 		Max:        state.mechanical.Max,
 		Dir:        runDir,
@@ -579,6 +624,7 @@ func (r *Runner) finishFailure(ctx context.Context, state *runState, status mode
 		Run:        state.runCtx.Run,
 		Status:     status,
 		StopReason: stopReason,
+		Error:      message,
 		Dir:        filepath.Dir(filepath.Dir(attempt.Dir)),
 	}
 	if err := r.writeDiagnostic(state, "", outcome); err != nil {

@@ -19,7 +19,7 @@ import (
 	"github.com/rikdc/ai-skills/internal/usage"
 )
 
-func newSuiteCommand() *cobra.Command {
+func newSuiteCommand(opts *GlobalOptions) *cobra.Command {
 	var (
 		plugins          []string
 		units            []string
@@ -213,11 +213,13 @@ func newSuiteCommand() *cobra.Command {
 				}
 			}
 
-			agentExec, err := command.New(command.Config{
+			creds := executorCredentials{
+				auth:    command.AuthOptions{CLI: authCLI, Keychain: keychain, Paths: authPaths},
+				passEnv: passEnv,
+			}
+			agentExec, err := creds.newExecutor(command.Config{
 				Command:  agentCmd,
 				Timeout:  agentDuration,
-				Auth:     command.AuthOptions{CLI: authCLI, Keychain: keychain, Paths: authPaths},
-				PassEnv:  passEnv,
 				UsageCmd: usageCmd,
 				Pricing:  pricing,
 				Model:    modelName,
@@ -227,7 +229,7 @@ func newSuiteCommand() *cobra.Command {
 			}
 			var judgeExec executor.AgentExecutor
 			if strings.TrimSpace(judgeCmd) != "" {
-				exec, err := command.New(command.Config{
+				exec, err := creds.newExecutor(command.Config{
 					Command:  judgeCmd,
 					Timeout:  judgeDuration,
 					UsageCmd: judgeUsageCmd,
@@ -277,6 +279,7 @@ func newSuiteCommand() *cobra.Command {
 				AgentExec:        agentExec,
 				JudgeExec:        judgeExec,
 				JudgeCmd:         judgeCmd,
+				Logger:           loggerOf(opts),
 			})
 			if err != nil {
 				return selectionError(err)

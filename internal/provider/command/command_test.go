@@ -166,6 +166,45 @@ func TestStatusMatrix(t *testing.T) {
 	}
 }
 
+func TestFailureDetailPrefersStderr(t *testing.T) {
+	workspace, home, logDir := setup(t)
+	e := newExecutor(t, Config{Command: `echo stdout-detail; echo stderr-detail >&2; exit 3`})
+	res, err := e.Run(context.Background(), executor.AgentRunRequest{
+		Task: "task", Workspace: workspace, HomeDir: home, LogDir: logDir,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Status != model.StatusAgentFailed {
+		t.Fatalf("status = %s", res.Status)
+	}
+	if !strings.Contains(res.Error, "agent exited with status 3") ||
+		!strings.Contains(res.Error, "stderr-detail") {
+		t.Fatalf("error = %q", res.Error)
+	}
+	if strings.Contains(res.Error, "stdout-detail") {
+		t.Fatalf("stdout must not win over stderr: %q", res.Error)
+	}
+}
+
+func TestFailureDetailFallsBackToStdoutAndIsBounded(t *testing.T) {
+	workspace, home, logDir := setup(t)
+	long := strings.Repeat("z", 800)
+	e := newExecutor(t, Config{Command: `printf '%s\n' "` + long + `"; exit 1`})
+	res, err := e.Run(context.Background(), executor.AgentRunRequest{
+		Task: "task", Workspace: workspace, HomeDir: home, LogDir: logDir,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasSuffix(res.Error, "…") {
+		t.Fatalf("error must be truncated: %q", res.Error)
+	}
+	if got := strings.Count(res.Error, "z"); got != maxFailureDetail {
+		t.Fatalf("kept %d characters, want %d: %q", got, maxFailureDetail, res.Error)
+	}
+}
+
 func TestDeadline(t *testing.T) {
 	workspace, home, logDir := setup(t)
 	e := newExecutor(t, Config{Command: "sleep 30"})

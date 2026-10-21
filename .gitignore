@@ -13,6 +13,9 @@ lint-report.txt
 # Eval run output (scripts/eval-run.sh)
 results/
 
+# Built evalctl binary
+bin/
+
 # claudelint cache
 .claudelint-cache/
 

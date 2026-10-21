@@ -336,6 +336,34 @@ func (r *Runner) aggregate(selected []scenario.Selected, fingerprints map[string
 	return stats
 }
 
+// runFailureLines describes every failed run in the aggregate so the summary
+// and the suite-level error explain what happened instead of only counting.
+func runFailureLines(stats aggregateStats) []string {
+	var lines []string
+	for _, row := range stats.Scenarios {
+		for _, run := range row.Runs {
+			if run.Status == string(model.StatusOK) {
+				continue
+			}
+			line := fmt.Sprintf("%s/%s %s/run-%d: %s",
+				row.Plugin, row.Scenario, run.Arm, run.Run, run.Status)
+			if run.Error != "" {
+				line += ": " + run.Error
+			}
+			lines = append(lines, line)
+		}
+	}
+	return lines
+}
+
+// firstRunFailure returns the first failed run, or "" when nothing failed.
+func firstRunFailure(stats aggregateStats) string {
+	if lines := runFailureLines(stats); len(lines) > 0 {
+		return lines[0]
+	}
+	return ""
+}
+
 func armCountOf(pair ArmPair) int {
 	n := 0
 	if pair.With.Runs > 0 {
@@ -1064,8 +1092,12 @@ func renderSummary(manifest model.SuiteManifest, stats aggregateStats) string {
 		stats.Counts["agent_invocations"], stats.Counts["judged_runs"], stats.Counts["timed_out_runs"])
 
 	if stats.Counts["pending_runs"] > 0 {
-		fmt.Fprintf(&b, "**%d run(s) still have pending criteria.** Grade them with `evalctl grade --suite <suite>`.\n\n",
-			stats.Counts["pending_runs"])
+		gradeHint := "evalctl grade --suite <suite>"
+		if manifest.Config.AuthCLI {
+			gradeHint += " --auth-cli"
+		}
+		fmt.Fprintf(&b, "**%d run(s) still have pending criteria.** Grade them with `%s`.\n\n",
+			stats.Counts["pending_runs"], gradeHint)
 	}
 
 	b.WriteString("## By plugin\n\n")
@@ -1083,6 +1115,17 @@ func renderSummary(manifest model.SuiteManifest, stats aggregateStats) string {
 			row.Plugin, row.Scenario, pct(row.Arms.With.PercentMean),
 			pct(row.Arms.Without.PercentMean), pts(row.Delta),
 			strconv.FormatFloat(row.PendingPoints, 'f', -1, 64)+" pending", row.Status)
+	}
+	if lines := runFailureLines(stats); len(lines) > 0 {
+		b.WriteString("\n## Failures\n\n")
+		const maxLines = 20
+		for i, line := range lines {
+			if i == maxLines {
+				fmt.Fprintf(&b, "- … and %d more\n", len(lines)-maxLines)
+				break
+			}
+			fmt.Fprintf(&b, "- %s\n", line)
+		}
 	}
 	b.WriteString("\n## Counts\n\n")
 	keys := make([]string, 0, len(stats.Counts))

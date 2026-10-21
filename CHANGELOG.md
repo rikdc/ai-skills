@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added the Go `evalctl` harness as the default `make eval` backend for
+  Milestone A (command agent and command judge). `make evalctl-build`,
+  `evalctl-test`, `evalctl-check`, `evalctl-selftest`, and `evalctl-parity`
+  provide deterministic build, Go test, vet/gofmt, selftest, and shell-parity
+  gates with no model or network; `make test` now runs the Go checks too
+- Added `tests/test-evalctl-parity.sh`: compares shell and Go scenario
+  selection, plan counts, the authoring gate, and stub-agent comparison and
+  functional campaigns (20 checks)
+- Added a `evalctl` GitHub workflow: Go test/vet/race/selftest/parity on Linux
+  and Go test/process-lifecycle coverage on macOS
 - Added `scripts/eval-usage.sh`, a read-only usage parser/hook that normalizes
   opencode JSONL and Claude result-object tokens/cost, supports a generic
   `--cmd` hook, and reports unknown usage as unknown rather than zero
@@ -54,6 +64,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `make eval` now routes to `evalctl` and builds `bin/evalctl` on demand; set
+  `EVALCTL_LEGACY=1` to run the legacy shell harness. The shell scripts and
+  jq programs remain until the documented deletion criteria are met, and the
+  `evalctl-a-parity` tag is the rollback checkpoint
 - Every `plugins/*/evals/*/scenario.json` now maps its scenario to the
   skill/command/hook unit it measures; `generate-evals` requires the field
   for new scenarios
@@ -68,6 +82,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   run fully hermetic
 - Migrated the `git-workflow` plugin from commands to the skill format
   (`skills/<name>/SKILL.md`)
+- `evalctl suite` and `evalctl run` report progress on stderr while they work:
+  one Info line per `scenario started`, `run started`, `run finished`,
+  `judge started`, `judge finished`/`judge failed`, and `scenario finished`
+  with status and duration. Progress never touches stdout, `-q` silences it,
+  and `-v`/`--debug` add skipped-run events
 - Tightened `git-workflow` commit and PR message rules: no emoji, shorter bodies
 - Improved project linting and code quality standards
 - Enhanced security scanning capabilities
@@ -95,6 +114,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed markdown linting issues (line length violations)
 - Fixed general linter issues across project files
 - Removed superfluous comments from codebase
+- The command judge now receives the same CLI credentials and `--pass-env`
+  values as the agent in both `suite` and `grade`. It previously ran in its own
+  empty home, so with `--auth-cli` the agent was authenticated but every judge
+  attempt failed and every criterion stayed `pending` with no verdict possible;
+  `grade` also gained `--auth-cli`, `--keychain`, `--auth-path`, and
+  `--pass-env`, and the pending-criteria hint now names `--auth-cli` when the
+  suite ran with credentials
+- `make eval` now forwards credentials to the Go backend: `AUTH_CLI=1` (the
+  default, matching the shell harness) copies the agent CLI login state,
+  `AUTH_CLI=0` disables copying, and `AUTH_PATH`/`KEYCHAIN` map to
+  `--auth-path`/`--keychain`. `bin/evalctl` keeps its credential-off default,
+  so a real run without credentials no longer fails as an unexplained agent
+  error
+- Failed runs now explain themselves: the command adapter appends the agent's
+  last output line to the error, `summary.md` gains a `Failures` section, and
+  the suite-level error names the first failing run instead of only counting
+  runner failures
 
 ### Security
 

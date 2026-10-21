@@ -2,14 +2,17 @@ package runner
 
 import (
 	"archive/tar"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -116,6 +119,7 @@ type runOptions struct {
 	hooks            attempts.Hooks
 	maxSize          int64
 	attemptArtifacts string
+	logger           *slog.Logger
 }
 
 func execute(t *testing.T, fx *fixture, opts runOptions) (*Summary, error) {
@@ -160,6 +164,7 @@ func executeCtx(t *testing.T, fx *fixture, opts runOptions, ctx context.Context)
 		AttemptArtifacts: opts.attemptArtifacts,
 		StoreHooks:       opts.hooks,
 		Executor:         exec,
+		Logger:           opts.logger,
 	})
 	if err != nil {
 		return nil, err
@@ -735,5 +740,250 @@ func TestNoChecksLeavesCriteriaPending(t *testing.T) {
 	finished := readJSON[model.FinishedAttempt](t, filepath.Join(dir, "attempts", "agent-000001", "finished.json"))
 	if finished.ChecksStatus != model.ChecksNotApplicable {
 		t.Fatalf("checks status = %q", finished.ChecksStatus)
+	}
+}
+
+// logBuffer collects progress logs. It is safe for the concurrent workers the
+// suite uses.
+type logBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *logBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *logBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
+func testLogger(buffer *logBuffer, level slog.Level) *slog.Logger {
+	return slog.New(slog.NewTextHandler(buffer, &slog.HandlerOptions{Level: level}))
+}
+
+// logFields parses one slog text line into its key=value fields, honouring
+// quoted values that contain spaces.
+func logFields(line string) map[string]string {
+	fields := map[string]string{}
+	var current strings.Builder
+	inQuotes := false
+	flush := func() {
+		token := current.String()
+		current.Reset()
+		key, value, ok := strings.Cut(token, "=")
+		if !ok {
+			return
+		}
+		if unquoted, err := strconv.Unquote(value); err == nil {
+			value = unquoted
+		}
+		fields[key] = value
+	}
+	remaining := line
+	for len(remaining) > 0 {
+		char := remaining[0]
+		switch {
+		case char == '"':
+			inQuotes = !inQuotes
+			current.WriteByte(char)
+			remaining = remaining[1:]
+		case char == '\\' && inQuotes && len(remaining) > 1:
+			current.WriteByte(char)
+			current.WriteByte(remaining[1])
+			remaining = remaining[2:]
+		case char == ' ' && !inQuotes:
+			flush()
+			remaining = remaining[1:]
+		default:
+			current.WriteByte(char)
+			remaining = remaining[1:]
+		}
+	}
+	flush()
+	return fields
+}
+
+// findLog returns the fields of the first progress line whose msg and wanted
+// attributes all match.
+func findLog(t *testing.T, logged, msg string, wanted map[string]string) map[string]string {
+	t.Helper()
+	for _, line := range strings.Split(strings.TrimSpace(logged), "\n") {
+		fields := logFields(line)
+		if fields["msg"] != msg {
+			continue
+		}
+		matched := true
+		for key, value := range wanted {
+			if fields[key] != value {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			return fields
+		}
+	}
+	t.Fatalf("no %q progress line matching %v in:\n%s", msg, wanted, logged)
+	return nil
+}
+
+func countLog(logged, msg string) int {
+	count := 0
+	for _, line := range strings.Split(strings.TrimSpace(logged), "\n") {
+		if logFields(line)["msg"] == msg {
+			count++
+		}
+	}
+	return count
+}
+
+func logDuration(t *testing.T, fields map[string]string) int64 {
+	t.Helper()
+	value, ok := fields["duration_seconds"]
+	if !ok {
+		t.Fatalf("no duration_seconds attribute in %v", fields)
+	}
+	seconds, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		t.Fatalf("duration_seconds %q: %v", value, err)
+	}
+	if seconds < 0 {
+		t.Fatalf("duration_seconds = %d, want a rounded whole number of seconds", seconds)
+	}
+	return seconds
+}
+
+func TestRunLogsStartedAndFinishedPair(t *testing.T) {
+	fx := newFixture(t, fixtureOptions{})
+	buffer := &logBuffer{}
+	summary, err := execute(t, fx, runOptions{out: t.TempDir(), logger: testLogger(buffer, slog.LevelInfo)})
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if len(summary.Runs) != 1 {
+		t.Fatalf("runs = %d, want 1", len(summary.Runs))
+	}
+	run := summary.Runs[0]
+	logged := buffer.String()
+	wanted := map[string]string{
+		"plugin":   fx.plugin,
+		"scenario": fx.scenario,
+		"arm":      run.Arm,
+		"run":      itoa(run.Run),
+	}
+	started := findLog(t, logged, "run started", wanted)
+	if started["status"] != "" {
+		t.Fatalf("run started carries status %q", started["status"])
+	}
+	finished := findLog(t, logged, "run finished", wanted)
+	if finished["status"] != string(run.Status) {
+		t.Fatalf("run finished status = %q, want %q", finished["status"], run.Status)
+	}
+	logDuration(t, finished)
+	if message, ok := finished["error"]; ok {
+		t.Fatalf("successful run logged error %q", message)
+	}
+	if strings.Index(logged, "run started") > strings.Index(logged, "run finished") {
+		t.Fatalf("run finished preceded run started:\n%s", logged)
+	}
+	if countLog(logged, "run started") != 1 || countLog(logged, "run finished") != 1 {
+		t.Fatalf("progress pair was not logged exactly once:\n%s", logged)
+	}
+}
+
+func TestRunLogsFailureStatusAndError(t *testing.T) {
+	fx := newFixture(t, fixtureOptions{})
+	buffer := &logBuffer{}
+	summary, err := execute(t, fx, runOptions{
+		out:     t.TempDir(),
+		command: "exit 7",
+		logger:  testLogger(buffer, slog.LevelInfo),
+	})
+	if err == nil {
+		t.Fatal("expected operational error")
+	}
+	if len(summary.Runs) != 1 {
+		t.Fatalf("runs = %d, want 1", len(summary.Runs))
+	}
+	run := summary.Runs[0]
+	if run.Status == model.StatusOK || run.Error == "" {
+		t.Fatalf("outcome = %+v", run)
+	}
+	finished := findLog(t, buffer.String(), "run finished", map[string]string{
+		"plugin": fx.plugin, "scenario": fx.scenario, "arm": run.Arm, "run": itoa(run.Run),
+	})
+	if finished["status"] != string(run.Status) {
+		t.Fatalf("run finished status = %q, want %q", finished["status"], run.Status)
+	}
+	if finished["error"] != run.Error {
+		t.Fatalf("run finished error = %q, want %q", finished["error"], run.Error)
+	}
+	logDuration(t, finished)
+}
+
+func TestRunLogsSkippedRunsAtDebug(t *testing.T) {
+	fx := newFixture(t, fixtureOptions{})
+	out := t.TempDir()
+	for _, tc := range []struct {
+		name  string
+		level slog.Level
+		want  int
+	}{
+		{name: "info hides skipped runs", level: slog.LevelInfo, want: 0},
+		{name: "debug shows skipped runs", level: slog.LevelDebug, want: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			buffer := &logBuffer{}
+			r, err := New(Config{
+				Root:     fx.root,
+				Plugin:   fx.plugin,
+				Scenario: fx.scenario,
+				Arm:      "with",
+				Runs:     1,
+				Out:      out,
+				SkillDir: ".claude/skills",
+				Executor: mustExecutor(t),
+				Logger:   testLogger(buffer, tc.level),
+				SkipRun:  func(string, int) bool { return true },
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			summary, err := r.Run(context.Background())
+			if err != nil {
+				t.Fatalf("run: %v", err)
+			}
+			if len(summary.Runs) != 0 {
+				t.Fatalf("runs = %d, want 0", len(summary.Runs))
+			}
+			logged := buffer.String()
+			if got := countLog(logged, "run skipped"); got != tc.want {
+				t.Fatalf("run skipped lines = %d, want %d:\n%s", got, tc.want, logged)
+			}
+			if got := countLog(logged, "run started"); got != 0 {
+				t.Fatalf("skipped run was started %d time(s):\n%s", got, logged)
+			}
+			if tc.want == 1 {
+				findLog(t, logged, "run skipped", map[string]string{
+					"plugin": fx.plugin, "scenario": fx.scenario, "arm": "with", "run": "1",
+				})
+			}
+		})
+	}
+}
+
+func TestRunNilLoggerDoesNotPanic(t *testing.T) {
+	fx := newFixture(t, fixtureOptions{})
+	summary, err := execute(t, fx, runOptions{out: t.TempDir(), logger: nil})
+	if err != nil {
+		t.Fatalf("run with nil logger: %v", err)
+	}
+	if len(summary.Runs) != 1 || summary.Runs[0].Status != model.StatusOK {
+		t.Fatalf("outcome = %+v", summary.Runs)
 	}
 }

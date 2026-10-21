@@ -180,13 +180,159 @@ A mechanical score is not a verdict. By default the suite exits non-zero only
 when a scenario fails to run; `--strict` additionally fails when criteria are
 still pending or a scenario scores no better with its unit than without it.
 
+## evalctl (Milestone A)
+
+`make eval` now runs `evalctl`, the Go harness under `cmd/evalctl` and
+`internal/`. The shell harness is still installed and is the documented
+fallback, so both paths read the same `plugins/*/evals/` scenarios and both
+remain reportable. Nothing was deleted in the cutover.
+
+Milestone A is the **command backend**: `--agent-cmd` and `--judge-cmd` are
+the only real backends. It does not call a model API and does not execute
+hooks directly. Milestone B (native OpenAI-compatible agent/judge) and
+Milestone C (direct hook execution) are not available yet; flags such as
+`--backend openai` and direct-hook scenarios return clear errors instead of
+silently falling back.
+
+### Build, test, and run
+
+```bash
+make evalctl-build       # bin/evalctl
+make evalctl-test        # go test ./...
+make evalctl-check       # gofmt check, go vet ./..., evalctl check
+make evalctl-selftest    # deterministic end-to-end run + every fixture setup
+make check               # evalctl-check + evalctl-selftest
+
+make evalctl-parity      # shell-vs-Go selection, plan, gate, and stub campaigns
+```
+
+`evalctl selftest --quick` skips repository fixture coverage when you want a
+fast local smoke test. `make evalctl-selftest SELFTEST_ARGS=--quick` does the
+same through Make. None of these targets require a model, network, or
+credentials.
+
+```bash
+bin/evalctl version
+bin/evalctl list --plugin git-workflow
+bin/evalctl plan --plugin git-workflow --runs 3
+bin/evalctl check
+bin/evalctl suite --agent-cmd 'claude -p' --plugin git-workflow --runs 3
+bin/evalctl report results/eval-suite/<stamp>-<sha> --format all
+```
+
+The command adapter passes the prompt on stdin and runs in the temporary
+workspace, exactly like `eval-run.sh`. `bin/evalctl suite` keeps credentials
+off by default: `--auth-cli` copies the known CLI login state, `--keychain`
+links the macOS Keychains directory, and `--auth-path` adds one path.
+
+`make eval` opts in for you, because the shell harness it replaces copies CLI
+login state by default (`scripts/eval-suite.sh` `AUTH=1`) and most agent CLIs
+cannot run without it. Set `AUTH_CLI=0` to run without credentials,
+`AUTH_CLI=1` (the default) to copy them, `AUTH_PATH=<relative path>` to add
+files, and `KEYCHAIN=1` to link the macOS Keychains directory (`KEYCHAIN=1`
+requires the evalctl backend). If a credential file cannot be read, the
+suite-level error names it instead of only counting failed runs. The legacy
+shell path keeps its own default (`--no-auth` disables it).
+
+`suite` and `run` also report progress on stderr while they work — one line per
+event (`scenario started`, `run started`, `run finished`, `judge started`,
+`judge finished`/`judge failed`, `scenario finished`) with status and duration,
+so a multi-minute suite is not a blank terminal. Progress never touches stdout,
+`-q` silences it, and `-v`/`--debug` add skipped-run events.
+
+### `make eval` cutover and `EVALCTL_LEGACY=1`
+
+`make eval` keeps its existing variables and maps them to the Go suite and
+report:
+
+| Make variable | evalctl flag |
+| --- | --- |
+| `PLUGIN` | `--plugin` |
+| `SKILL=<name>` / `UNIT=<unit>` | `--unit skills/<name>` / `--unit <unit>` |
+| `RUNS` / `JOBS` | `--runs` / `--jobs` |
+| `AGENT` / `JUDGE` | `--agent-cmd` / `--judge-cmd` |
+| `USAGE_CMD` / `JUDGE_USAGE_CMD` | `--usage-cmd` / `--judge-usage-cmd` |
+| `AUTH_CLI=1` (default) / `AUTH_CLI=0` | `--auth-cli` / no credential flag |
+| `AUTH_PATH=<relative path>...` | `--auth-path` (repeatable) |
+| `KEYCHAIN=1` | `--keychain` (evalctl backend only) |
+| `DRY=1` | `suite --plan` (no agent, no writes) |
+| `REPORT` | `report --format` |
+
+The legacy shell path stays available at any time:
+
+```bash
+EVALCTL_LEGACY=1 make eval PLUGIN=git-workflow RUNS=1 DRY=1
+EVALCTL_LEGACY=1 make eval PLUGIN=git-workflow SKILL=pr AGENT='claude -p'
+```
+
+A real run writes to `results/eval-suite/<timestamp>-<sha>-<pid>/` and prints
+the report plus the HTML path, the same contract as before. Go suites use v3
+attempt directories under `runs/<plugin>/<scenario>/<arm>/run-N/attempts/`;
+`evalctl report` and `eval-report.sh` both read the accepted artifacts.
+
+### Rollback checkpoint
+
+Tag `evalctl-a-parity` is the pre-cutover checkpoint (create it on the commit
+before the cutover). The documented rollback is:
+
+```bash
+EVALCTL_LEGACY=1 make eval ...     # keep working immediately
+```
+
+or revert the cutover commit, not the attempt/report work. There is no
+destructive migration: old shell suite directories remain reportable, and a
+v3 resume uses a new `--out` directory. Deletion criteria for the shell
+orchestration are: all Milestone A gates pass for two consecutive parity
+campaigns, Go tests cover the shell assertions, one release has shipped both
+paths, and the rollback tag has been exercised once.
+
+### Parity gate
+
+`tests/test-evalctl-parity.sh` (run by `make evalctl-parity` and CI) compares
+the shell and Go harnesses with no model or network:
+
+- selection for every scenario and for `--plugin`, `--unit`, `--scenario`,
+  and `--shard 1/4` / `3/4`;
+- full and filtered plan output, including invocation counts;
+- `tests/test-evals.sh` vs `evalctl check`, including `--changes HEAD`;
+- a comparison scenario (`git-workflow/pr-draft-read-replica`) and a
+  functional hook scenario (`security-hooks/scanner-clean-payload-allowed`)
+  run with agent `true`, comparing status, arm/run results, mechanical
+  scores, pending counts, suite counts, criteria, and the grading index.
+
+Recorded result on the Milestone A cutover: **20 checks passed, 0 failed**
+across the 65 repository scenarios. Evidence-path differences are excluded by
+design: the shell writes a run directory and v3 writes an attempt evidence
+path. Formatting and version fields are not compared.
+
+### Evaluating the Go code
+
+- `cmd/evalctl`: process entry, signal context, exit-code mapping.
+- `internal/cli`: Cobra commands and flag wiring.
+- `internal/scenario`, `internal/check`: discovery, selection, plan, and the
+  deterministic authoring gate.
+- `internal/runner`, `internal/runner/attempts`: workspace staging, attempts,
+  `current.json`, projections, crash recovery.
+- `internal/suite`, `internal/judge`, `internal/report`, `internal/reportio`:
+  orchestration, command judging, report analysis and rendering.
+- `internal/provider/command`, `internal/executor`, `internal/usage`,
+  `internal/platform/execx`: the command backend, process lifecycle, and
+  usage normalization.
+- `internal/selftest`: the synthetic end-to-end fixture.
+
+Run `go test ./...`, `go test -race ./...` (Linux), `go vet ./...`, and
+`gofmt -l cmd internal` to check it. `internal/report/parity_test.go`,
+`internal/report/v3_parity_test.go`, and `tests/test-evalctl-parity.sh` are
+the shell-parity oracles.
+
 ## `make eval` and the report
 
-`make eval` wraps the suite and the report renderer. `SKILL=<name>` is
-shorthand for `--unit skills/<name>`; `UNIT=` names any skill, command or
-hook. `PLUGIN`, `RUNS`, `JOBS`, `AGENT`, `JUDGE`, `DRY` and `REPORT` map to
-the suite options and the report format. `AGENT` is required for a real run
-and `JUDGE` defaults to it.
+`make eval` wraps the suite and the report renderer. It uses `evalctl` unless
+`EVALCTL_LEGACY=1` is set. `SKILL=<name>` is shorthand for
+`--unit skills/<name>`; `UNIT=` names any skill, command or hook. `PLUGIN`,
+`RUNS`, `JOBS`, `AGENT`, `JUDGE`, `DRY` and `REPORT` map to the suite options
+and the report format. `AGENT` is required for a real run and `JUDGE` defaults
+to it.
 
 ```bash
 # Plan only: no agent, no network
@@ -321,6 +467,19 @@ folds accepted judgements into the percentages without rerunning the agent.
 `judge-result.json` records the judge command and grader version next to each
 accepted judgement. Reusing a grade with a different judge, or with a changed
 grader, is refused; pass `--regrade` to replace it.
+
+The Go harness offers the same half:
+
+```bash
+bin/evalctl grade --suite results/eval-suite/<id> \
+    --judge-cmd 'opencode run --auto --format json "$(cat)"' --auth-cli
+```
+
+`grade` accepts the same credential flags as `suite` (`--auth-cli`,
+`--keychain`, `--auth-path`, `--pass-env`), because the judge is a CLI running
+in its own home: a judge that needs login state must be given it, exactly like
+the agent. When a suite ran with credentials, its summary prints the matching
+hint (`evalctl grade --suite <suite> --auth-cli`).
 
 Usage (as agent skills): `generate-evals plugins/<name>` and
 `review-evals <pr-number>`; see `skills/*/SKILL.md`.

@@ -346,7 +346,7 @@ func (e *Executor) Run(ctx context.Context, req executor.AgentRunRequest) (execu
 	// Credentials must be gone before any post-run hook or evidence capture.
 	cleanup()
 
-	out := e.mapResult(res, runErr, started)
+	out := e.mapResult(res, runErr, started, logPath)
 	if !res.Started {
 		out.Usage = model.NotApplicable("command")
 		return out, runErr
@@ -394,7 +394,7 @@ func (e *Executor) usage(req executor.AgentRunRequest, logPath string, exitCode 
 	return e.cfg.Pricing.Apply(e.cfg.Model, u)
 }
 
-func (e *Executor) mapResult(res execx.Result, runErr error, started time.Time) executor.AgentRunResult {
+func (e *Executor) mapResult(res execx.Result, runErr error, started time.Time, logPath string) executor.AgentRunResult {
 	out := executor.AgentRunResult{
 		TimedOut:  res.TimedOut,
 		Cancelled: res.Cancelled,
@@ -457,7 +457,67 @@ func (e *Executor) mapResult(res execx.Result, runErr error, started time.Time) 
 			out.Error = fmt.Sprintf("agent exited with status %d", res.ExitCode)
 		}
 	}
+	if out.Status != model.StatusOK {
+		if detail := failureDetail(logPath); detail != "" {
+			if out.Error == "" {
+				out.Error = detail
+			} else {
+				out.Error += ": " + detail
+			}
+		}
+	}
 	return out
+}
+
+// failureDetail returns a bounded excerpt of the agent's own output so a failed
+// run reports why it failed instead of only an exit status. execx hands real
+// files to the child, so the captured buffers are empty for this adapter: the
+// tail is read back from the log after the process exits.
+func failureDetail(logPath string) string {
+	file, err := os.Open(logPath)
+	if err != nil {
+		return ""
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return ""
+	}
+	start := int64(0)
+	if info.Size() > failureDetailBytes {
+		start = info.Size() - failureDetailBytes
+	}
+	buf := make([]byte, info.Size()-start)
+	if _, err := file.ReadAt(buf, start); err != nil && !errors.Is(err, io.EOF) {
+		return ""
+	}
+	return truncateDetail(lastNonEmptyLine(buf), maxFailureDetail)
+}
+
+const (
+	maxFailureDetail   = 400
+	failureDetailBytes = 8 << 10
+)
+
+func lastNonEmptyLine(data []byte) string {
+	lines := strings.Split(string(data), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		if line := strings.TrimSpace(lines[i]); line != "" {
+			return line
+		}
+	}
+	return ""
+}
+
+func truncateDetail(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	runes := []rune(s)
+	if len(runes) <= max {
+		return s
+	}
+	return string(runes[:max]) + "…"
 }
 
 func (e *Executor) fail(stopReason, message string, started time.Time) (executor.AgentRunResult, error) {
