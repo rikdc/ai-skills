@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"bytes"
+	"strings"
+	"testing"
+)
 
 func TestRunExitCodes(t *testing.T) {
 	tests := []struct {
@@ -16,5 +20,27 @@ func TestRunExitCodes(t *testing.T) {
 		if got := run(test.args); got != test.want {
 			t.Errorf("run(%v) = %d, want %d", test.args, got, test.want)
 		}
+	}
+}
+
+func TestRunPrintsCommandErrorsOnce(t *testing.T) {
+	var stderr bytes.Buffer
+	if code := runWithStderr([]string{"run"}, &stderr); code != 2 {
+		t.Fatalf("exit code = %d, want 2", code)
+	}
+	message := stderr.String()
+	if !strings.Contains(message, "not implemented in this increment") {
+		t.Fatalf("stderr = %q", message)
+	}
+	if strings.Count(message, "not implemented in this increment") != 1 {
+		t.Fatalf("error printed more than once: %q", message)
+	}
+
+	stderr.Reset()
+	if code := runWithStderr([]string{"version"}, &stderr); code != 0 {
+		t.Fatalf("version exit code = %d", code)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("version wrote to stderr: %q", stderr.String())
 	}
 }
