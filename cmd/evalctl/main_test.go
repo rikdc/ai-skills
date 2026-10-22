@@ -29,10 +29,10 @@ func TestRunPrintsCommandErrorsOnce(t *testing.T) {
 		t.Fatalf("exit code = %d, want 2", code)
 	}
 	message := stderr.String()
-	if !strings.Contains(message, "not implemented in this increment") {
+	if !strings.Contains(message, "--agent-cmd is required") {
 		t.Fatalf("stderr = %q", message)
 	}
-	if strings.Count(message, "not implemented in this increment") != 1 {
+	if strings.Count(message, "--agent-cmd is required") != 1 {
 		t.Fatalf("error printed more than once: %q", message)
 	}
 
