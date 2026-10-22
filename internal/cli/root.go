@@ -35,6 +35,14 @@ func (o *GlobalOptions) RequireRoot() (string, error) {
 	return o.Root, nil
 }
 
+// loggerOf returns the global logger, or nil when no options were supplied.
+func loggerOf(opts *GlobalOptions) *slog.Logger {
+	if opts == nil {
+		return nil
+	}
+	return opts.Logger
+}
+
 // NewRootCommand builds the full command tree with all A1 subcommands.
 func NewRootCommand() *cobra.Command {
 	opts := &GlobalOptions{}
@@ -91,8 +99,8 @@ func NewRootCommand() *cobra.Command {
 	pf.BoolVar(&flagDebug, "debug", false, "debug logging and diagnostics")
 
 	root.AddCommand(
-		newRunCommand(),
-		newSuiteCommand(),
+		newRunCommand(opts),
+		newSuiteCommand(opts),
 		newGradeCommand(),
 		newReportCommand(),
 		newListCommand(),

@@ -10,6 +10,8 @@ SHELL := /bin/bash
 PROJECT_ROOT := $(shell pwd)
 TESTS_DIR := $(PROJECT_ROOT)/tests
 SCRIPTS_DIR := $(PROJECT_ROOT)/scripts
+BIN_DIR := $(PROJECT_ROOT)/bin
+EVALCTL_BIN := $(BIN_DIR)/evalctl
 CLAUDE_DIR := $(PROJECT_ROOT)/.claude
 PLUGIN_DIR := $(PROJECT_ROOT)/plugins/security-hooks
 HOOKS_DIR := $(PLUGIN_DIR)/hooks
@@ -45,6 +47,21 @@ DRY :=
 REPORT := all
 USAGE_CMD :=
 JUDGE_USAGE_CMD :=
+# Credential forwarding for real runs. The legacy shell harness copies the agent
+# CLI login state into each workspace by default (scripts/eval-suite.sh AUTH=1),
+# so `make eval` keeps that default; AUTH_CLI=0 runs without credentials.
+# AUTH_PATH holds one or more paths relative to the real home. KEYCHAIN links
+# the macOS Keychains directory and is evalctl-only.
+AUTH_CLI := 1
+KEYCHAIN :=
+AUTH_PATH :=
+# Empty means the evalctl backend; set to 1 to run the legacy shell harness.
+EVALCTL_LEGACY ?=
+# Extra arguments for `make evalctl-selftest` (for example SELFTEST_ARGS=--quick).
+SELFTEST_ARGS ?=
+
+# Go toolchain used by the evalctl targets.
+GO ?= go
 
 # AGENT/JUDGE/USAGE_CMD may contain a shell substitution like $(cat). Export
 # them so the recipe can read the value as data instead of re-parsing it as
@@ -64,10 +81,52 @@ NC := \033[0m # No Color
 # Default target
 .DEFAULT_GOAL := help
 
+##@ evalctl (Milestone A)
+
+.PHONY: evalctl-build
+evalctl-build: ## Build the evalctl binary into bin/evalctl
+	@echo -e "$(BLUE)🔨 Building evalctl...$(NC)"
+	@mkdir -p "$(BIN_DIR)"
+	@cd "$(PROJECT_ROOT)" && $(GO) build -trimpath -o "$(EVALCTL_BIN)" ./cmd/evalctl
+	@echo -e "  $(GREEN)✅ $(EVALCTL_BIN)$(NC)"
+
+.PHONY: evalctl-test
+evalctl-test: ## Run the Go unit and integration tests (no model or network)
+	@echo -e "$(BLUE)🧪 Running evalctl Go tests...$(NC)"
+	@cd "$(PROJECT_ROOT)" && $(GO) test ./...
+
+.PHONY: evalctl-check
+evalctl-check: ## Run gofmt, go vet, and the deterministic evalctl authoring gate
+	@echo -e "$(BLUE)🔍 Checking evalctl Go sources...$(NC)"
+	@cd "$(PROJECT_ROOT)" && $(GO) vet ./...
+	@unformatted="$$(cd "$(PROJECT_ROOT)" && find cmd internal -name '*.go' -type f -print0 | xargs -0 gofmt -l)"; \
+	if [[ -n "$$unformatted" ]]; then \
+		echo "gofmt needed for:" >&2; \
+		echo "$$unformatted" >&2; \
+		exit 1; \
+	fi
+	@$(MAKE) --no-print-directory evalctl-build
+	@"$(EVALCTL_BIN)" check
+	@echo -e "  $(GREEN)✅ gofmt, go vet, and evalctl check passed$(NC)"
+
+.PHONY: evalctl-selftest
+evalctl-selftest: evalctl-build ## Run the deterministic end-to-end evalctl selftest
+	@echo -e "$(BLUE)🧪 Running evalctl selftest...$(NC)"
+	@"$(EVALCTL_BIN)" selftest $(SELFTEST_ARGS)
+
+.PHONY: evalctl-parity
+evalctl-parity: evalctl-build ## Compare shell and Go selection, plan, check, and stub runs
+	@echo -e "$(BLUE)🔀 Running shell-vs-evalctl parity checks...$(NC)"
+	@EVALCTL_BIN="$(EVALCTL_BIN)" "$(TESTS_DIR)/test-evalctl-parity.sh"
+
+.PHONY: check
+check: evalctl-check evalctl-selftest ## Run the Go checks and deterministic selftest
+	@echo -e "$(GREEN)✅ check passed$(NC)"
+
 ##@ Testing
 
 .PHONY: test
-test: ## Run complete test suite
+test: evalctl-test evalctl-check ## Run complete test suite
 	@echo -e "$(BLUE)🧪 Running security scanner tests...$(NC)"
 	@$(TEST_SCRIPT)
 	@echo
@@ -95,6 +154,15 @@ test: ## Run complete test suite
 .PHONY: eval
 eval: ## Run eval scenarios with an agent and render the comparison report
 	@set -euo pipefail; \
+	if [[ "$(EVALCTL_LEGACY)" == "1" ]]; then \
+		echo "make eval: using the legacy shell harness (EVALCTL_LEGACY=1)" >&2; \
+		suite_runner=("$(EVAL_SUITE_SCRIPT)"); \
+		report_runner=("$(EVAL_REPORT_SCRIPT)"); \
+	else \
+		$(MAKE) --no-print-directory evalctl-build; \
+		suite_runner=("$(EVALCTL_BIN)" suite); \
+		report_runner=("$(EVALCTL_BIN)" report); \
+	fi; \
 	unit=""; \
 	if [[ -n "$(SKILL)" && -n "$(UNIT)" ]]; then \
 		echo "make eval: pass SKILL or UNIT, not both" >&2; \
@@ -105,6 +173,38 @@ eval: ## Run eval scenarios with an agent and render the comparison report
 	elif [[ -n "$(UNIT)" ]]; then \
 		unit="$(UNIT)"; \
 	fi; \
+	auth_args=(); \
+	if [[ -n "$(AUTH_CLI)" && "$(AUTH_CLI)" != "0" && "$(AUTH_CLI)" != "1" ]]; then \
+		echo "make eval: AUTH_CLI must be 1 or 0" >&2; \
+		exit 2; \
+	fi; \
+	if [[ -n "$(KEYCHAIN)" && "$(KEYCHAIN)" != "1" ]]; then \
+		echo "make eval: KEYCHAIN must be 1 or empty" >&2; \
+		exit 2; \
+	fi; \
+	if [[ "$(KEYCHAIN)" == "1" ]]; then \
+		if [[ "$(AUTH_CLI)" == "0" ]]; then \
+			echo "make eval: KEYCHAIN=1 requires AUTH_CLI=1" >&2; \
+			exit 2; \
+		fi; \
+		if [[ "$(EVALCTL_LEGACY)" == "1" ]]; then \
+			echo "make eval: KEYCHAIN=1 needs the evalctl backend; drop EVALCTL_LEGACY=1" >&2; \
+			exit 2; \
+		fi; \
+	fi; \
+	if [[ "$(EVALCTL_LEGACY)" == "1" ]]; then \
+		if [[ "$(AUTH_CLI)" == "0" ]]; then \
+			auth_args+=(--no-auth); \
+		fi; \
+	elif [[ "$(AUTH_CLI)" != "0" ]]; then \
+		auth_args+=(--auth-cli); \
+		if [[ "$(KEYCHAIN)" == "1" ]]; then \
+			auth_args+=(--keychain); \
+		fi; \
+	fi; \
+	for auth_path in $(AUTH_PATH); do \
+		auth_args+=(--auth-path "$$auth_path"); \
+	done; \
 	suite_args=(); \
 	if [[ -n "$(PLUGIN)" ]]; then \
 		suite_args+=(--plugin "$(PLUGIN)"); \
@@ -122,7 +222,7 @@ eval: ## Run eval scenarios with an agent and render the comparison report
 	stamp="$$(date -u +%Y%m%dT%H%M%SZ)-$$(git -C "$(PROJECT_ROOT)" rev-parse --short HEAD 2>/dev/null || echo nogit)-$$$$"; \
 	suite_dir="$(PROJECT_ROOT)/results/eval-suite/$$stamp"; \
 	if [[ "$(DRY)" == "1" ]]; then \
-		"$(EVAL_SUITE_SCRIPT)" --plan "$${suite_args[@]}"; \
+		"$${suite_runner[@]}" --plan "$${suite_args[@]}"; \
 		echo; \
 		echo "Report destination: $$suite_dir/report"; \
 		exit 0; \
@@ -147,9 +247,14 @@ eval: ## Run eval scenarios with an agent and render the comparison report
 			echo "make eval: warning: claude is not using --output-format json, so cost will be unknown (set USAGE_CMD or add the flag)" >&2; \
 		fi; \
 	fi; \
+	if [[ "$(AUTH_CLI)" != "0" ]]; then \
+		echo "make eval: copying CLI login state into workspaces (AUTH_CLI=0 to disable)" >&2; \
+	else \
+		echo "make eval: running without CLI credentials (AUTH_CLI=0)" >&2; \
+	fi; \
 	mkdir -p "$$suite_dir"; \
-	"$(EVAL_SUITE_SCRIPT)" "$${suite_args[@]}" --out "$$suite_dir"; \
-	"$(EVAL_REPORT_SCRIPT)" "$$suite_dir" --format "$(REPORT)" --out "$$suite_dir/report"; \
+	"$${suite_runner[@]}" "$${suite_args[@]}" $${auth_args[@]+"$${auth_args[@]}"} --out "$$suite_dir"; \
+	"$${report_runner[@]}" "$$suite_dir" --format "$(REPORT)" --out "$$suite_dir/report"; \
 	if [[ -f "$$suite_dir/report/report.html" ]]; then \
 		echo "HTML report: $$suite_dir/report/report.html"; \
 	fi
@@ -209,6 +314,8 @@ clean: ## Remove test artifacts and logs
 	@find "$(CLAUDE_DIR)" -name "*.log" -type f -delete 2>/dev/null || true
 	@find "$(PLUGIN_DIR)" -name "*.log" -type f -delete 2>/dev/null || true
 	@find "$(TESTS_DIR)" -name "*.log" -type f -delete 2>/dev/null || true
+	@rm -f "$(EVALCTL_BIN)"
+	@rmdir "$(BIN_DIR)" 2>/dev/null || true
 	@echo -e "$(GREEN)✅ Cleanup complete$(NC)"
 
 .PHONY: sync-codex-skills
@@ -231,7 +338,7 @@ check-tools: ## Check for required and optional tools
 	done
 	@echo
 	@echo "Development tools:"
-	@for tool in shellcheck markdownlint; do \
+	@for tool in go shellcheck markdownlint; do \
 		if command -v $$tool >/dev/null 2>&1; then \
 			echo -e "  ✅ $$tool"; \
 		else \
@@ -272,15 +379,21 @@ help: ## Display this help
 	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) }' $(MAKEFILE_LIST)
 	@echo
 	@echo -e "$(BLUE)Examples:$(NC)"
-	@echo "  make test              # Run all tests"
+	@echo "  make test              # Run all shell and Go tests"
 	@echo "  make validate          # Validate plugin configuration"
 	@echo "  make lint              # Run code quality checks"
+	@echo "  make evalctl-build     # Build bin/evalctl"
+	@echo "  make evalctl-check     # gofmt, go vet, and evalctl check"
+	@echo "  make evalctl-selftest  # Deterministic end-to-end evalctl selftest"
+	@echo "  make evalctl-parity    # Compare shell and Go selection/plan/stub runs"
 	@echo "  make install           # Make hook scripts executable"
 	@echo "  make sync-codex-skills # Sync .codex/skills symlinks with plugins/*/skills"
 	@echo "  make eval PLUGIN=git-workflow SKILL=pr RUNS=3 AGENT='claude -p --output-format json'"
 	@echo '  make eval PLUGIN=git-workflow UNIT=commands/review AGENT='"'"'opencode run --auto --format json "$$$$(cat)"'"'"''
 	@echo "  (cost needs structured output or USAGE_CMD; Make consumes \$$(...), so use the double-dollar form above)"
 	@echo "  make eval PLUGIN=git-workflow RUNS=1 DRY=1"
+	@echo "  EVALCTL_LEGACY=1 make eval PLUGIN=git-workflow RUNS=1 DRY=1  # shell path"
+	@echo "  make eval PLUGIN=git-workflow RUNS=1 AUTH_CLI=0 ...           # no credentials"
 	@echo "  make clean             # Clean up artifacts"
 	@echo
 

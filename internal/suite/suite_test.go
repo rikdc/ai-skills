@@ -1,13 +1,16 @@
 package suite
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -540,7 +543,8 @@ func TestArmWithoutAppliesOnlyToComparison(t *testing.T) {
 func TestFailedAgentIsRecordedWithoutAbortingSuite(t *testing.T) {
 	fx := newFixture(t)
 	writeFile(t, fx.agentScript, fmt.Sprintf(
-		"#!/usr/bin/env bash\nprintf 'call\\n' >> %q\nexit 1\n", fx.agentCalls), 0o755)
+		"#!/usr/bin/env bash\nprintf 'call\\n' >> %q\necho 'demo provider exploded' >&2\nexit 1\n",
+		fx.agentCalls), 0o755)
 	out := filepath.Join(t.TempDir(), "suite")
 	cfg := fx.suiteConfig(t, out)
 	runner, err := New(cfg)
@@ -550,6 +554,10 @@ func TestFailedAgentIsRecordedWithoutAbortingSuite(t *testing.T) {
 	result, runErr := runner.Run(context.Background())
 	if runErr == nil || errs.Code(runErr) != 1 {
 		t.Fatalf("suite exit = %v, want 1", runErr)
+	}
+	if !strings.Contains(runErr.Error(), "first:") ||
+		!strings.Contains(runErr.Error(), "demo provider exploded") {
+		t.Fatalf("suite error lacks the failure reason: %v", runErr)
 	}
 	if result.Executed != 2 || result.RunnerFailures != 2 {
 		t.Fatalf("result = %+v", result)
@@ -566,7 +574,18 @@ func TestFailedAgentIsRecordedWithoutAbortingSuite(t *testing.T) {
 			if run.Status != string(model.StatusAgentFailed) {
 				t.Fatalf("run status = %s", run.Status)
 			}
+			if !strings.Contains(run.Error, "demo provider exploded") {
+				t.Fatalf("run error = %q", run.Error)
+			}
 		}
+	}
+	summary, err := os.ReadFile(filepath.Join(out, "summary.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(summary), "## Failures") ||
+		!strings.Contains(string(summary), "demo provider exploded") {
+		t.Fatalf("summary lacks failures: %s", summary)
 	}
 	doc := readSuiteJSON(t, out)
 	if doc.Counts["failed_attempts"] != 3 {
@@ -840,4 +859,218 @@ func TestAggregationConcurrentReadsAreConsistent(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+}
+
+// logBuffer collects progress logs. It is safe for the concurrent workers the
+// suite uses.
+type logBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *logBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *logBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
+func testLogger(buffer *logBuffer, level slog.Level) *slog.Logger {
+	return slog.New(slog.NewTextHandler(buffer, &slog.HandlerOptions{Level: level}))
+}
+
+// logFields parses one slog text line into its key=value fields, honouring
+// quoted values that contain spaces.
+func logFields(line string) map[string]string {
+	fields := map[string]string{}
+	var current strings.Builder
+	inQuotes := false
+	flush := func() {
+		token := current.String()
+		current.Reset()
+		key, value, ok := strings.Cut(token, "=")
+		if !ok {
+			return
+		}
+		if unquoted, err := strconv.Unquote(value); err == nil {
+			value = unquoted
+		}
+		fields[key] = value
+	}
+	remaining := line
+	for len(remaining) > 0 {
+		char := remaining[0]
+		switch {
+		case char == '"':
+			inQuotes = !inQuotes
+			current.WriteByte(char)
+			remaining = remaining[1:]
+		case char == '\\' && inQuotes && len(remaining) > 1:
+			current.WriteByte(char)
+			current.WriteByte(remaining[1])
+			remaining = remaining[2:]
+		case char == ' ' && !inQuotes:
+			flush()
+			remaining = remaining[1:]
+		default:
+			current.WriteByte(char)
+			remaining = remaining[1:]
+		}
+	}
+	flush()
+	return fields
+}
+
+// findLog returns the fields of the first progress line whose msg and wanted
+// attributes all match.
+func findLog(t *testing.T, logged, msg string, wanted map[string]string) map[string]string {
+	t.Helper()
+	for _, line := range strings.Split(strings.TrimSpace(logged), "\n") {
+		fields := logFields(line)
+		if fields["msg"] != msg {
+			continue
+		}
+		matched := true
+		for key, value := range wanted {
+			if fields[key] != value {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			return fields
+		}
+	}
+	t.Fatalf("no %q progress line matching %v in:\n%s", msg, wanted, logged)
+	return nil
+}
+
+func countLog(logged, msg string) int {
+	count := 0
+	for _, line := range strings.Split(strings.TrimSpace(logged), "\n") {
+		if logFields(line)["msg"] == msg {
+			count++
+		}
+	}
+	return count
+}
+
+func logDuration(t *testing.T, fields map[string]string) int64 {
+	t.Helper()
+	value, ok := fields["duration_seconds"]
+	if !ok {
+		t.Fatalf("no duration_seconds attribute in %v", fields)
+	}
+	seconds, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		t.Fatalf("duration_seconds %q: %v", value, err)
+	}
+	if seconds < 0 {
+		t.Fatalf("duration_seconds = %d, want a rounded whole number of seconds", seconds)
+	}
+	return seconds
+}
+
+// loggedSuiteConfig narrows a fixture suite to the comparison scenario and
+// wires the command judge plus a progress logger.
+func loggedSuiteConfig(t *testing.T, fx *fixture, out string, buffer *logBuffer) Config {
+	t.Helper()
+	cfg := fx.suiteConfig(t, out)
+	cfg.Selection = scenario.Selection{Pattern: "^demo/compare$"}
+	cfg.JudgeCmd = fx.judgeScript
+	cfg.JudgeExec = fx.judgeExecutor(t, fx.judgeScript)
+	cfg.Logger = testLogger(buffer, slog.LevelInfo)
+	return cfg
+}
+
+func TestSuiteLogsScenarioRunAndJudgeProgress(t *testing.T) {
+	fx := newFixture(t)
+	out := filepath.Join(t.TempDir(), "suite")
+	buffer := &logBuffer{}
+	if _, _, err := runSuite(t, loggedSuiteConfig(t, fx, out, buffer)); err != nil {
+		t.Fatalf("suite: %v", err)
+	}
+	logged := buffer.String()
+
+	findLog(t, logged, "scenario started", map[string]string{"plugin": "demo", "scenario": "compare"})
+	finished := findLog(t, logged, "scenario finished", map[string]string{"plugin": "demo", "scenario": "compare"})
+	if finished["status"] != "ok" {
+		t.Fatalf("scenario finished status = %q, want ok", finished["status"])
+	}
+	logDuration(t, finished)
+	if message, ok := finished["error"]; ok {
+		t.Fatalf("successful scenario logged error %q", message)
+	}
+	if countLog(logged, "scenario started") != 1 || countLog(logged, "scenario finished") != 1 {
+		t.Fatalf("scenario progress pair was not logged exactly once:\n%s", logged)
+	}
+
+	for _, arm := range []string{"without", "with"} {
+		wanted := map[string]string{"plugin": "demo", "scenario": "compare", "arm": arm, "run": "1"}
+		started := findLog(t, logged, "run started", wanted)
+		if started["status"] != "" {
+			t.Fatalf("run started carries status %q", started["status"])
+		}
+		runFinished := findLog(t, logged, "run finished", wanted)
+		if runFinished["status"] != string(model.StatusOK) {
+			t.Fatalf("%s run finished status = %q, want ok", arm, runFinished["status"])
+		}
+		logDuration(t, runFinished)
+		findLog(t, logged, "judge started", wanted)
+		findLog(t, logged, "judge finished", wanted)
+	}
+	if got := countLog(logged, "judge failed"); got != 0 {
+		t.Fatalf("judge failed lines = %d, want 0:\n%s", got, logged)
+	}
+	if got := countLog(logged, "run skipped"); got != 0 {
+		t.Fatalf("run skipped lines = %d, want 0:\n%s", got, logged)
+	}
+	if strings.Index(logged, "scenario started") > strings.Index(logged, "run started") {
+		t.Fatalf("run started preceded scenario started:\n%s", logged)
+	}
+	if strings.Index(logged, "run finished") > strings.Index(logged, "scenario finished") {
+		t.Fatalf("scenario finished preceded run finished:\n%s", logged)
+	}
+}
+
+func TestSuiteLogsJudgeFailure(t *testing.T) {
+	fx := newFixture(t)
+	out := filepath.Join(t.TempDir(), "suite")
+	broken := filepath.Join(fx.root, "judge-broken.sh")
+	writeFile(t, broken, "#!/usr/bin/env bash\nexit 1\n", 0o755)
+	buffer := &logBuffer{}
+	cfg := loggedSuiteConfig(t, fx, out, buffer)
+	cfg.JudgeCmd = broken
+	cfg.JudgeExec = fx.judgeExecutor(t, broken)
+	if _, _, err := runSuite(t, cfg); err != nil {
+		t.Fatalf("suite: %v", err)
+	}
+	logged := buffer.String()
+	failed := findLog(t, logged, "judge failed", map[string]string{
+		"plugin": "demo", "scenario": "compare", "arm": "with", "run": "1",
+	})
+	if failed["error"] == "" {
+		t.Fatalf("judge failed carries no error attribute: %v", failed)
+	}
+	if got := countLog(logged, "judge finished"); got != 0 {
+		t.Fatalf("judge finished lines = %d, want 0:\n%s", got, logged)
+	}
+}
+
+func TestSuiteNilLoggerDoesNotPanic(t *testing.T) {
+	fx := newFixture(t)
+	out := filepath.Join(t.TempDir(), "suite")
+	cfg := fx.suiteConfig(t, out)
+	cfg.Selection = scenario.Selection{Pattern: "^demo/compare$"}
+	cfg.JudgeCmd = fx.judgeScript
+	cfg.JudgeExec = fx.judgeExecutor(t, fx.judgeScript)
+	cfg.Logger = nil
+	if _, _, err := runSuite(t, cfg); err != nil {
+		t.Fatalf("suite with nil logger: %v", err)
+	}
 }

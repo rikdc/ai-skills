@@ -116,13 +116,30 @@ Detection patterns live in `.claude/security-patterns.conf`. Copy
 
 ```bash
 make install        # Make the hook scripts executable
-make test           # Scanner, branch protection, and marketplace consistency tests
+make test           # Go tests/vet plus the complete shell test suite
 make validate       # Check the plugin manifest, hook scripts, and dependencies
 make lint           # ShellCheck and markdownlint
+make evalctl-build  # Build bin/evalctl
+make evalctl-check  # gofmt, go vet, and the deterministic evalctl gate
+make evalctl-selftest # Deterministic end-to-end evalctl selftest
 make check-tools    # Report required and optional tools
 make status         # Show configuration and tool status
 make help           # List every target
 ```
+
+`make eval` runs the Go `evalctl` harness by default and copies the agent CLI
+login state into each workspace, matching the legacy shell harness. Set
+`AUTH_CLI=0` to run without credentials. Set `EVALCTL_LEGACY=1` to use the
+legacy shell harness instead:
+
+```bash
+make eval PLUGIN=git-workflow RUNS=1 DRY=1
+EVALCTL_LEGACY=1 make eval PLUGIN=git-workflow RUNS=1 DRY=1
+```
+
+See [plugins/eval-workflow/README.md](plugins/eval-workflow/README.md) for
+the Milestone A scope, build/run/selftest commands, rollback checkpoint, and
+the shell-vs-Go parity gate.
 
 `jq`, `grep`, `awk`, and `mktemp` are required. `trufflehog`, `gitleaks`, and
 `git-secrets` are optional, and improve secret detection when present.
@@ -141,9 +158,11 @@ plugins/                        # Everything the marketplace ships
 
 .claude-plugin/marketplace.json # Marketplace manifest
 .claude/                        # Local config: security patterns, logs
+cmd/evalctl/                    # Go eval harness entry point
+internal/                       # evalctl packages, provider, runner, reports
 docs/                           # Hook and marketplace documentation
-scripts/                        # Validation tooling
-tests/                          # Test suite
+scripts/                        # Validation and legacy eval harness tooling
+tests/                          # Shell and Go test suite
 Makefile                        # Everything above, in one place
 ```
 

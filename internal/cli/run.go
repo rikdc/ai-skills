@@ -16,7 +16,7 @@ import (
 	"github.com/rikdc/ai-skills/internal/usage"
 )
 
-func newRunCommand() *cobra.Command {
+func newRunCommand(opts *GlobalOptions) *cobra.Command {
 	var (
 		plugin        string
 		scenarioName  string
@@ -132,6 +132,7 @@ func newRunCommand() *cobra.Command {
 				AttemptArtifacts: attemptArtifacts,
 				PassEnv:          passEnv,
 				Executor:         exec,
+				Logger:           loggerOf(opts),
 			})
 			if err != nil {
 				return err

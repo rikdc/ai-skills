@@ -28,6 +28,11 @@ func newGradeCommand() *cobra.Command {
 		judgeUsage   string
 		usageCmd     string
 
+		authCLI   bool
+		keychain  bool
+		authPaths []string
+		passEnv   []string
+
 		regrade     bool
 		pricingFile string
 
@@ -79,7 +84,11 @@ func newGradeCommand() *cobra.Command {
 					return errs.Usage("%v", err)
 				}
 			}
-			exec, err := command.New(command.Config{
+			creds := executorCredentials{
+				auth:    command.AuthOptions{CLI: authCLI, Keychain: keychain, Paths: authPaths},
+				passEnv: passEnv,
+			}
+			exec, err := creds.newExecutor(command.Config{
 				Command:  judgeCmd,
 				Timeout:  timeout,
 				UsageCmd: usageCommand,
@@ -137,6 +146,10 @@ func newGradeCommand() *cobra.Command {
 	flags.StringVar(&judgeTimeout, "judge-timeout", "10m", "per-run judge deadline (duration or seconds)")
 	flags.StringVar(&judgeUsage, "judge-usage-cmd", "", "judge usage normalization hook")
 	flags.StringVar(&usageCmd, "usage-cmd", "", "alias for --judge-usage-cmd")
+	flags.BoolVar(&authCLI, "auth-cli", false, "copy selected CLI credentials into the judge home")
+	flags.BoolVar(&keychain, "keychain", false, "link the macOS Keychains directory (requires --auth-cli)")
+	flags.StringArrayVar(&authPaths, "auth-path", nil, "extra credential path under the real home (requires --auth-cli)")
+	flags.StringArrayVar(&passEnv, "pass-env", nil, "environment variable to pass to the judge")
 	flags.BoolVar(&regrade, "regrade", false, "create a new judge attempt for existing judgements")
 	flags.StringVar(&pricingFile, "pricing", "", "pricing JSON file (env EVALCTL_PRICING)")
 	addNativeFlags(flags, &native)

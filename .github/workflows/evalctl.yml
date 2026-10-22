@@ -1,0 +1,82 @@
+---
+name: evalctl
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  go-linux:
+    name: Go tests, race, selftest, parity (Linux)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Verify toolchain
+        run: |
+          go version
+          jq --version
+
+      - name: Build evalctl
+        run: go build ./cmd/evalctl
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
+      - name: Race test
+        run: go test -race ./...
+
+      - name: Deterministic selftest
+        run: make evalctl-selftest
+
+      - name: Shell/evalctl parity
+        run: make evalctl-parity
+
+      - name: Verify make eval routing
+        run: |
+          make eval DRY=1 PLUGIN=git-workflow RUNS=1
+          EVALCTL_LEGACY=1 make eval DRY=1 PLUGIN=git-workflow RUNS=1
+
+  go-macos:
+    name: Go tests and process lifecycle (macOS)
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Verify toolchain
+        run: |
+          go version
+          jq --version
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
+      - name: Process lifecycle tests
+        run: go test -count=1 ./internal/platform/execx ./internal/runner/...

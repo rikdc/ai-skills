@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -177,6 +178,57 @@ func TestBlackBoxDoctorDoesNotLeakSecrets(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "EVALCTL_API_KEY=set") {
 		t.Fatalf("doctor did not report key presence: %q", stdout)
+	}
+}
+
+func TestBlackBoxSuiteJudgeReceivesCredentials(t *testing.T) {
+	root, _ := blackBoxRepo(t)
+	home := t.TempDir()
+	env := []string{"HOME=" + home, "TMPDIR=" + t.TempDir(), "NO_COLOR=1"}
+	// A fake CLI credential that --auth-cli must copy into the judge's own home.
+	if err := os.WriteFile(filepath.Join(home, ".claude.json"), []byte(`{"fake":true}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(t.TempDir(), "results")
+	// The judge must see the copied credential in its HOME or it fails loudly.
+	judgeCmd := `sh -c 'test -f "$HOME/.claude.json" || { echo judge-has-no-credentials >&2; exit 9; }; printf "[{\"name\":\"a\",\"score\":10,\"max\":10}]" > judgement.json'`
+	stdout, stderr, code := runBinary(t, root, env, "suite",
+		"--plugin", "demo", "--scenario", "basic", "--arm", "with",
+		"--agent-cmd", "true", "--judge-cmd", judgeCmd,
+		"--auth-cli", "--runs", "1", "--out", out)
+	if code != 0 {
+		t.Fatalf("suite exit = %d\nstdout=%s\nstderr=%s", code, stdout, stderr)
+	}
+
+	data, err := os.ReadFile(filepath.Join(out, "suite.json"))
+	if err != nil {
+		t.Fatalf("read suite.json: %v", err)
+	}
+	var doc struct {
+		Counts map[string]int `json:"counts"`
+	}
+	if err := json.Unmarshal(data, &doc); err != nil {
+		t.Fatalf("parse suite.json: %v", err)
+	}
+	if got := doc.Counts["judged_runs"]; got != 1 {
+		t.Fatalf("judged_runs = %d, want 1 (judge did not see credentials?)\nsuite.json=%s", got, data)
+	}
+	if got := doc.Counts["pending_runs"]; got != 0 {
+		t.Fatalf("pending_runs = %d, want 0\nsuite.json=%s", got, data)
+	}
+	if got := doc.Counts["judge_attempts"]; got != 1 {
+		t.Fatalf("judge_attempts = %d, want 1 (inline grading should satisfy final grading)\nsuite.json=%s", got, data)
+	}
+
+	results, err := os.ReadFile(filepath.Join(out, "results.jsonl"))
+	if err != nil {
+		t.Fatalf("read results.jsonl: %v", err)
+	}
+	if strings.Contains(string(results), `"status":"pending"`) {
+		t.Fatalf("results.jsonl still reports a pending scenario:\n%s", results)
+	}
+	if !strings.Contains(string(results), `"judge_attempt":"judge-`) {
+		t.Fatalf("results.jsonl has no accepted judge attempt:\n%s", results)
 	}
 }
 

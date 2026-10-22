@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -369,8 +370,11 @@ feed:
 		return result, errs.Operational("suite cancelled: %v", ctx.Err())
 	}
 	if stats.RunnerFailures > 0 {
-		return result, errs.Operational("%d scenario(s) had runner failures; see %s",
-			stats.RunnerFailures, result.SummaryPath)
+		message := fmt.Sprintf("%d scenario(s) had runner failures", stats.RunnerFailures)
+		if detail := firstRunFailure(stats); detail != "" {
+			message += "; first: " + detail
+		}
+		return result, errs.Operational("%s; see %s", message, result.SummaryPath)
 	}
 	if len(stats.StrictFailures) > 0 {
 		return result, errs.Operational("strict: %s", strings.Join(stats.StrictFailures, "; "))
@@ -661,13 +665,30 @@ func (r *Runner) runScenario(ctx context.Context, item scenario.Selected,
 		_ = atomicfile.Write(statusPath, []byte("1\n"), 0o600)
 		return true, err
 	}
+	logInfo(r.cfg.Logger, "scenario started",
+		"plugin", item.Scenario.Plugin, "scenario", item.Scenario.Name)
+	scenarioStartedAt := time.Now()
 	summary, runErr := scenarioRunner.Run(ctx)
+	scenarioAttributes := []any{
+		"plugin", item.Scenario.Plugin,
+		"scenario", item.Scenario.Name,
+		"status", scenarioStatus(summary, runErr),
+		"duration_seconds", wholeSeconds(time.Since(scenarioStartedAt)),
+	}
+	if runErr != nil {
+		scenarioAttributes = append(scenarioAttributes, "error", runErr.Error())
+	}
+	logInfo(r.cfg.Logger, "scenario finished", scenarioAttributes...)
 	if runErr != nil {
 		fmt.Fprintf(logFile, "error: %v\n", runErr)
 	}
 	if summary != nil {
 		for _, run := range summary.Runs {
-			fmt.Fprintf(logFile, "%s/run-%d: %s\n", run.Arm, run.Run, run.Status)
+			line := fmt.Sprintf("%s/run-%d: %s", run.Arm, run.Run, run.Status)
+			if run.Error != "" {
+				line += ": " + run.Error
+			}
+			fmt.Fprintln(logFile, line)
 		}
 	}
 
@@ -680,7 +701,7 @@ func (r *Runner) runScenario(ctx context.Context, item scenario.Selected,
 			key := runKey{item.Scenario.Plugin, item.Scenario.Name, run.Arm, run.Run}
 			dir := key.runDir(r.cfg.Out)
 			regrade := r.cfg.Regrade
-			gradeErr := gradeRun(ctx, r.cfg, dir, regrade)
+			gradeErr := gradeRun(ctx, r.cfg, key, dir, regrade)
 			if gradeErr != nil {
 				fmt.Fprintf(logFile, "grade %s: %v\n", dir, gradeErr)
 				if errs.Code(gradeErr) == errs.CodeUsage {
@@ -711,7 +732,11 @@ func keyString(k runKey) string {
 	return fmt.Sprintf("%s/%s/%s/%d", k.plugin, k.scenario, k.arm, k.run)
 }
 
-func gradeRun(ctx context.Context, cfg Config, runDir string, regrade bool) error {
+// gradeRun grades one run and emits its progress pair. The judge key attributes
+// are logged here so inline and final grading share one shape.
+func gradeRun(ctx context.Context, cfg Config, key runKey, runDir string, regrade bool) error {
+	logInfo(cfg.Logger, "judge started",
+		"plugin", key.plugin, "scenario", key.scenario, "arm", key.arm, "run", key.run)
 	_, err := judge.Grade(ctx, judge.Config{
 		RunDir:   runDir,
 		Command:  cfg.JudgeCmd,
@@ -719,7 +744,55 @@ func gradeRun(ctx context.Context, cfg Config, runDir string, regrade bool) erro
 		Regrade:  regrade,
 		Executor: cfg.JudgeExec,
 	})
-	return err
+	attributes := []any{
+		"plugin", key.plugin,
+		"scenario", key.scenario,
+		"arm", key.arm,
+		"run", key.run,
+	}
+	if err != nil {
+		attributes = append(attributes, "error", err.Error())
+		logWarn(cfg.Logger, "judge failed", attributes...)
+		return err
+	}
+	logInfo(cfg.Logger, "judge finished", attributes...)
+	return nil
+}
+
+// logInfo emits one-line progress records through the configured logger.
+// Progress never goes to stdout, and a nil logger is a no-op.
+func logInfo(logger *slog.Logger, msg string, args ...any) {
+	if logger != nil {
+		logger.Info(msg, args...)
+	}
+}
+
+// logWarn emits one-line anomaly records through the configured logger, so a
+// failed judge is visible at the same level as the pre-existing final-grading
+// warning.
+func logWarn(logger *slog.Logger, msg string, args ...any) {
+	if logger != nil {
+		logger.Warn(msg, args...)
+	}
+}
+
+// wholeSeconds rounds a measured duration to whole seconds for progress logs.
+func wholeSeconds(d time.Duration) int64 {
+	return int64(math.Round(d.Seconds()))
+}
+
+// scenarioStatus mirrors the suite's scenario status vocabulary: every run ok
+// means ok, anything else means runner-failed.
+func scenarioStatus(summary *runner.Summary, runErr error) string {
+	if runErr != nil || summary == nil {
+		return "runner-failed"
+	}
+	for _, run := range summary.Runs {
+		if run.Status != model.StatusOK {
+			return "runner-failed"
+		}
+	}
+	return "ok"
 }
 
 func (r *Runner) finalGrading(ctx context.Context, selected []scenario.Selected, gradedInline map[string]bool) error {
@@ -739,7 +812,7 @@ func (r *Runner) finalGrading(ctx context.Context, selected []scenario.Selected,
 					continue
 				}
 				regrade := r.cfg.Regrade && !gradedInline[keyString(key)]
-				if err := gradeRun(ctx, r.cfg, dir, regrade); err != nil {
+				if err := gradeRun(ctx, r.cfg, key, dir, regrade); err != nil {
 					if errs.Code(err) == errs.CodeUsage {
 						return err
 					}
