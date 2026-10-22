@@ -10,7 +10,7 @@ tests/output/
 tests/**/test-results.log
 lint-report.txt
 
-# Eval run output (scripts/eval-run.sh)
+# Eval run output
 results/
 
 # Built evalctl binary

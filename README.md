@@ -127,14 +127,11 @@ make status         # Show configuration and tool status
 make help           # List every target
 ```
 
-`make eval` runs the Go `evalctl` harness by default and copies the agent CLI
-login state into each workspace, matching the legacy shell harness. Set
-`AUTH_CLI=0` to run without credentials. Set `EVALCTL_LEGACY=1` to use the
-legacy shell harness instead:
+`make eval` runs the `evalctl` harness and copies the agent CLI login state
+into each workspace. Set `AUTH_CLI=0` to run without credentials:
 
 ```bash
 make eval PLUGIN=git-workflow RUNS=1 DRY=1
-EVALCTL_LEGACY=1 make eval PLUGIN=git-workflow RUNS=1 DRY=1
 ```
 
 A suite that hits a runner failure (a timed-out or failed agent run) still
@@ -144,8 +141,7 @@ selection and agent>` re-attempts only the runs without an accepted attempt.
 `summary.md` prints the exact resume command in a copy-pasteable block.
 
 See [plugins/eval-workflow/README.md](plugins/eval-workflow/README.md) for
-the Milestone A scope, build/run/selftest commands, rollback checkpoint, and
-the shell-vs-Go parity gate.
+the Milestone A scope and the build/run/selftest commands.
 
 `jq`, `grep`, `awk`, and `mktemp` are required. `trufflehog`, `gitleaks`, and
 `git-secrets` are optional, and improve secret detection when present.
@@ -167,7 +163,7 @@ plugins/                        # Everything the marketplace ships
 cmd/evalctl/                    # Go eval harness entry point
 internal/                       # evalctl packages, provider, runner, reports
 docs/                           # Hook and marketplace documentation
-scripts/                        # Validation and legacy eval harness tooling
+scripts/                        # Validation and repository tooling
 tests/                          # Shell and Go test suite
 Makefile                        # Everything above, in one place
 ```

@@ -7,7 +7,7 @@
 # whether the body reads well, whether the title is imperative - needs
 # judgement and is left to a judge; see the review-evals skill.
 #
-# Run by scripts/eval-run.sh with the sandbox as the working directory:
+# Run by bin/evalctl run with the sandbox as the working directory:
 #   SANDBOX       the sandbox root
 #   SCENARIO_DIR  this scenario's directory
 #   CRITERIA      this scenario's criteria.json

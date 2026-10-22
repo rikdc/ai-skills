@@ -8,7 +8,7 @@ rm -rf hooks payloads repo
 mkdir -p payloads .claude
 
 if [[ -z "${EVAL_HOOK_SOURCE:-}" || ! -f "$EVAL_HOOK_SOURCE/hooks/protect-main-branch.sh" ]]; then
-    echo "setup: EVAL_HOOK_SOURCE does not contain the plugin hook; run through scripts/eval-run.sh" >&2
+    echo "setup: EVAL_HOOK_SOURCE does not contain the plugin hook; run through bin/evalctl run" >&2
     exit 1
 fi
 cp -R "$EVAL_HOOK_SOURCE/hooks" ./hooks

@@ -51,8 +51,8 @@ func (s Selected) Execution() model.ExecutionBackend { return s.Scenario.Executi
 // DirectHook reports whether direct hook execution (milestone C) is requested.
 func (s Selected) DirectHook() bool { return s.Scenario.DirectHook() }
 
-// Select applies plugin, unit, regex, changed, and shard filters in the legacy
-// suite order. Warnings describe incomplete scenarios that were skipped.
+// Select applies plugin, unit, regex, changed, and shard filters in the suite
+// order. Warnings describe incomplete scenarios that were skipped.
 func Select(root string, opts Selection) ([]Selected, []string, error) {
 	if err := validateRequestedUnits(root, opts); err != nil {
 		return nil, nil, err
