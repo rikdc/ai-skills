@@ -1,51 +1,56 @@
 {
-  "context": "Baseline failure mode: without the skill's secrets rule, an agent reviews the module as fine cosmetically ('it compiles') or accepts the teammate's chmod-600 + untracked plaintext file as a fix, because both look 'secure enough' at the filesystem level. The skill's documented rule is that everything in the Nix store is world-readable, so plaintext secrets in a .nix file are unacceptable regardless of file permissions, and agenix or sops-nix with path-reference consumption is the required pattern. Items below fail (0) on those baseline answers.",
+  "context": "Baseline failure mode: a generic agent flags the plaintext secrets and recommends 'use a secrets manager', and may name agenix or sops-nix, but is likely to accept the teammate's untracked chmod-600 secrets.env as adequate, or to describe the fix loosely. The skill's documented rules are: everything in the Nix store is world-readable so plaintext in a .nix file is never acceptable; use agenix or sops-nix with an encrypted file committed to the repo (agenix: secrets.nix with publicKeys, edited with `agenix -e`), declared via age.secrets.<name> and consumed by path (`EnvironmentFile = config.age.secrets.<name>.path`, 'pass the path, never the value'). Items marked as skill-specific should score low on a reasonable-but-generic answer.",
   "type": "weighted_checklist",
   "checklist": [
     {
       "name": "Verdict stated",
       "description": "review.md exists and states plainly that the change as written is not acceptable.",
-      "max_score": 8
+      "max_score": 6
     },
     {
-      "name": "Identifies Nix store exposure",
-      "description": "The review says the plaintext values land in the Nix store (through the systemd environment and the generated environment.etc file) and that the store is world-readable.",
+      "name": "Identifies Nix store exposure at both sites",
+      "description": "The review says the plaintext values land in the Nix store (via the services.jitsi-videobridge environment and the environment.etc .text file) and that everything in the store is world-readable.",
       "max_score": 14
     },
     {
-      "name": "Flags both leak sites",
-      "description": "Both embedded secrets (JVB_XMPP_PASSWORD and the turn secret) are identified as leaks; neither is missed.",
-      "max_score": 10
-    },
-    {
-      "name": "Recommends agenix or sops-nix",
-      "description": "The recommended pattern names agenix or sops-nix (an encrypted-secrets-in-repo solution), not 'move to an environment variable', 'chmod', or a vault-with-network-fetch scheme.",
-      "max_score": 16
-    },
-    {
-      "name": "Correct consumption shape",
-      "description": "The corrected module shows the service consuming the secret by path reference, e.g. an environmentFile / passwordFile / config.age.secrets.<name>.path style, never interpolating the decrypted value into the derivation or store.",
-      "max_score": 16
-    },
-    {
-      "name": "Rejects the easy fix at filesystem level",
-      "description": "The review states that an untracked, chmod 600 plaintext secrets.env does NOT solve the problem — once referenced by the store/derivation the value is world-readable again — rather than accepting it as adequate.",
-      "max_score": 18
-    },
-    {
-      "name": "Declarative-not-imperative framing",
-      "description": "The recommendation replaces the imperative value-in-module approach with a declarative encrypted-file declaration, not with an escape hatch such as a postStart script writing/sourcing the secret.",
+      "name": "Both secrets flagged",
+      "description": "Both embedded secrets (JVB_XMPP_PASSWORD and the turn shared secret) are identified as leaks; neither is missed.",
       "max_score": 8
     },
     {
-      "name": "No invented commands",
-      "description": "The review does not present commands claiming to have verified the build (it is an offline review), or, if it lists commands, they are framed as what the author should run, not as executed.",
-      "max_score": 5
+      "name": "Encrypted-in-repo pattern with recipients",
+      "description": "The review recommends agenix or sops-nix with the secret stored encrypted in the repository, and for agenix shows or describes a secrets.nix declaring publicKeys (user and host keys) and a .age file per secret.",
+      "max_score": 16
     },
     {
-      "name": "Actionable correction for the author",
-      "description": "The review gives the module author concrete next steps (which tooling to add and how to re-key/migrate the two secrets), not just criticism.",
-      "max_score": 5
+      "name": "Path-not-value consumption",
+      "description": "The corrected module declares age.secrets.<name> (file, and owner/group/mode as needed) and has the service consume the decrypted runtime path, e.g. EnvironmentFile = config.age.secrets.<name>.path or a passwordFile option, stating the rule of passing the path and never the value.",
+      "max_score": 16
+    },
+    {
+      "name": "Per-secret declaration for both values",
+      "description": "The corrected module handles both secrets (the XMPP password for the videobridge environment and the turn secret now rendered into /etc) through separate or clearly distinct age.secrets declarations rather than one plaintext blob.",
+      "max_score": 6
+    },
+    {
+      "name": "Rejects the plaintext secrets.env fix",
+      "description": "The review states that an untracked, chmod 600 plaintext secrets.env is not the answer: the secret still sits unencrypted outside the declarative, versioned configuration. The recommended replacement is an encrypted file committed to the repository.",
+      "max_score": 14
+    },
+    {
+      "name": "Declarative, not imperative",
+      "description": "The recommendation uses the declarative encrypted-secret declaration and does not rely on an imperative escape hatch such as a postStart script that writes or sources the secret.",
+      "max_score": 6
+    },
+    {
+      "name": "Migration steps and rotation",
+      "description": "The review gives concrete steps: create the encrypted files with `agenix -e` (or the sops equivalent), re-key with `agenix -r` when hosts change, and treats the two values already committed or exposed as compromised, to be rotated.",
+      "max_score": 10
+    },
+    {
+      "name": "No invented commands or verification",
+      "description": "The review does not claim to have built or tested anything (it is an offline review); any commands are framed as what the author should run.",
+      "max_score": 4
     }
   ]
 }

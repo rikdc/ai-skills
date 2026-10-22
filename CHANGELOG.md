@@ -101,6 +101,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   difference (`resume timeouts differ from the recorded suite`) rather than
   refusing it; everything that defines the experiment (agent and judge command
   and identity, arm, `RUNS`, units, credential mode) is still compared exactly
+- `nix-expert` secrets guidance now rejects an untracked plaintext env file,
+  requires one declaration per secret, and lists the migration and rotation
+  steps
 - `make eval` now rejects an `AGENT`/`JUDGE` containing an empty quoted
   argument — the single-dollar `$(cat)` trap — naming the cause and the
   `$$(cat)` fix, and warns when an ambient `RUNS` is discarded instead of

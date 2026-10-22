@@ -1,46 +1,51 @@
 {
-  "context": "Baseline failure mode: an agent commits the lock with a bare 'chore: update flake.lock' one-liner (or a vague subject plus nothing else) because a lock diff looks mechanical; it may also misread the summary and credit only one input, or add opinionated padding instead of the generated record. The skill's documented rule changes the output: the commit message body must contain the human-readable update summary (a bare-hash diff is unreadable on its own) and a 'why' line above the summary when an input is pinned or overridden. Items below score 0 on the baseline answer.",
+  "context": "Baseline failure mode: a generic agent writes a plausible conventional-commit message ('chore(flake): update home-manager and nixpkgs') and may even summarise which inputs moved in prose or abbreviated hashes, but does not know the skill's rule that the commit body must carry the generated `nix flake update` output (the only readable record of a lock diff of bare hashes and epochs), nor that the why for a pinned or overridden input goes above that output. Items marked as skill-specific should score low on a reasonable-but-generic answer.",
   "type": "weighted_checklist",
   "checklist": [
     {
       "name": "Commit exists with only the lock change",
       "description": "The repository has exactly one new commit on main, it touches only flake.lock, and it was committed (the change is no longer staged-but-uncommitted).",
-      "max_score": 14
-    },
-    {
-      "name": "Committed via the written message",
-      "description": "commit-message.txt exists and the commit's message (git log --format=%B -n 1) matches it — the commit was made with the written file, not a separate ad-hoc message.",
       "max_score": 12
     },
     {
+      "name": "Committed via the written message",
+      "description": "commit-message.txt exists and the commit's message (git log --format=%B -n 1) matches it, so the commit was made with the written file rather than a separate ad-hoc message.",
+      "max_score": 6
+    },
+    {
       "name": "Message not bare",
-      "description": "The commit message body carries content beyond a short subject: it is not just a one-line 'chore: update flake.lock' (or similar) with no body.",
+      "description": "The commit message has a body beyond a short subject; it is not just a one-line 'chore: update flake.lock' or similar.",
+      "max_score": 6
+    },
+    {
+      "name": "Body records both transitions",
+      "description": "The body records both moved inputs with their old and new revisions: home-manager 3a1f2cbb... -> 7c2a4e8f... and nixpkgs b9c9b0af... -> d4a2b7c9.... A prose line such as 'bumped home-manager and nixpkgs' with no revisions does not count.",
       "max_score": 14
     },
     {
-      "name": "Summary names both moved inputs",
-      "description": "The body records both transitions: home-manager 3a1f... -> 7c2a... and nixpkgs b9c9... -> d4a2..., i.e. both inputs the update actually moved, captured from the dry-run summary.",
+      "name": "Body carries the update output as generated",
+      "description": "The body contains the `nix flake update` output from notes/update-summary.txt in its generated form (the `Updated '<input>' in flake.lock:` lines with the full `github:...` refs and dates), copied rather than paraphrased or reduced to short hashes. This is the skill's rule that the generated summary is the readable record.",
       "max_score": 16
     },
     {
-      "name": "Why-line above the summary for the pin",
-      "description": "The body contains the reason home-manager is pinned (e.g. release-25.05 pin pending an upstream fix / waybar regression) — placed with the summary, above it, per the documented rule.",
+      "name": "Why-line present for the pinned input",
+      "description": "The body states why home-manager is pinned (the release-25.05 pin pending a fix for the upstream waybar regression), so a reader knows the pin is deliberate.",
+      "max_score": 14
+    },
+    {
+      "name": "Why-line sits above the summary",
+      "description": "The pin rationale appears in the body above the generated update output, not below it or only in the subject. This ordering is the skill's documented rule for pinned or overridden inputs.",
       "max_score": 16
     },
     {
       "name": "No fabricated claims",
-      "description": "The message does not claim actions that were not taken (e.g. 'rebuilt all hosts and verified', 'ran full system test'), since the sandbox is offline.",
+      "description": "The message does not claim actions that were not taken (for example 'rebuilt all hosts and verified' or 'ran flake check'); the sandbox is offline with no Nix.",
       "max_score": 8
     },
     {
-      "name": "No unrelated content or noise padding",
-      "description": "The message contains no invented boilerplate such as signed-off trailers for others, emoji, or 'Generated-by' lines beyond what the workflow produces; the diff itself is untouched.",
-      "max_score": 10
-    },
-    {
       "name": "flake.nix untouched",
-      "description": "flake.nix is unchanged relative to its committed main version (the input URL pin stays; the update does not silently widen or remove the pin).",
-      "max_score": 10
+      "description": "flake.nix is unchanged relative to its committed main version: the home-manager input pin stays and the update does not widen or remove it.",
+      "max_score": 8
     }
   ]
 }
