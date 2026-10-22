@@ -461,7 +461,7 @@ func loadV3Run(runDir, rel string, ri model.RunInput, rubric []model.Criterion, 
 	if id, started, finished, err := supersedingAttempt(runDir, current.AgentAttempt); err != nil {
 		return ri, err
 	} else if id != "" {
-		return supersededRun(ri, id, started, finished), nil
+		return supersededRun(ri, runDir, id, started, finished)
 	}
 
 	agentDir := filepath.Join(runDir, "attempts", current.AgentAttempt)
@@ -620,7 +620,18 @@ func supersedingAttempt(runDir, accepted string) (string, *startedFile, *finishe
 
 // supersededRun reports a failed rerun as the run's outcome.
 // Like any failed run, it has no accepted usage or judgement.
-func supersededRun(ri model.RunInput, id string, started *startedFile, finished *finishedFile) model.RunInput {
+func supersededRun(ri model.RunInput, runDir, id string, started *startedFile, finished *finishedFile) (model.RunInput, error) {
+	// Mechanical items and evidence come from the failed rerun, as in the
+	// suite summary row.
+	attemptDir := filepath.Join(runDir, "attempts", id)
+	items, err := readMechanical(attemptDir, nil)
+	if err != nil {
+		return ri, err
+	}
+	ri.MechanicalItems = items
+	if _, err := os.Stat(filepath.Join(attemptDir, "evidence.json")); err == nil {
+		ri.Evidence = filepath.ToSlash(filepath.Join(ri.Evidence, "attempts", id, "evidence.json"))
+	}
 	ri.AgentAttempt = id
 	ri.JudgeAttempt = ""
 	ri.Complete = false
@@ -637,7 +648,7 @@ func supersededRun(ri model.RunInput, id string, started *startedFile, finished 
 	ri.AgentUsage = notApplicableUsage()
 	ri.JudgeUsage = notApplicableUsage()
 	ri.CombinedUsage = notApplicableUsage()
-	return ri
+	return ri, nil
 }
 
 // readProjection returns result.json only when it is bound to the accepted

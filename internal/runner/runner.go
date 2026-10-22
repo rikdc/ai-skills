@@ -897,11 +897,15 @@ func existingEvidence(attemptDir string) []string {
 func (r *Runner) writeDiagnostic(state *runState, evidenceSHA string, outcome RunOutcome) error {
 	supersededID := ""
 	if pointer, _, err := state.store.LoadCurrent(); err == nil {
-		superseding, err := state.store.Superseded()
+		// The run has already failed; an unreadable accepted or intermediate
+		// attempt only means the projection is left as it was. Readers that
+		// decide superseding report that damage themselves.
+		accepted, err := state.store.LoadAttempt(pointer.AgentAttempt)
 		if err != nil {
-			return fmt.Errorf("check whether %s supersedes the accepted attempt: %w", state.attempt.ID, err)
+			return nil
 		}
-		if superseding == nil || superseding.ID != state.attempt.ID {
+		superseding, err := state.store.SupersedingFor(accepted)
+		if err != nil || superseding == nil || superseding.ID != state.attempt.ID {
 			return nil
 		}
 		supersededID = pointer.AgentAttempt

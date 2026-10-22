@@ -356,6 +356,9 @@ func TestVersionWithoutWorkingDirectory(t *testing.T) {
 	if err := os.Remove(gone); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := os.Getwd(); err == nil {
+		t.Skip("this platform still resolves a deleted working directory")
+	}
 	t.Setenv("EVALCTL_ROOT", "")
 
 	if _, _, err := executeCommand(t, "version"); err != nil {

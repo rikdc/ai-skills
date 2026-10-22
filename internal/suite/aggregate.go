@@ -476,18 +476,26 @@ func loadRunRow(runDir, arm string, run int, rubric []model.Criterion, denominat
 		return row
 	}
 	store := attempts.New(runDir)
-	list, err := store.Enumerate()
-	if err != nil || len(list) == 0 {
+	pointer, raw, currentErr := store.LoadCurrent()
+	// With an accepted attempt the full list is only a fallback, so damage to
+	// an older attempt does not hide an accepted run.
+	list, listErr := store.Enumerate()
+	if currentErr != nil && (listErr != nil || len(list) == 0) {
 		return row
 	}
-	pointer, raw, currentErr := store.LoadCurrent()
 	useCurrent := currentErr == nil
 	execution := attempts.LatestExecution(list)
 	if useCurrent {
 		agent, err := store.LoadAttempt(pointer.AgentAttempt)
 		if err == nil {
 			execution = agent
-			if superseding := attempts.SupersedingAttempt(list, agent); superseding != nil {
+			superseding, err := store.SupersedingFor(agent)
+			if err != nil {
+				// A damaged newer attempt may be the outcome: report nothing
+				// rather than the accepted result.
+				return row
+			}
+			if superseding != nil {
 				// A failed rerun is the run's outcome; the accepted pointer is
 				// provenance only, and its recorded skill use describes the
 				// replaced attempt.
@@ -1041,6 +1049,9 @@ func expenditure(item scenario.Selected, outRoot string) ExpenditureSummary {
 		}
 	}
 	summary.KnownTotal, summary.Complete = model.SumLowerBound("expenditure", usages)
+	if !summary.Complete {
+		summary.KnownTotal = summary.KnownTotal.WithState(model.UsageUnknown)
+	}
 	return summary
 }
 

@@ -267,3 +267,25 @@ func TestCheckFindingExitOne(t *testing.T) {
 		t.Fatalf("finding = %+v", finding)
 	}
 }
+
+func TestExplicitRootWorksWithoutWorkingDirectory(t *testing.T) {
+	root := cliRoot(t)
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	gone := t.TempDir()
+	if err := os.Chdir(gone); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(cwd) })
+	if err := os.Remove(gone); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Getwd(); err == nil {
+		t.Skip("this platform still resolves a deleted working directory")
+	}
+	if _, stderr, err := executeWithRoot(t, "--root", root, "list"); err != nil {
+		t.Fatalf("list --root from a deleted cwd: %v (stderr %s)", err, stderr)
+	}
+}

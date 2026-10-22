@@ -93,10 +93,9 @@ func resolveRoot(cmd *cobra.Command) (string, error) {
 	if err != nil {
 		return "", errs.Usage("resolve repository root: %v", err)
 	}
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", errs.Usage("get working directory: %v", err)
-	}
+	// A missing cwd only matters when discovery needs it; ResolveRoot then
+	// reports it. An explicit --root or EVALCTL_ROOT works without one.
+	cwd, _ := os.Getwd()
 	root, err := config.ResolveRoot(flagRoot, flags.Changed("root"), cwd, os.Getenv)
 	if err != nil {
 		return "", errs.Usage("resolve repository root: %v", err)

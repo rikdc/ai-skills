@@ -321,6 +321,7 @@ func TestV3FailedRerunSupersedesAcceptedAttempt(t *testing.T) {
 		FinishedAt: "2026-02-02T00:03:00Z", Status: model.StatusAgentFailed,
 		StopReason: model.StopProviderError, Usage: model.Usage{State: model.UsageKnown, Known: true, Source: "x"},
 	})
+	writeJSON(t, filepath.Join(failed, "mechanical.json"), []model.JudgedItem{{Name: "A", Score: 10, Max: 60}})
 	// A failed allocation after it is not an attempt and must not hide it.
 	if err := os.MkdirAll(filepath.Join(runDir, "attempts", "agent-000005"), 0o700); err != nil {
 		t.Fatal(err)
@@ -337,5 +338,8 @@ func TestV3FailedRerunSupersedesAcceptedAttempt(t *testing.T) {
 	}
 	if with.DurationSeconds == nil || *with.DurationSeconds != 60 {
 		t.Fatalf("duration = %v, want the rerun's 60s", with.DurationSeconds)
+	}
+	if len(with.MechanicalItems) != 1 || with.MechanicalItems[0].Score != 10 {
+		t.Fatalf("mechanical = %+v, want the rerun's items", with.MechanicalItems)
 	}
 }

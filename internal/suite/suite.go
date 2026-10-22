@@ -617,11 +617,22 @@ func (r *Runner) planRuns(selected []scenario.Selected, fingerprints map[string]
 					if err != nil {
 						return nil, errs.Operational("enumerate %s: %v", dir, err)
 					}
-					// Retain interrupted and non-ok work, including a failed
-					// rerun of an accepted run; stale successful work is
-					// rerun (it is not a failure).
-					if latest := attempts.LatestExecution(list); latest != nil &&
+					// Retain interrupted and non-ok work. With an accepted
+					// attempt only a failed rerun that supersedes it counts;
+					// an unfinished newer attempt never does, so stale
+					// successful work is rerun (it is not a failure).
+					retain := false
+					if accepted := acceptedAttempt(store); accepted != nil {
+						superseding, err := store.SupersedingFor(accepted)
+						if err != nil {
+							return nil, errs.Operational("read newer attempts in %s: %v", dir, err)
+						}
+						retain = superseding != nil
+					} else if latest := attempts.LatestExecution(list); latest != nil &&
 						(latest.Finished == nil || latest.Finished.Status != model.StatusOK) {
+						retain = true
+					}
+					if retain {
 						decisions[key] = decision{retain: true, reason: "kept-failure"}
 						continue
 					}
@@ -636,6 +647,20 @@ func (r *Runner) planRuns(selected []scenario.Selected, fingerprints map[string]
 		}
 	}
 	return decisions, nil
+}
+
+// acceptedAttempt returns the attempt current.json accepts, or nil when there
+// is no readable accepted attempt.
+func acceptedAttempt(store *attempts.Store) *attempts.Attempt {
+	pointer, _, err := store.LoadCurrent()
+	if err != nil {
+		return nil
+	}
+	accepted, err := store.LoadAttempt(pointer.AgentAttempt)
+	if err != nil {
+		return nil
+	}
+	return accepted
 }
 
 // ensureProjections rebuilds result.json and grading-request.json when they
@@ -979,7 +1004,11 @@ func (r *Runner) checkJudgeProvenance(selected []scenario.Selected, identity str
 					continue
 				}
 				// A replaced result's judgement is never shown or reused.
-				if superseding, _ := store.Superseded(); superseding != nil {
+				superseding, err := store.Superseded()
+				if err != nil {
+					return errs.Operational("read newer attempts in %s: %v", dir, err)
+				}
+				if superseding != nil {
 					continue
 				}
 				if pointer.JudgeIdentitySHA256 != identity {

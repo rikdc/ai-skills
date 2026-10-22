@@ -590,6 +590,73 @@ func TestKeepFailuresRetainsFailedRerunOfAcceptedRun(t *testing.T) {
 	}
 }
 
+func TestKeepFailuresRerunsStaleRunBehindUnfinishedAttempt(t *testing.T) {
+	fx := newFixture(t)
+	out := filepath.Join(t.TempDir(), "suite")
+	if _, _, err := runSuite(t, fx.suiteConfig(t, out)); err != nil {
+		t.Fatal(err)
+	}
+	runDir := filepath.Join(out, "runs", "demo", "compare", "with", "run-1")
+	writeFile(t, filepath.Join(fx.root, "plugins", "demo", "evals", "compare", "task.md"), "# Task\n\nChanged.\n", 0o644)
+	fp, err := scenario.Fingerprint(fx.root, "demo", "compare")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A crashed newer attempt never supersedes, so it cannot keep the stale
+	// accepted result alive.
+	if _, err := attempts.New(runDir).Allocate(model.StartedAttempt{
+		Kind: model.KindAgent, RunID: "demo/compare/with/run-1", Fingerprint: fp,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	cfg := fx.suiteConfig(t, out)
+	cfg.Resume = true
+	cfg.ResumePolicy = PolicyKeepFailures
+	if _, _, err := runSuite(t, cfg); err != nil {
+		t.Fatalf("keep-failures resume: %v", err)
+	}
+	list, err := attempts.New(runDir).Enumerate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if latest := attempts.LatestExecution(list); latest == nil || latest.Finished == nil ||
+		latest.Finished.Status != model.StatusOK || latest.Finished.Fingerprint != fp {
+		t.Fatalf("with/run-1 was not rerun for the new fingerprint: latest = %+v", latest)
+	}
+}
+
+func TestSummaryRowSurvivesCorruptOlderAttempt(t *testing.T) {
+	fx := newFixture(t)
+	writeFile(t, fx.agentScript, fmt.Sprintf(
+		"#!/usr/bin/env bash\nprintf 'call\\n' >> %q\nexit 1\n", fx.agentCalls), 0o755)
+	out := filepath.Join(t.TempDir(), "suite")
+	if _, _, err := runSuite(t, fx.suiteConfig(t, out)); err == nil {
+		t.Fatal("expected the failing suite to report runner failures")
+	}
+	writeFile(t, fx.agentScript, fmt.Sprintf(
+		"#!/usr/bin/env bash\nprintf 'call\\n' >> %q\n", fx.agentCalls), 0o755)
+	cfg := fx.suiteConfig(t, out)
+	cfg.Resume = true
+	if _, _, err := runSuite(t, cfg); err != nil {
+		t.Fatal(err)
+	}
+	runDir := filepath.Join(out, "runs", "demo", "compare", "with", "run-1")
+	writeFile(t, filepath.Join(runDir, "attempts", "agent-000001", "finished.json"), "{", 0o600)
+	if err := Refresh(fx.root, out); err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range readResults(t, out) {
+		if row.Scenario != "compare" {
+			continue
+		}
+		for _, run := range row.Runs {
+			if run.Arm == "with" && run.Status != string(model.StatusOK) {
+				t.Fatalf("accepted run hidden by a corrupt older attempt: %+v", run)
+			}
+		}
+	}
+}
+
 func TestFingerprintInvalidationReruns(t *testing.T) {
 	fx := newFixture(t)
 	out := filepath.Join(t.TempDir(), "suite")

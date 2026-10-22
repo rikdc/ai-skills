@@ -633,6 +633,23 @@ func TestInterruptedAttemptRestart(t *testing.T) {
 	}
 }
 
+func TestFailedRerunWithUnreadableAcceptedAttemptIsAnOrdinaryFailure(t *testing.T) {
+	fx := newFixture(t, fixtureOptions{})
+	out := t.TempDir()
+	if _, err := execute(t, fx, runOptions{out: out}); err != nil {
+		t.Fatal(err)
+	}
+	dir := runPath(out, "with", 1)
+	// current.json now names an attempt that is not on disk.
+	if err := os.RemoveAll(filepath.Join(dir, "attempts", "agent-000001")); err != nil {
+		t.Fatal(err)
+	}
+	_, err := execute(t, fx, runOptions{out: out, command: "exit 9"})
+	if err == nil || !strings.Contains(err.Error(), "did not complete ok") {
+		t.Fatalf("err = %v, want the ordinary run failure", err)
+	}
+}
+
 func TestFailedRerunKeepsAcceptedCurrent(t *testing.T) {
 	fx := newFixture(t, fixtureOptions{})
 	out := t.TempDir()
