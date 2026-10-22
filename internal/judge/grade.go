@@ -128,11 +128,11 @@ func Grade(ctx context.Context, cfg Config) (Result, error) {
 			runDir, agent.ID)
 	}
 	// Grading a replaced result would pay the judge for a score no reader shows.
-	list, err := store.Enumerate()
+	superseding, err := store.SupersedingFor(agent)
 	if err != nil {
-		return empty, errs.Operational("%s: list attempts: %v", runDir, err)
+		return empty, errs.Operational("%s: read newer attempts: %v", runDir, err)
 	}
-	if attempts.SupersedingAttempt(list, agent) != nil {
+	if superseding != nil {
 		return Result{RunDir: runDir, Outcome: OutcomeSuperseded}, nil
 	}
 	if agent.Finished == nil || agent.Finished.EvidenceSHA256 != pointer.AgentEvidenceSHA256 ||

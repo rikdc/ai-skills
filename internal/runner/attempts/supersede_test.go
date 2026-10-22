@@ -158,14 +158,32 @@ func TestCorruptOlderFinishedRecordDoesNotBlockReuse(t *testing.T) {
 	if err := store.CheckReusable("fp"); err != nil {
 		t.Fatalf("a corrupt older finished.json blocked reuse: %v", err)
 	}
-	list, err := store.Enumerate()
-	if err != nil {
+	if superseding, err := store.Superseded(); err != nil || superseding != nil {
+		t.Fatalf("Superseded = %v, %v; want none", superseding, err)
+	}
+}
+
+func TestCorruptNewerRerunIsAnErrorNotAnOutcomeChange(t *testing.T) {
+	store := testStore(t)
+	acceptedRun(t, store)
+	rerun := failRerun(t, store, model.StatusAgentFailed)
+	if err := os.WriteFile(filepath.Join(rerun.Dir, "finished.json"), []byte("{"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	for _, attempt := range list {
-		if attempt.ID == older.ID && attempt.Finished != nil {
-			t.Fatalf("corrupt finished.json read as finished: %+v", attempt)
-		}
+	// The damaged attempt may be the run's outcome, so nothing may quietly
+	// fall back to the accepted one.
+	if err := store.CheckReusable("fp"); err == nil {
+		t.Fatal("a damaged newer rerun left the accepted run reusable")
+	}
+	if _, err := store.Superseded(); err == nil {
+		t.Fatal("Superseded ignored a damaged newer rerun")
+	}
+	before, _, _ := store.LoadCurrent()
+	if _, _, err := store.Adopt(AdoptOptions{Fingerprint: "fp"}); err == nil {
+		t.Fatal("Adopt ignored a damaged newer rerun")
+	}
+	if after, _, _ := store.LoadCurrent(); after.AgentAttempt != before.AgentAttempt {
+		t.Fatalf("current.json repointed from %s to %s", before.AgentAttempt, after.AgentAttempt)
 	}
 }
 

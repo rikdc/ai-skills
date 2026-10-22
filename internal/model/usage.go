@@ -119,9 +119,14 @@ func Combine(a, b Usage) Usage {
 		CacheWriteTokens: sum(a.CacheWriteTokens, b.CacheWriteTokens),
 		TotalTokens:      sum(a.TotalTokens, b.TotalTokens),
 	}
-	if !known {
+	switch {
+	case !known:
 		out.State = UsageUnknown
 		out.Reason = combineReason(a.Reason, b.Reason)
+	case !hasComponent(out) && sumFloat64(a.CostUSD, b.CostUSD) == nil:
+		// Known records that share no component measure nothing together.
+		out.State = UsageUnknown
+		out.Reason = "no usage component reported by both invocations"
 	}
 	out.Known = out.State == UsageKnown
 	out.CostUSD = sumFloat64(a.CostUSD, b.CostUSD)
@@ -173,6 +178,16 @@ func sumInt64(a, b *int64) *int64 {
 	}
 	v := *a + *b
 	return &v
+}
+
+// hasComponent reports whether u carries any token component.
+func hasComponent(u Usage) bool {
+	for _, component := range usageComponents(u) {
+		if component.value != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func sumBothInt64(a, b *int64) *int64 {

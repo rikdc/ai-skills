@@ -117,7 +117,8 @@ type AcceptedUsage struct {
 	Combined UsageTotals `json:"combined"`
 }
 
-// UsageTotals sums one usage stream. Unknown is never zero: runs_known counts
+// UsageTotals sums one usage stream over the runs where it applies (a run that
+// needed no judge has no judge usage). Unknown is never zero: runs_known counts
 // only known records, and a total is present only when every applicable run
 // reports that component, so a sum over a subset never reads as a total.
 type UsageTotals struct {
@@ -811,11 +812,15 @@ func acceptedUsage(runs []RunRow) AcceptedUsage {
 }
 
 func usageTotals(usages []model.Usage) UsageTotals {
-	out := UsageTotals{RunsTotal: len(usages)}
+	var out UsageTotals
 	for _, usage := range usages {
-		if usage.NormalizeState().State == model.UsageKnown {
+		switch usage.NormalizeState().State {
+		case model.UsageNotApplicable:
+			continue
+		case model.UsageKnown:
 			out.RunsKnown++
 		}
+		out.RunsTotal++
 	}
 	total := model.SumUsage("accepted", usages)
 	out.CostUSD = total.CostUSD

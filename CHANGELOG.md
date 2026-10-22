@@ -168,9 +168,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it (`superseded`) instead of paying the judge for a hidden score, and
   `--attempt-artifacts none` keeps its evidence. `result.json` describes the
   failed rerun (`superseded_attempt` names the replaced one) and is never
-  rebuilt from the replaced pointer. An attempt with an unreadable
-  `finished.json` reads as unfinished instead of failing every reader of the
-  run. An unfinished newer attempt
+  rebuilt from the replaced pointer. Reuse, grading and superseding read only
+  attempts newer than the accepted one, so a damaged older attempt cannot
+  block them, while a damaged newer one is reported as an error rather than
+  silently restoring the accepted result. An unfinished newer attempt
   (in flight or crashed) neither replaces the accepted result nor hides an
   earlier failed rerun.
 - After an interrupt, `evalctl run`, `suite`, and `grade --suite` stop

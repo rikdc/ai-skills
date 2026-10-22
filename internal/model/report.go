@@ -139,6 +139,9 @@ type CostReport struct {
 
 // CostStats is the per-arm cost/token aggregation.
 type CostStats struct {
+	// RunsTotal is every run in the arm. Agent, Judge and Combined each count
+	// only the runs where that usage applies, which is the coverage
+	// denominator.
 	RunsTotal int           `json:"runs_total"`
 	Agent     FieldStats    `json:"agent"`
 	Judge     FieldStats    `json:"judge"`

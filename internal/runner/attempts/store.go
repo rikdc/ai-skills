@@ -431,6 +431,19 @@ func isIgnorableAttemptError(err error) bool {
 // numeric sequence. Directories without a valid started.json are failed
 // allocations and are ignored; they are not attempts.
 func (s *Store) Enumerate() ([]*Attempt, error) {
+	return s.enumerate(func(model.AttemptKind, int) bool { return true })
+}
+
+// newerExecutions lists the agent and hook attempts with a sequence above
+// after, read exactly like Enumerate. Older attempts are never read, so damage
+// to them cannot affect a decision about the accepted attempt.
+func (s *Store) newerExecutions(after int) ([]*Attempt, error) {
+	return s.enumerate(func(kind model.AttemptKind, sequence int) bool {
+		return sequence > after && (kind == model.KindAgent || kind == model.KindHook)
+	})
+}
+
+func (s *Store) enumerate(include func(model.AttemptKind, int) bool) ([]*Attempt, error) {
 	entries, err := os.ReadDir(s.AttemptsDir())
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
@@ -444,7 +457,7 @@ func (s *Store) Enumerate() ([]*Attempt, error) {
 			continue
 		}
 		kind, sequence, ok := parseAttemptID(entry.Name())
-		if !ok {
+		if !ok || !include(kind, sequence) {
 			continue
 		}
 		id := entry.Name()
@@ -464,14 +477,11 @@ func (s *Store) Enumerate() ([]*Attempt, error) {
 			Started:  started,
 			Status:   model.StatusInterrupted,
 		}
-		// An unreadable finished.json leaves the attempt unfinished, as a
-		// crash before the record was complete would: it never counts as ok,
-		// and one damaged attempt cannot block reading the rest of the run.
 		finished, err := readFinished(dir, id, kind)
 		if err == nil {
 			attempt.Finished = finished
 			attempt.Status = finished.Status
-		} else if !errors.Is(err, fs.ErrNotExist) && !errors.Is(err, ErrInvalidAttempt) {
+		} else if !errors.Is(err, fs.ErrNotExist) {
 			return nil, err
 		}
 		attempts = append(attempts, attempt)

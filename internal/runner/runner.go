@@ -898,7 +898,10 @@ func (r *Runner) writeDiagnostic(state *runState, evidenceSHA string, outcome Ru
 	supersededID := ""
 	if pointer, _, err := state.store.LoadCurrent(); err == nil {
 		superseding, err := state.store.Superseded()
-		if err != nil || superseding == nil || superseding.ID != state.attempt.ID {
+		if err != nil {
+			return fmt.Errorf("check whether %s supersedes the accepted attempt: %w", state.attempt.ID, err)
+		}
+		if superseding == nil || superseding.ID != state.attempt.ID {
 			return nil
 		}
 		supersededID = pointer.AgentAttempt

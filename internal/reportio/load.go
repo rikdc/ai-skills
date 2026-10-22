@@ -595,19 +595,19 @@ func loadV3Run(runDir, rel string, ri model.RunInput, rubric []model.Criterion, 
 
 // supersedingAttempt returns the attempt that replaces the accepted one as the
 // run's outcome (see attempts.SupersedingAttempt), or "" when the accepted
-// attempt is still the outcome. An unreadable attempt store never fails the
-// report; the accepted attempt is then reported as before.
+// attempt is still the outcome. A missing or unreadable accepted attempt is
+// left to the accepted-attempt checks below; a damaged newer attempt fails the
+// load like any other damaged attempt record.
 func supersedingAttempt(runDir, accepted string) (string, *startedFile, *finishedFile, error) {
 	store := attempts.New(runDir)
 	acceptedAttempt, err := store.LoadAttempt(accepted)
 	if err != nil {
 		return "", nil, nil, nil
 	}
-	list, err := store.Enumerate()
+	superseding, err := store.SupersedingFor(acceptedAttempt)
 	if err != nil {
-		return "", nil, nil, nil
+		return "", nil, nil, err
 	}
-	superseding := attempts.SupersedingAttempt(list, acceptedAttempt)
 	if superseding == nil {
 		return "", nil, nil, nil
 	}

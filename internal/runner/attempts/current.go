@@ -313,11 +313,11 @@ func (s *Store) CheckReusable(fingerprint string) error {
 	if agent.Finished.GradingRequestSHA256 != pointer.AgentGradingRequestSHA256 {
 		return fmt.Errorf("accepted attempt grading-request digest does not match current pointer")
 	}
-	list, err := s.Enumerate()
+	superseding, err := s.SupersedingFor(agent)
 	if err != nil {
 		return err
 	}
-	if superseding := SupersedingAttempt(list, agent); superseding != nil {
+	if superseding != nil {
 		return fmt.Errorf("attempt %s after accepted attempt %s did not finish ok", superseding.ID, agent.ID)
 	}
 	if err := VerifyEvidence(agent); err != nil {
@@ -361,8 +361,8 @@ func LatestExecution(list []*Attempt) *Attempt {
 // timed out). Unfinished attempts are in flight or crashed: they are skipped,
 // so they neither supersede nor hide an earlier failed rerun. The accepted
 // pointer stays on disk as provenance but is no longer the run's result,
-// reusable, or gradable. list comes from Enumerate, which already skips
-// failed allocations and invalid attempt directories.
+// reusable, or gradable. list is read like Enumerate, which skips failed
+// allocations and invalid attempt directories.
 func SupersedingAttempt(list []*Attempt, accepted *Attempt) *Attempt {
 	if accepted == nil {
 		return nil
@@ -385,22 +385,32 @@ func SupersedingAttempt(list []*Attempt, accepted *Attempt) *Attempt {
 	return newest
 }
 
-// Superseded reports the attempt that replaces the accepted one, or nil when
-// there is no accepted attempt or it is still the run's outcome.
-func (s *Store) Superseded() (*Attempt, error) {
-	pointer, _, err := s.LoadCurrent()
-	if err != nil {
-		return nil, nil
-	}
-	accepted, err := s.LoadAttempt(pointer.AgentAttempt)
-	if err != nil {
-		return nil, nil
-	}
-	list, err := s.Enumerate()
+// SupersedingFor returns the attempt that supersedes accepted, reading only the
+// execution attempts newer than it. A damaged newer attempt is an error: it
+// may be the run's outcome, so it never silently leaves accepted current.
+func (s *Store) SupersedingFor(accepted *Attempt) (*Attempt, error) {
+	newer, err := s.newerExecutions(accepted.Sequence)
 	if err != nil {
 		return nil, err
 	}
-	return SupersedingAttempt(list, accepted), nil
+	return SupersedingAttempt(newer, accepted), nil
+}
+
+// Superseded returns the attempt that supersedes the accepted one, or nil when
+// there is no accepted attempt or it is still the run's outcome.
+func (s *Store) Superseded() (*Attempt, error) {
+	pointer, _, err := s.LoadCurrent()
+	if errors.Is(err, ErrNoCurrent) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	accepted, err := s.LoadAttempt(pointer.AgentAttempt)
+	if err != nil {
+		return nil, err
+	}
+	return s.SupersedingFor(accepted)
 }
 
 // Reusable reports whether the completion predicate holds for fingerprint.

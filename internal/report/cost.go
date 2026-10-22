@@ -94,7 +94,7 @@ func costStats(runs []model.RunRow) model.CostStats {
 }
 
 func fieldStats(runs []model.RunRow, get func(model.RunRow) model.Usage) model.FieldStats {
-	stats := model.FieldStats{RunsTotal: len(runs)}
+	var stats model.FieldStats
 	var costs, totals []float64
 	var inputs, outputs, reasonings, reads, writes []float64
 	applicable := 0
@@ -169,10 +169,10 @@ func tokenStats(totals, inputs, outputs, reasonings, reads, writes []float64, ru
 }
 
 // combinedStats summarises agent plus judge usage per run through
-// model.Combine, so a run whose invocations do not report the same components
-// is unknown here exactly as in the suite summary.
+// model.Combine, so a combined component is present only when both
+// invocations report it, exactly as in the suite summary.
 func combinedStats(runs []model.RunRow) model.CombinedStats {
-	stats := model.CombinedStats{RunsTotal: len(runs)}
+	var stats model.CombinedStats
 	var costs, totals, inputs, outputs, reasonings, reads, writes []float64
 	applicable := 0
 	add := func(dst *[]float64, value *int64) {

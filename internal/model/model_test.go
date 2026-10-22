@@ -491,3 +491,17 @@ func TestSumLowerBoundCompleteness(t *testing.T) {
 		t.Fatalf("unknown partial lower bound = %+v, %v", total, complete)
 	}
 }
+
+func TestCombineKnownWithNothingSharedIsUnknown(t *testing.T) {
+	n := func(v int64) *int64 { return &v }
+	c := func(v float64) *float64 { return &v }
+	agent := Usage{Source: "agent", InputTokens: n(10), OutputTokens: n(5)}.WithState(UsageKnown)
+	judge := Usage{Source: "judge", TotalTokens: n(20), CostUSD: c(0.1)}.WithState(UsageKnown)
+	if got := Combine(agent, judge); got.State != UsageUnknown || got.Reason == "" {
+		t.Fatalf("combined = %+v, want unknown with a reason", got)
+	}
+	shared := Usage{Source: "judge", InputTokens: n(1)}.WithState(UsageKnown)
+	if got := Combine(agent, shared); got.State != UsageKnown || got.InputTokens == nil || *got.InputTokens != 11 {
+		t.Fatalf("combined = %+v, want known input 11", got)
+	}
+}
