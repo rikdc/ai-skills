@@ -160,7 +160,7 @@ func newRunCommand(opts *GlobalOptions) *cobra.Command {
 	flags.BoolVar(&authCLI, "auth-cli", false, "copy selected CLI credentials into the workspace home")
 	flags.BoolVar(&keychain, "keychain", false, "link the macOS Keychains directory (requires --auth-cli)")
 	flags.StringArrayVar(&authPaths, "auth-path", nil, "extra credential path under the real home (requires --auth-cli)")
-	flags.StringArrayVar(&passEnv, "pass-env", nil, "environment variable to pass to setup, the agent, and checks")
+	flags.StringArrayVar(&passEnv, "pass-env", nil, "environment variable to pass to setup, the agent, and checks (overrides the credential filter)")
 	flags.StringVar(&usageCmd, "usage-cmd", "", "usage normalization hook")
 	flags.StringVar(&backend, "backend", "command", "agent runtime: command|openai")
 	flags.StringVar(&agentCmd, "agent-cmd", "", "command adapter command")

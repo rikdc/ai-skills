@@ -311,12 +311,20 @@ func (r *Runner) Run(ctx context.Context) (*Result, error) {
 		return result, err
 	}
 
+	// The plan is final once the resume decisions exist. Announce its shape
+	// before any worker starts, so the position inside a long campaign is
+	// visible from the first line of output.
+	runsToRun := expectedRuns(decisions)
+	scenariosToRun := r.executingScenarios(selected, decisions)
+	r.logPlan(len(selected), runsToRun, scenariosToRun)
+
 	started := time.Now()
 	type scenarioJob struct {
 		item scenario.Selected
 	}
 	jobs := make(chan scenarioJob)
 	var mu sync.Mutex
+	progress := newProgressTracker(&mu, scenariosToRun, runsToRun)
 	gradedInline := map[string]bool{}
 	var wg sync.WaitGroup
 
@@ -329,7 +337,7 @@ func (r *Runner) Run(ctx context.Context) (*Result, error) {
 		go func() {
 			defer wg.Done()
 			for job := range jobs {
-				executed, runErr := r.runScenario(ctx, job.item, decisions, gradedInline, &mu)
+				executed, runErr := r.runScenario(ctx, job.item, decisions, gradedInline, &mu, progress)
 				mu.Lock()
 				if executed {
 					result.Executed++
@@ -375,6 +383,7 @@ feed:
 		if detail := firstRunFailure(stats); detail != "" {
 			message += "; first: " + detail
 		}
+		message += fmt.Sprintf("; retry with --resume --resume-policy %s --out %s", PolicyRetryFailed, out)
 		return result, errs.Operational("%s; see %s", message, result.SummaryPath)
 	}
 	if len(stats.StrictFailures) > 0 {
@@ -477,6 +486,99 @@ func armsFor(mode model.Mode, arm string) []string {
 	default:
 		return []string{"without", "with"}
 	}
+}
+
+// logPlan emits the run-start plan record and the serial warning. The record
+// names the selection and the invocation counts this pass will actually spend
+// (resume decisions already removed reusable and retained work), so a long
+// campaign is legible before it starts. It goes through the configured logger:
+// never on stdout, silenceable with -q, and a nil logger is a no-op.
+func (r *Runner) logPlan(scenarios, runs, executingScenarios int) {
+	judge := any("none")
+	if r.cfg.JudgeCmd != "" {
+		judge = runs
+	}
+	logInfo(r.cfg.Logger, "suite plan",
+		"scenarios", scenarios,
+		"agent_invocations", runs,
+		"judge_invocations", judge,
+		"jobs", r.cfg.Jobs,
+		"timeout_seconds", int(r.cfg.Timeout/time.Second),
+	)
+	if r.cfg.Jobs == 1 && executingScenarios > 1 {
+		logWarn(r.cfg.Logger,
+			"scenarios run one after another; use --jobs N (JOBS=N with make) to run them concurrently",
+			"scenarios", executingScenarios, "jobs", r.cfg.Jobs)
+	}
+}
+
+// expectedRuns counts the arm/run pairs this pass will execute.
+func expectedRuns(decisions map[runKey]decision) int {
+	runs := 0
+	for _, d := range decisions {
+		if d.execute {
+			runs++
+		}
+	}
+	return runs
+}
+
+// hasExecutableRun reports whether this pass executes at least one arm/run for
+// the scenario.
+func (r *Runner) hasExecutableRun(item scenario.Selected, decisions map[runKey]decision) bool {
+	for _, arm := range armsFor(item.Mode(), r.cfg.Arm) {
+		for n := 1; n <= r.cfg.Runs; n++ {
+			if decisions[runKey{item.Scenario.Plugin, item.Scenario.Name, arm, n}].execute {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// executingScenarios counts the scenarios this pass will run.
+func (r *Runner) executingScenarios(selected []scenario.Selected, decisions map[runKey]decision) int {
+	scenarios := 0
+	for _, item := range selected {
+		if r.hasExecutableRun(item, decisions) {
+			scenarios++
+		}
+	}
+	return scenarios
+}
+
+// progressTracker numbers the suite's scenario and run progress records. The
+// totals come from the run decisions, so they describe what this pass
+// executes; the counters increment under the suite's run mutex because the
+// worker goroutines share them.
+type progressTracker struct {
+	mu            *sync.Mutex
+	scenarioTotal int
+	runTotal      int
+	scenarios     int
+	runs          int
+}
+
+func newProgressTracker(mu *sync.Mutex, scenarios, runs int) *progressTracker {
+	return &progressTracker{mu: mu, scenarioTotal: scenarios, runTotal: runs}
+}
+
+// nextScenario returns the position of the scenario about to start, as
+// "i/N".
+func (p *progressTracker) nextScenario() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.scenarios++
+	return fmt.Sprintf("%d/%d", p.scenarios, p.scenarioTotal)
+}
+
+// nextRun returns the position of the arm/run about to execute, in the shape
+// runner.Config.Progress expects.
+func (p *progressTracker) nextRun(string, int) (int, int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.runs++
+	return p.runs, p.runTotal
 }
 
 func (r *Runner) planRuns(selected []scenario.Selected, fingerprints map[string]string, judgeIdentity string) (map[runKey]decision, error) {
@@ -604,7 +706,7 @@ func (r *Runner) ensureProjections(dir string, item scenario.Selected, arm strin
 
 func (r *Runner) runScenario(ctx context.Context, item scenario.Selected,
 	decisions map[runKey]decision, gradedInline map[string]bool,
-	mu *sync.Mutex) (bool, error) {
+	mu *sync.Mutex, progress *progressTracker) (bool, error) {
 
 	logPath := filepath.Join(r.cfg.Out, "logs", item.Scenario.Plugin, item.Scenario.Name+".log")
 	statusPath := filepath.Join(r.cfg.Out, "logs", item.Scenario.Plugin, item.Scenario.Name+".status")
@@ -618,15 +720,7 @@ func (r *Runner) runScenario(ctx context.Context, item scenario.Selected,
 	defer logFile.Close()
 	fmt.Fprintf(logFile, "suite: %s/%s\n", item.Scenario.Plugin, item.Scenario.Name)
 
-	anyExecute := false
-	for _, arm := range armsFor(item.Mode(), r.cfg.Arm) {
-		for n := 1; n <= r.cfg.Runs; n++ {
-			if decisions[runKey{item.Scenario.Plugin, item.Scenario.Name, arm, n}].execute {
-				anyExecute = true
-			}
-		}
-	}
-	if !anyExecute {
+	if !r.hasExecutableRun(item, decisions) {
 		fmt.Fprintln(logFile, "skipped: all runs are reusable or retained")
 		_ = atomicfile.Write(statusPath, []byte("0\n"), 0o600)
 		return false, nil
@@ -656,6 +750,7 @@ func (r *Runner) runScenario(ctx context.Context, item scenario.Selected,
 		PassEnv:          r.cfg.PassEnv,
 		Executor:         r.cfg.AgentExec,
 		Logger:           r.cfg.Logger,
+		Progress:         progress.nextRun,
 	}
 	runCfg.SkipRun = func(arm string, run int) bool {
 		d := decisions[runKey{item.Scenario.Plugin, item.Scenario.Name, arm, run}]
@@ -671,13 +766,16 @@ func (r *Runner) runScenario(ctx context.Context, item scenario.Selected,
 		_ = atomicfile.Write(statusPath, []byte("1\n"), 0o600)
 		return true, err
 	}
+	scenarioProgress := progress.nextScenario()
 	logInfo(r.cfg.Logger, "scenario started",
-		"plugin", item.Scenario.Plugin, "scenario", item.Scenario.Name)
+		"plugin", item.Scenario.Plugin, "scenario", item.Scenario.Name,
+		"progress", scenarioProgress)
 	scenarioStartedAt := time.Now()
 	summary, runErr := scenarioRunner.Run(ctx)
 	scenarioAttributes := []any{
 		"plugin", item.Scenario.Plugin,
 		"scenario", item.Scenario.Name,
+		"progress", scenarioProgress,
 		"status", scenarioStatus(summary, runErr),
 		"duration_seconds", wholeSeconds(time.Since(scenarioStartedAt)),
 	}
@@ -696,6 +794,7 @@ func (r *Runner) runScenario(ctx context.Context, item scenario.Selected,
 			}
 			fmt.Fprintln(logFile, line)
 		}
+		warnUnusedSkills(r.cfg.Logger, item, summary)
 	}
 
 	// Inline judging runs only for runs that finished ok in this pass.
@@ -779,6 +878,29 @@ func logInfo(logger *slog.Logger, msg string, args ...any) {
 func logWarn(logger *slog.Logger, msg string, args ...any) {
 	if logger != nil {
 		logger.Warn(msg, args...)
+	}
+}
+
+// warnUnusedSkills emits one warning per with-arm run that finished without
+// invoking the scenario's skill, so the miss is visible while the suite runs
+// rather than only in the rendered report. It reads the recorded skill use
+// from result.json; a run that never recorded one (or recorded "unknown")
+// says nothing.
+func warnUnusedSkills(logger *slog.Logger, item scenario.Selected, summary *runner.Summary) {
+	if summary == nil || item.Mode() == model.ModeFunctional {
+		return
+	}
+	for _, run := range summary.Runs {
+		if run.Arm != "with" || run.Status != model.StatusOK {
+			continue
+		}
+		use := recordedSkillUse(run.Dir)
+		if use == nil || use.State != model.SkillNotInvoked {
+			continue
+		}
+		logWarn(logger, "skill not invoked; the scenario cannot measure the skill, rerun with RUNS>=3",
+			"plugin", item.Scenario.Plugin, "scenario", item.Scenario.Name,
+			"arm", run.Arm, "run", run.Run)
 	}
 }
 
@@ -901,6 +1023,11 @@ func (r *Runner) loadOrCreateManifest(fingerprints map[string]string) (model.Sui
 		return model.SuiteManifest{}, errs.Usage(
 			"--resume configuration differs from the existing suite: %s", strings.Join(problems, "; "))
 	}
+	if notice := resumeTimeoutNotice(old.Config, config); notice != "" {
+		logInfo(r.cfg.Logger,
+			"resume timeouts differ from the recorded suite; only the retried runs use the new caps",
+			"changes", notice)
+	}
 	if old.CreatedAt != "" {
 		r.created = old.CreatedAt
 	}
@@ -998,6 +1125,22 @@ func (r *Runner) suiteConfig() (model.SuiteConfig, error) {
 	}, nil
 }
 
+// resumeTimeoutNotice describes the per-run timeout changes a resume accepts,
+// so a widened or tightened cap is visible rather than silent.
+func resumeTimeoutNotice(old, current model.SuiteConfig) string {
+	var parts []string
+	add := func(field string, a, b int) {
+		if a != b {
+			parts = append(parts, fmt.Sprintf("%s %ds → %ds", field, a, b))
+		}
+	}
+	add("agent", old.TimeoutSeconds, current.TimeoutSeconds)
+	add("setup", old.SetupTimeoutSeconds, current.SetupTimeoutSeconds)
+	add("checks", old.ChecksTimeoutSeconds, current.ChecksTimeoutSeconds)
+	add("judge", old.JudgeTimeoutSeconds, current.JudgeTimeoutSeconds)
+	return strings.Join(parts, ", ")
+}
+
 func compareConfigs(old, current model.SuiteConfig, regrade bool) []string {
 	var problems []string
 	add := func(field string, a, b any) {
@@ -1018,10 +1161,10 @@ func compareConfigs(old, current model.SuiteConfig, regrade bool) []string {
 	add("agent_cmd", old.AgentCmd, current.AgentCmd)
 	add("arm", old.Arm, current.Arm)
 	add("runs", old.Runs, current.Runs)
-	add("timeout_seconds", old.TimeoutSeconds, current.TimeoutSeconds)
-	add("setup_timeout_seconds", old.SetupTimeoutSeconds, current.SetupTimeoutSeconds)
-	add("checks_timeout_seconds", old.ChecksTimeoutSeconds, current.ChecksTimeoutSeconds)
-	add("judge_timeout_seconds", old.JudgeTimeoutSeconds, current.JudgeTimeoutSeconds)
+	// The per-run timeouts are operational caps, not part of the measurement
+	// contract: a resume may tighten or widen them for the runs it retries
+	// without invalidating accepted attempts. Changing them is reported by
+	// resumeTimeoutNotice instead of being refused.
 	add("skill_dir", old.SkillDir, current.SkillDir)
 	add("auth_cli", old.AuthCLI, current.AuthCLI)
 	add("keychain", old.Keychain, current.Keychain)
@@ -1120,7 +1263,7 @@ func (r *Runner) writeArtifacts(manifest model.SuiteManifest, stats aggregateSta
 		return err
 	}
 	return atomicfile.Write(filepath.Join(r.cfg.Out, "summary.md"),
-		[]byte(renderSummary(manifest, stats)), 0o600)
+		[]byte(renderSummary(manifest, stats, r.cfg.Out)), 0o600)
 }
 
 // SummaryText reads a written summary for CLI output.

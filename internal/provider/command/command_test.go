@@ -123,6 +123,81 @@ func TestPassEnvOptIn(t *testing.T) {
 	}
 }
 
+// TestPassEnvOverridesCredentialDenyList pins the precedence rule: an explicit
+// pass-env name wins over the credential deny list for both the agent and the
+// judge, and every name that was not opted in is still stripped.
+func TestPassEnvOverridesCredentialDenyList(t *testing.T) {
+	parent := []string{
+		"PATH=/usr/bin:/bin",
+		"OPENCODE_API_KEY=sk-opencode-secret",
+		"GITHUB_TOKEN=ghp-secret",
+		"EVALCTL_SESSION=internal",
+	}
+	cases := []struct {
+		name    string
+		kind    model.AttemptKind
+		passEnv []string
+		want    []string
+		absent  []string
+	}{
+		{
+			name:   "agent denies credentials by default",
+			kind:   model.KindAgent,
+			absent: []string{"OPENCODE_API_KEY", "GITHUB_TOKEN", "EVALCTL_SESSION"},
+		},
+		{
+			name:    "agent passes the opted-in key only",
+			kind:    model.KindAgent,
+			passEnv: []string{"OPENCODE_API_KEY"},
+			want:    []string{"OPENCODE_API_KEY=sk-opencode-secret"},
+			absent:  []string{"GITHUB_TOKEN", "EVALCTL_SESSION"},
+		},
+		{
+			name:    "judge passes every opted-in credential",
+			kind:    model.KindJudge,
+			passEnv: []string{"OPENCODE_API_KEY", "GITHUB_TOKEN", "EVALCTL_SESSION"},
+			want: []string{
+				"OPENCODE_API_KEY=sk-opencode-secret",
+				"GITHUB_TOKEN=ghp-secret",
+				"EVALCTL_SESSION=internal",
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			workspace, home, logDir := setup(t)
+			e := newExecutor(t, Config{
+				Command:   `env > env.txt`,
+				ParentEnv: parent,
+				PassEnv:   tc.passEnv,
+			})
+			runString(t, e, executor.AgentRunRequest{
+				Task: "task", Kind: tc.kind, Workspace: workspace, HomeDir: home, LogDir: logDir,
+			})
+			env := readFile(t, filepath.Join(workspace, "env.txt"))
+			for _, want := range tc.want {
+				if !hasEnvEntry(env, want) {
+					t.Fatalf("%s missing from environment:\n%s", want, env)
+				}
+			}
+			for _, name := range tc.absent {
+				if hasEnvEntry(env, name+"=") {
+					t.Fatalf("%s leaked into the environment:\n%s", name, env)
+				}
+			}
+		})
+	}
+}
+
+func hasEnvEntry(env, entry string) bool {
+	for _, line := range strings.Split(env, "\n") {
+		if strings.HasPrefix(line, entry) {
+			return true
+		}
+	}
+	return false
+}
+
 func TestStatusMatrix(t *testing.T) {
 	cases := []struct {
 		name       string

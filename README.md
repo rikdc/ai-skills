@@ -137,6 +137,12 @@ make eval PLUGIN=git-workflow RUNS=1 DRY=1
 EVALCTL_LEGACY=1 make eval PLUGIN=git-workflow RUNS=1 DRY=1
 ```
 
+A suite that hits a runner failure (a timed-out or failed agent run) still
+renders its report before make exits non-zero, and a partial suite is resumed
+rather than re-run: `make eval OUT=results/eval-suite/<dir> RESUME=1 <same
+selection and agent>` re-attempts only the runs without an accepted attempt.
+`summary.md` prints the exact resume command in a copy-pasteable block.
+
 See [plugins/eval-workflow/README.md](plugins/eval-workflow/README.md) for
 the Milestone A scope, build/run/selftest commands, rollback checkpoint, and
 the shell-vs-Go parity gate.

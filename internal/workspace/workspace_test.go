@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -239,4 +240,73 @@ func TestRunSetupUsesWorkspaceHome(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(ws.Dir, "workspace.txt")); err != nil {
 		t.Fatalf("EVAL_WORKSPACE was not the workspace: %v", err)
 	}
+}
+
+// TestEnvironmentPassEnvOverridesCredentialDenyList pins the workspace side of
+// the precedence rule: --pass-env wins over the credential deny list for the
+// setup and checks environments, while non-opted-in credentials stay stripped.
+func TestEnvironmentPassEnvOverridesCredentialDenyList(t *testing.T) {
+	t.Setenv("OPENCODE_API_KEY", "sk-workspace-secret")
+	t.Setenv("GITHUB_TOKEN", "ghp-workspace-secret")
+	t.Setenv("EVALCTL_SESSION", "workspace-session")
+
+	without, err := New("demo", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer without.Cleanup()
+
+	checks := without.ChecksEnvironment("/scenario", "/plugin", "criteria")
+	for _, name := range []string{"OPENCODE_API_KEY", "GITHUB_TOKEN", "EVALCTL_SESSION"} {
+		if hasEnvEntry(checks, name+"=") {
+			t.Fatalf("%s leaked into the checks environment:\n%v", name, checks)
+		}
+	}
+	for _, want := range []string{
+		"CRITERIA=criteria",
+		"HOME=" + without.Home,
+		"TMPDIR=" + without.TempDir,
+		"EVAL_WORKSPACE=" + without.Dir,
+		"SANDBOX=" + without.Dir,
+	} {
+		if !hasEnvEntry(checks, want) {
+			t.Fatalf("%s missing from checks environment:\n%v", want, checks)
+		}
+	}
+
+	with, err := New("demo", []string{"OPENCODE_API_KEY"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer with.Cleanup()
+
+	checks = with.ChecksEnvironment("/scenario", "/plugin", "criteria")
+	if !hasEnvEntry(checks, "OPENCODE_API_KEY=sk-workspace-secret") {
+		t.Fatalf("opted-in key missing from checks environment:\n%v", checks)
+	}
+	for _, name := range []string{"GITHUB_TOKEN", "EVALCTL_SESSION"} {
+		if hasEnvEntry(checks, name+"=") {
+			t.Fatalf("%s leaked into the checks environment:\n%v", name, checks)
+		}
+	}
+	if !sort.StringsAreSorted(checks) {
+		t.Fatalf("checks environment is not sorted:\n%v", checks)
+	}
+
+	setup := with.SetupEnvironment("/scenario", "/plugin")
+	if !hasEnvEntry(setup, "OPENCODE_API_KEY=sk-workspace-secret") {
+		t.Fatalf("opted-in key missing from setup environment:\n%v", setup)
+	}
+	if hasEnvEntry(setup, "CRITERIA=") {
+		t.Fatalf("setup environment must not carry CRITERIA:\n%v", setup)
+	}
+}
+
+func hasEnvEntry(env []string, entry string) bool {
+	for _, line := range env {
+		if strings.HasPrefix(line, entry) {
+			return true
+		}
+	}
+	return false
 }

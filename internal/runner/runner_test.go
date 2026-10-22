@@ -880,6 +880,9 @@ func TestRunLogsStartedAndFinishedPair(t *testing.T) {
 	if started["status"] != "" {
 		t.Fatalf("run started carries status %q", started["status"])
 	}
+	if progress, ok := started["progress"]; ok {
+		t.Fatalf("run started carries progress %q without a Progress function", progress)
+	}
 	finished := findLog(t, logged, "run finished", wanted)
 	if finished["status"] != string(run.Status) {
 		t.Fatalf("run finished status = %q, want %q", finished["status"], run.Status)
@@ -974,6 +977,73 @@ func TestRunLogsSkippedRunsAtDebug(t *testing.T) {
 				})
 			}
 		})
+	}
+}
+
+// TestRunLogsProgressPositions covers the suite-supplied progress function: the
+// runner calls it once per executed arm/run, so a resumed run that skips most
+// of its work consumes no position, and both records of a run carry the same
+// position.
+func TestRunLogsProgressPositions(t *testing.T) {
+	fx := newFixture(t, fixtureOptions{})
+	buffer := &logBuffer{}
+	var mu sync.Mutex
+	calls, position := 0, 0
+	// The suite derives the denominator from the run decisions; here run-1 is
+	// skipped, so this pass executes two runs.
+	const total = 2
+	r, err := New(Config{
+		Root:     fx.root,
+		Plugin:   fx.plugin,
+		Scenario: fx.scenario,
+		Arm:      "with",
+		Runs:     3,
+		Out:      t.TempDir(),
+		SkillDir: ".claude/skills",
+		Executor: mustExecutor(t),
+		Logger:   testLogger(buffer, slog.LevelInfo),
+		SkipRun:  func(_ string, run int) bool { return run == 1 },
+		Progress: func(string, int) (int, int) {
+			mu.Lock()
+			defer mu.Unlock()
+			calls++
+			position++
+			return position, total
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	summary, err := r.Run(context.Background())
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if len(summary.Runs) != 2 {
+		t.Fatalf("runs = %d, want 2", len(summary.Runs))
+	}
+	if calls != 2 {
+		t.Fatalf("progress calls = %d, want one per executed run", calls)
+	}
+	logged := buffer.String()
+	for _, tc := range []struct {
+		run      int
+		progress string
+	}{
+		{run: 2, progress: "1/2"},
+		{run: 3, progress: "2/2"},
+	} {
+		wanted := map[string]string{"arm": "with", "run": itoa(tc.run)}
+		started := findLog(t, logged, "run started", wanted)
+		if started["progress"] != tc.progress {
+			t.Fatalf("run %d started progress = %q, want %q", tc.run, started["progress"], tc.progress)
+		}
+		finished := findLog(t, logged, "run finished", wanted)
+		if finished["progress"] != tc.progress {
+			t.Fatalf("run %d finished progress = %q, want %q", tc.run, finished["progress"], tc.progress)
+		}
+	}
+	if got := countLog(logged, "run started"); got != 2 {
+		t.Fatalf("run started lines = %d, want 2 (the skipped run takes no position):\n%s", got, logged)
 	}
 }
 
