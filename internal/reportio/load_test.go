@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/rikdc/ai-skills/internal/model"
@@ -421,3 +422,58 @@ func newV3Suite(t *testing.T) string {
 
 func ptrFloat(v float64) *float64 { return &v }
 func ptrInt(v int64) *int64       { return &v }
+
+// TestLoadV1FixtureTotals covers the retained v1 compatibility fixture
+// (internal/report/testdata/v1suite): it must load its on-disk scenario,
+// rubric, run and count values unchanged.
+func TestLoadV1FixtureTotals(t *testing.T) {
+	suiteDir := filepath.Join("..", "report", "testdata", "v1suite")
+	in, err := reportio.Load(suiteDir, reportio.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if in.ManifestVersion != 1 {
+		t.Fatalf("manifest version = %d, want 1", in.ManifestVersion)
+	}
+	if got := strings.Join(in.Manifest.Config.Units, ","); got != "skills/nix-expert" {
+		t.Fatalf("config units = %q, want skills/nix-expert", got)
+	}
+	if len(in.Scenarios) != 1 {
+		t.Fatalf("scenarios = %d, want 1", len(in.Scenarios))
+	}
+	sc := in.Scenarios[0]
+	if sc.Plugin != "nix-skills" || sc.Scenario != "nix-expert-secrets-review" {
+		t.Fatalf("scenario identity = %s/%s", sc.Plugin, sc.Scenario)
+	}
+	if got := strings.Join(sc.Units, ","); got != "skills/nix-expert" {
+		t.Fatalf("scenario units = %q, want skills/nix-expert", got)
+	}
+	if len(sc.Rubric) != 9 {
+		t.Fatalf("rubric items = %d, want 9", len(sc.Rubric))
+	}
+	if len(sc.Runs) != 2 {
+		t.Fatalf("runs = %d, want 2", len(sc.Runs))
+	}
+	for _, run := range sc.Runs {
+		if run.Status != string(model.StatusOK) {
+			t.Fatalf("run %s status = %q, want ok", run.Arm, run.Status)
+		}
+		if len(run.JudgedItems) != 9 {
+			t.Fatalf("run %s judged items = %d, want 9", run.Arm, len(run.JudgedItems))
+		}
+	}
+	want := map[string]int{
+		"planned": 1, "executed": 1, "skipped": 0, "runner_failures": 0,
+		"agent_invocations": 2, "judged_runs": 2, "pending_runs": 0,
+		"cost_known_runs": 2, "cost_total_runs": 2, "duration_seconds": 300,
+		"timed_out_runs": 0,
+	}
+	for key, value := range want {
+		if in.State.Counts[key] != value {
+			t.Fatalf("counts[%s] = %d, want %d (all: %v)", key, in.State.Counts[key], value, in.State.Counts)
+		}
+	}
+	if in.State.DurationSeconds == nil || *in.State.DurationSeconds != 300 {
+		t.Fatalf("duration_seconds = %v, want 300", in.State.DurationSeconds)
+	}
+}

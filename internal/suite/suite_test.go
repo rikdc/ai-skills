@@ -793,6 +793,79 @@ func TestStrictRejectsPendingCriteria(t *testing.T) {
 	}
 }
 
+// TestStrictRejectsNonDiscriminatingScenario checks that a fully judged suite
+// whose with arm scores no better than without is a strict failure even
+// though no run failed and nothing is pending.
+func TestStrictRejectsNonDiscriminatingScenario(t *testing.T) {
+	fx := newFixture(t)
+	out := filepath.Join(t.TempDir(), "suite")
+	cfg := fx.suiteConfig(t, out)
+	cfg.JudgeCmd = fx.judgeScript
+	cfg.JudgeExec = fx.judgeExecutor(t, fx.judgeScript)
+	cfg.Strict = true
+	_, _, err := runSuite(t, cfg)
+	if err == nil || errs.Code(err) != 1 {
+		t.Fatalf("strict exit = %v, want 1", err)
+	}
+	if !strings.Contains(err.Error(), "scored no better with the unit than without") {
+		t.Fatalf("strict message = %v", err)
+	}
+	if strings.Contains(err.Error(), "pending") {
+		t.Fatalf("the fixture must be fully judged, not pending: %v", err)
+	}
+}
+
+// TestManifestRecordsSelectedUnits checks that the manifest records the --unit
+// selection in config.units and per scenario.
+func TestManifestRecordsSelectedUnits(t *testing.T) {
+	fx := newFixture(t)
+	out := filepath.Join(t.TempDir(), "suite")
+	cfg := fx.suiteConfig(t, out)
+	cfg.Selection = scenario.Selection{Plugins: []string{"demo"}, Units: []string{"skills/good"}}
+	if _, _, err := runSuite(t, cfg); err != nil {
+		t.Fatal(err)
+	}
+	manifest := readJSONFile[model.SuiteManifest](t, filepath.Join(out, "manifest.json"))
+	if got := strings.Join(manifest.Config.Units, ","); got != "skills/good" {
+		t.Fatalf("config.units = %q, want skills/good", got)
+	}
+	if len(manifest.Scenarios) != 1 {
+		t.Fatalf("scenarios = %v, want only the unit-declaring scenario", manifest.Scenarios)
+	}
+	if got := strings.Join(manifest.Scenarios[0].Units, ","); got != "skills/good" {
+		t.Fatalf("scenarios[0].units = %q, want skills/good", got)
+	}
+}
+
+// TestNarrowedResumeRewritesManifest checks that resuming with fewer selected
+// scenarios replaces the recorded set instead of leaving a stale manifest.
+func TestNarrowedResumeRewritesManifest(t *testing.T) {
+	fx := newFixture(t)
+	out := filepath.Join(t.TempDir(), "suite")
+	cfg := fx.suiteConfig(t, out)
+	if _, _, err := runSuite(t, cfg); err != nil {
+		t.Fatal(err)
+	}
+	if manifest := readJSONFile[model.SuiteManifest](t, filepath.Join(out, "manifest.json")); len(manifest.Scenarios) != 2 {
+		t.Fatalf("first manifest scenarios = %d, want 2", len(manifest.Scenarios))
+	}
+
+	narrowed := fx.suiteConfig(t, out)
+	narrowed.Resume = true
+	narrowed.Selection = scenario.Selection{Plugins: []string{"demo"}, Pattern: "^demo/compare$"}
+	if _, _, err := runSuite(t, narrowed); err != nil {
+		t.Fatal(err)
+	}
+	manifest := readJSONFile[model.SuiteManifest](t, filepath.Join(out, "manifest.json"))
+	if len(manifest.Scenarios) != 1 || manifest.Scenarios[0].Scenario != "compare" {
+		t.Fatalf("narrowed manifest = %+v, want only demo/compare", manifest.Scenarios)
+	}
+	rows := readResults(t, out)
+	if len(rows) != 1 || rows[0].Scenario != "compare" {
+		t.Fatalf("narrowed results = %+v, want a single compare row", rows)
+	}
+}
+
 // TestUnusedSkillWarnsAndFailsStrict covers the not-invoked signal end to end:
 // a recognised log that never touches the skill, the warning emitted through
 // the logger, the summary section, and the --strict failure.
@@ -1550,6 +1623,17 @@ func TestResumeAllowsTimeoutChangesButNotContractChanges(t *testing.T) {
 	changed.Runs = 1
 	if problems := compareConfigs(base, changed, false); len(problems) == 0 {
 		t.Fatal("a RUNS change must still be refused")
+	}
+	// A different --unit selection invalidates the suite, and the refusal must
+	// name the field.
+	changed = base
+	changed.Units = []string{"skills/good"}
+	unitProblems := compareConfigs(base, changed, false)
+	if len(unitProblems) == 0 {
+		t.Fatal("a unit selection change must still be refused")
+	}
+	if !strings.Contains(unitProblems[0], "units changed") {
+		t.Fatalf("unit mismatch must name the field: %v", unitProblems)
 	}
 	changed = base
 	changed.PricingSHA256 = "b"

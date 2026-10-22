@@ -101,6 +101,35 @@ func TestDiscoverSorted(t *testing.T) {
 	}
 }
 
+// TestDiscoverIgnoresWorktrees checks that a sibling checkout living under
+// .worktrees/<checkout>/plugins never contributes scenarios.
+func TestDiscoverIgnoresWorktrees(t *testing.T) {
+	f := newFixture(t)
+	writeFile(t, filepath.Join(f.root, ".worktrees", "checkout", "plugins", "alpha", "evals", "ghost",
+		"scenario.json"), `{"description":"ghost","include":[],"unit":"skills/a"}`, 0o644)
+
+	entries, err := Discover(f.root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pairs []string
+	for _, entry := range entries {
+		if strings.Contains(entry.Dir, ".worktrees") {
+			t.Fatalf("discovery leaked %s from a worktree checkout", entry.Pair())
+		}
+		pairs = append(pairs, entry.Pair())
+	}
+	want := []string{
+		"alpha/compare",
+		"alpha/incomplete",
+		"beta/direct",
+		"beta/functional",
+	}
+	if strings.Join(pairs, ",") != strings.Join(want, ",") {
+		t.Fatalf("pairs = %v, want %v", pairs, want)
+	}
+}
+
 func TestSelectSkipsIncompleteWithWarning(t *testing.T) {
 	f := newFixture(t)
 	selected, warnings, err := Select(f.root, Selection{})

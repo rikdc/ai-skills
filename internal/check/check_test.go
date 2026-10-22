@@ -177,6 +177,21 @@ func TestFunctionalScenarioFindings(t *testing.T) {
 	assertFinding(t, runGate(t, r), "functional mode requires a hook unit")
 }
 
+func TestScenarioCanonicalNameFinding(t *testing.T) {
+	r := validRepo(t)
+	// A tessl downloader-owned scenario-N directory is flagged even when
+	// everything else about it is valid.
+	dir := filepath.Join(r.root, "plugins", r.plugin, "evals", "scenario-12")
+	write(t, filepath.Join(dir, "scenario.json"),
+		`{"description":"demo","include":["./inputs"],"unit":"skills/alpha"}`, 0o644)
+	write(t, filepath.Join(dir, "task.md"), "# Task\n\nDo it.\n", 0o644)
+	write(t, filepath.Join(dir, "criteria.json"), criteriaJSON(t, nil), 0o644)
+	write(t, filepath.Join(dir, "inputs", "setup.sh"),
+		"#!/usr/bin/env bash\nset -euo pipefail\necho fixture.txt\n", 0o755)
+	write(t, filepath.Join(dir, "inputs", "fixture.txt"), "fixture\n", 0o644)
+	assertFinding(t, runGate(t, r), "canonical tessl name")
+}
+
 func TestDuplicateUnits(t *testing.T) {
 	r := validRepo(t)
 	dir := filepath.Join(r.root, "plugins", r.plugin, "evals", "demo")

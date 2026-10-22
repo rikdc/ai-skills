@@ -361,6 +361,58 @@ func TestCredentialsCopiedAndRemoved(t *testing.T) {
 	}
 }
 
+// TestAuthPathsCopyCustomCredential checks that a --auth-path file reaches the
+// agent home and is removed with the rest of the copied credentials.
+func TestAuthPathsCopyCustomCredential(t *testing.T) {
+	workspace, home, logDir := setup(t)
+	realHome := t.TempDir()
+	write(t, filepath.Join(realHome, ".agent-auth"), "secret")
+
+	e := newExecutor(t, Config{
+		Command: `cat "$HOME/.agent-auth" > got.txt`,
+		Auth:    AuthOptions{CLI: true, Paths: []string{".agent-auth"}, RealHome: realHome},
+	})
+	runString(t, e, executor.AgentRunRequest{Task: "task", Workspace: workspace, HomeDir: home, LogDir: logDir})
+
+	if got := readFile(t, filepath.Join(workspace, "got.txt")); got != "secret" {
+		t.Fatalf("custom --auth-path did not reach the agent: %q", got)
+	}
+	if _, err := os.Stat(filepath.Join(home, ".agent-auth")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("copied credential was not removed: %v", err)
+	}
+}
+
+// TestCredentialCopyFailureNamesSource checks that an unreadable credential
+// source aborts the run before the agent starts, with an error naming the
+// source.
+func TestCredentialCopyFailureNamesSource(t *testing.T) {
+	workspace, home, logDir := setup(t)
+	realHome := t.TempDir()
+	// A self-referential symlink is unreadable for any user, unlike a 000-mode
+	// file which root ignores; it exercises the same Stat error branch.
+	src := filepath.Join(realHome, ".claude.json")
+	if err := os.Symlink(src, src); err != nil {
+		t.Fatal(err)
+	}
+
+	e := newExecutor(t, Config{Command: "true", Auth: AuthOptions{CLI: true, RealHome: realHome}})
+	res, err := e.Run(context.Background(), executor.AgentRunRequest{
+		Task: "task", Workspace: workspace, HomeDir: home, LogDir: logDir,
+	})
+	if err == nil || errs.Code(err) != errs.CodeOperational {
+		t.Fatalf("credential copy error = %v, want an operational error", err)
+	}
+	if !strings.Contains(err.Error(), "cannot copy agent credentials from "+src) {
+		t.Fatalf("error must name the source: %v", err)
+	}
+	if res.StopReason != stopCredentialError {
+		t.Fatalf("stop reason = %q, want %q", res.StopReason, stopCredentialError)
+	}
+	if _, statErr := os.Stat(filepath.Join(logDir, "agent.log")); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("the agent started despite the credential failure: %v", statErr)
+	}
+}
+
 func TestKeychainSymlinkAndCleanup(t *testing.T) {
 	if runtime.GOOS != "darwin" {
 		t.Skip("keychain is macOS-only")
