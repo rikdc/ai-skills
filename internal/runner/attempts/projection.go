@@ -79,68 +79,10 @@ func normalizeUsage(usage model.Usage) model.Usage {
 	}
 }
 
-func addInt64(a, b *int64) *int64 {
-	if a == nil && b == nil {
-		return nil
-	}
-	var value int64
-	if a != nil {
-		value += *a
-	}
-	if b != nil {
-		value += *b
-	}
-	return &value
-}
-
-func addFloat64(a, b *float64) *float64 {
-	if a == nil && b == nil {
-		return nil
-	}
-	var value float64
-	if a != nil {
-		value += *a
-	}
-	if b != nil {
-		value += *b
-	}
-	return &value
-}
-
 // combineUsage merges accepted agent and judge usage with the three-state
-// rules. Unknown is never converted to zero.
+// rules shared with the report. Unknown is never converted to zero.
 func combineUsage(agent, judge model.Usage) model.Usage {
-	agent = normalizeUsage(agent)
-	judge = normalizeUsage(judge)
-	if agent.State == model.UsageNotApplicable {
-		return judge
-	}
-	if judge.State == model.UsageNotApplicable {
-		return agent
-	}
-	combined := model.Usage{
-		State:            model.UsageKnown,
-		Known:            true,
-		Source:           "combined",
-		InputTokens:      addInt64(agent.InputTokens, judge.InputTokens),
-		OutputTokens:     addInt64(agent.OutputTokens, judge.OutputTokens),
-		ReasoningTokens:  addInt64(agent.ReasoningTokens, judge.ReasoningTokens),
-		CacheReadTokens:  addInt64(agent.CacheReadTokens, judge.CacheReadTokens),
-		CacheWriteTokens: addInt64(agent.CacheWriteTokens, judge.CacheWriteTokens),
-		TotalTokens:      addInt64(agent.TotalTokens, judge.TotalTokens),
-		CostUSD:          addFloat64(agent.CostUSD, judge.CostUSD),
-	}
-	if agent.Currency != "" {
-		combined.Currency = agent.Currency
-	} else {
-		combined.Currency = judge.Currency
-	}
-	if agent.State == model.UsageUnknown || judge.State == model.UsageUnknown {
-		combined.State = model.UsageUnknown
-		combined.Known = false
-		combined.Reason = "at least one attempt has unknown usage"
-	}
-	return combined
+	return model.Combine(normalizeUsage(agent), normalizeUsage(judge))
 }
 
 // BuildResult derives the result projection from current.json and the accepted
@@ -259,9 +201,19 @@ func (s *Store) BuildResult(ctx RunContext) (model.RunResult, error) {
 	return result, nil
 }
 
+// ErrSuperseded reports that a failed rerun replaced the accepted attempt, so
+// current.json no longer describes the run's outcome.
+var ErrSuperseded = errors.New("accepted attempt is superseded by a failed rerun")
+
 // EnsureResultProjection rebuilds result.json when it is absent or differs
-// from the projection of current.json. current.json always wins.
+// from the projection of current.json. current.json wins unless a failed rerun
+// superseded it: then result.json describes that rerun and is left alone.
 func (s *Store) EnsureResultProjection(ctx RunContext) (model.RunResult, error) {
+	if superseding, err := s.Superseded(); err != nil {
+		return model.RunResult{}, err
+	} else if superseding != nil {
+		return model.RunResult{}, fmt.Errorf("%w: %s", ErrSuperseded, superseding.ID)
+	}
 	result, err := s.BuildResult(ctx)
 	if err != nil {
 		return model.RunResult{}, err

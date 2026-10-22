@@ -16,13 +16,13 @@ Criteria: 1 won, 0 lost, 2 tied    Coverage: 66.7%    Pending: 96 points (both a
 
 COST                       WITH      WITHOUT        DELTA
 agent                    $0.131       $0.035      -$0.004
-judge                    $0.044       $0.004       $0.000
-total                    $0.165       $0.029      -$0.004
-input tokens               3.0k         2.0k            0
-output tokens               360          240            0
+judge                         —            —            —
+total                         —            —            —
+input tokens                  —            —            —
+output tokens                 —            —            —
 reasoning tokens              —            —            —
 cache read                    —            —            —
-total tokens               3.4k         2.2k            0
+total tokens                  —            —            —
 
 Cost totals include functional runs; delta and efficiency use comparison scenarios only.
   coverage: agent 8/8, judge 6/8, total 6/8 (partial)
@@ -30,7 +30,7 @@ Efficiency: — (cost coverage or score delta does not support a per-point claim
 
 Expenditure (all immutable attempts)
   attempts 4 · agent 2 · hook 0 · judge 2
-  known 2 · unknown 1 · not applicable 1 · known total $0.012 (lower bound; unknown usage is never zero)
+  known 2 · unknown 1 · not applicable 1 · known total $0.012 (lower bound; missing usage is never zero)
   Includes functional runs and superseded/regraded attempts.
 
 Timing

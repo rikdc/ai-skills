@@ -386,3 +386,122 @@ func TestSameJudgeModel(t *testing.T) {
 		}
 	}
 }
+
+func TestUsageWithStateDerivesKnown(t *testing.T) {
+	u := Unknown("x", "missing").WithState(UsageKnown)
+	if u.State != UsageKnown || !u.Known {
+		t.Fatalf("known: %+v", u)
+	}
+	u = u.WithState(UsageUnknown)
+	if u.State != UsageUnknown || u.Known {
+		t.Fatalf("unknown: %+v", u)
+	}
+}
+
+func TestUsageMarshalDerivesKnownFromState(t *testing.T) {
+	for _, test := range []struct {
+		usage Usage
+		want  string
+	}{
+		{Usage{State: UsageKnown, Known: false}, `"known":true`},
+		{Usage{State: UsageUnknown, Known: true}, `"known":false`},
+		{Usage{Known: true}, `"known":true`},
+	} {
+		data, err := json.Marshal(test.usage)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(data), test.want) {
+			t.Errorf("%+v marshalled to %s, want %s", test.usage, data, test.want)
+		}
+		var round Usage
+		if err := json.Unmarshal(data, &round); err != nil {
+			t.Fatal(err)
+		}
+		if round.State != test.usage.State {
+			t.Errorf("round trip state = %q, want %q", round.State, test.usage.State)
+		}
+	}
+}
+
+func usageWith(state UsageState, total *int64, cost *float64) Usage {
+	u := Usage{Source: "t", TotalTokens: total, CostUSD: cost}.WithState(state)
+	return u
+}
+
+func TestSumUsageRequiresEveryRecord(t *testing.T) {
+	n := func(v int64) *int64 { return &v }
+	c := func(v float64) *float64 { return &v }
+
+	all := SumUsage("t", []Usage{
+		usageWith(UsageKnown, n(10), c(0.1)),
+		usageWith(UsageKnown, n(20), c(0.2)),
+		NotApplicable("judge"),
+	})
+	if all.State != UsageKnown || all.TotalTokens == nil || *all.TotalTokens != 30 || all.CostUSD == nil {
+		t.Fatalf("complete sum = %+v", all)
+	}
+
+	// One record without cost: tokens stay exact, cost is not a total.
+	partialCost := SumUsage("t", []Usage{
+		usageWith(UsageKnown, n(10), c(0.1)),
+		usageWith(UsageKnown, n(20), nil),
+	})
+	if partialCost.State != UsageUnknown || partialCost.CostUSD != nil ||
+		partialCost.TotalTokens == nil || *partialCost.TotalTokens != 30 {
+		t.Fatalf("partial cost sum = %+v", partialCost)
+	}
+
+	withUnknown := SumUsage("t", []Usage{usageWith(UsageKnown, n(10), c(0.1)), Unknown("t", "")})
+	if withUnknown.State != UsageUnknown || withUnknown.TotalTokens != nil || withUnknown.CostUSD != nil {
+		t.Fatalf("sum with an unknown record = %+v", withUnknown)
+	}
+
+	if none := SumUsage("t", []Usage{NotApplicable("t")}); none.State != UsageNotApplicable {
+		t.Fatalf("sum of nothing applicable = %+v", none)
+	}
+}
+
+func TestSumLowerBoundCompleteness(t *testing.T) {
+	n := func(v int64) *int64 { return &v }
+	c := func(v float64) *float64 { return &v }
+
+	total, complete := SumLowerBound("t", []Usage{
+		usageWith(UsageKnown, n(10), c(0.1)),
+		usageWith(UsageKnown, n(20), c(0.2)),
+	})
+	if !complete || total.CostUSD == nil || *total.CostUSD < 0.3-1e-9 {
+		t.Fatalf("complete lower bound = %+v, %v", total, complete)
+	}
+
+	// A known record that reports no cost leaves the cost a lower bound.
+	total, complete = SumLowerBound("t", []Usage{
+		usageWith(UsageKnown, n(10), c(0.1)),
+		usageWith(UsageKnown, n(20), nil),
+	})
+	if complete || total.CostUSD == nil || *total.CostUSD != 0.1 {
+		t.Fatalf("missing cost lower bound = %+v, %v", total, complete)
+	}
+
+	// Partial components of an unknown record still count toward the bound.
+	partial := Unknown("t", "no cost")
+	partial.TotalTokens = n(5)
+	total, complete = SumLowerBound("t", []Usage{usageWith(UsageKnown, n(10), nil), partial})
+	if complete || total.TotalTokens == nil || *total.TotalTokens != 15 {
+		t.Fatalf("unknown partial lower bound = %+v, %v", total, complete)
+	}
+}
+
+func TestCombineKnownWithNothingSharedIsUnknown(t *testing.T) {
+	n := func(v int64) *int64 { return &v }
+	c := func(v float64) *float64 { return &v }
+	agent := Usage{Source: "agent", InputTokens: n(10), OutputTokens: n(5)}.WithState(UsageKnown)
+	judge := Usage{Source: "judge", TotalTokens: n(20), CostUSD: c(0.1)}.WithState(UsageKnown)
+	if got := Combine(agent, judge); got.State != UsageUnknown || got.Reason == "" {
+		t.Fatalf("combined = %+v, want unknown with a reason", got)
+	}
+	shared := Usage{Source: "judge", InputTokens: n(1)}.WithState(UsageKnown)
+	if got := Combine(agent, shared); got.State != UsageKnown || got.InputTokens == nil || *got.InputTokens != 11 {
+		t.Fatalf("combined = %+v, want known input 11", got)
+	}
+}

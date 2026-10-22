@@ -14,11 +14,11 @@ type Options struct {
 	AddSource bool
 }
 
-// New returns a logger writing to w. The caller validates Format.
+// New returns a logger writing to w, or an error for an unsupported Format.
 func New(w io.Writer, opts Options) (*slog.Logger, error) {
 	handlerOpts := &slog.HandlerOptions{Level: opts.Level, AddSource: opts.AddSource}
 	switch opts.Format {
-	case "", "text":
+	case "text":
 		return slog.New(slog.NewTextHandler(w, handlerOpts)), nil
 	case "json":
 		return slog.New(slog.NewJSONHandler(w, handlerOpts)), nil

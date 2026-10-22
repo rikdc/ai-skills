@@ -33,8 +33,17 @@ func knownJudgeUsage() model.Usage {
 }
 
 func knownAgentUsage() model.Usage {
-	input := int64(10)
-	return model.Usage{State: model.UsageKnown, Known: true, Source: "test-agent", InputTokens: &input}
+	input, output, total := int64(10), int64(5), int64(15)
+	cost := 0.01
+	return model.Usage{
+		State:        model.UsageKnown,
+		Known:        true,
+		Source:       "test-agent",
+		InputTokens:  &input,
+		OutputTokens: &output,
+		TotalTokens:  &total,
+		CostUSD:      &cost,
+	}
 }
 
 // fixture is an accepted agent run ready for grading.
@@ -803,6 +812,90 @@ func TestGradeSuiteScansRunsAndCounts(t *testing.T) {
 	}
 	if again.Graded != 0 || again.AlreadyComplete != 2 || fake.calls != 1 {
 		t.Fatalf("second suite pass = %+v (calls %d)", again, fake.calls)
+	}
+}
+
+func TestGradeSuiteStopsAfterCancellation(t *testing.T) {
+	suite := t.TempDir()
+	var fixtures []*fixture
+	for _, run := range []string{"run-1", "run-2", "run-3"} {
+		fixtures = append(fixtures, newFixtureAt(t,
+			filepath.Join(suite, "runs", "demo", "basic", "with", run), standardPending()))
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	fake := newFake(testCommand)
+	result, err := GradeSuite(ctx, Config{
+		SuiteDir: suite,
+		Command:  testCommand,
+		Timeout:  time.Minute,
+		Executor: fake,
+	})
+	if errs.Code(err) != errs.CodeOperational || !strings.Contains(err.Error(), "cancelled") {
+		t.Fatalf("err = %v, want operational cancellation", err)
+	}
+	if result.Total != 0 || fake.calls != 0 {
+		t.Fatalf("graded after cancellation: %+v (calls %d)", result, fake.calls)
+	}
+	for _, f := range fixtures {
+		list, err := f.store.Enumerate()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, attempt := range list {
+			if attempt.Kind == model.KindJudge {
+				t.Fatalf("judge attempt %s recorded after cancellation", attempt.ID)
+			}
+		}
+	}
+}
+
+func TestGradeSkipsSupersededRun(t *testing.T) {
+	f := newFixture(t, standardPending())
+	rerun, err := f.store.Allocate(model.StartedAttempt{
+		Kind: model.KindAgent, RunID: "demo/basic/with/run-1", Fingerprint: "fp",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.store.Finish(rerun.ID, model.FinishedAttempt{
+		Status: model.StatusTimedOut, StopReason: model.StopTimeout, Usage: knownAgentUsage(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	fake := newFake(testCommand)
+	result, err := gradeRun(t, f, fake, testCommand, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Outcome != OutcomeSuperseded || fake.calls != 0 {
+		t.Fatalf("outcome = %q, judge calls = %d; want superseded with no judge call", result.Outcome, fake.calls)
+	}
+}
+
+func TestGradeSuiteCountsSupersededRuns(t *testing.T) {
+	suite := t.TempDir()
+	f := newFixtureAt(t, filepath.Join(suite, "runs", "demo", "basic", "with", "run-1"), standardPending())
+	rerun, err := f.store.Allocate(model.StartedAttempt{Kind: model.KindAgent, RunID: "demo/basic/with/run-1", Fingerprint: "fp"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.store.Finish(rerun.ID, model.FinishedAttempt{
+		Status: model.StatusAgentFailed, StopReason: model.StopProviderError, Usage: knownAgentUsage(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	newFixtureAt(t, filepath.Join(suite, "runs", "demo", "basic", "with", "run-2"), standardPending())
+	fake := newFake(testCommand)
+	result, err := GradeSuite(context.Background(), Config{
+		SuiteDir: suite, Command: testCommand, Timeout: time.Minute, Executor: fake,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Total != 2 || result.Superseded != 1 || result.Graded != 1 || fake.calls != 1 {
+		t.Fatalf("suite result = %+v (calls %d), want one graded and one superseded", result, fake.calls)
 	}
 }
 

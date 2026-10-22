@@ -46,13 +46,13 @@ None.
 | Cost | With | Without | Delta |
 | --- | --- | --- | --- |
 | agent | $0.131 | $0.035 | -$0.004 |
-| judge | $0.044 | $0.004 | $0.000 |
-| total | $0.165 | $0.029 | -$0.004 |
-| input tokens | 3.0k | 2.0k | 0 |
-| output tokens | 360 | 240 | 0 |
+| judge | — | — | — |
+| total | — | — | — |
+| input tokens | — | — | — |
+| output tokens | — | — | — |
 | reasoning tokens | — | — | — |
 | cache read | — | — | — |
-| total tokens | 3.4k | 2.2k | 0 |
+| total tokens | — | — | — |
 
 Coverage: agent 8/8, judge 6/8, total 6/8 (partial). Unknown usage is never counted as zero.
 Efficiency: — (partial cost coverage or no positive score delta).
@@ -65,7 +65,7 @@ Cost totals include functional runs; delta and efficiency use comparison scenari
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 4 | 2 | 0 | 2 | 2 | 1 | 1 | $0.012 |
 
-The known total is a lower bound: at least one applicable attempt has unknown usage. Unknown is never counted as zero.
+The known total is a lower bound: at least one applicable attempt has unknown usage or did not report every component. Missing usage is never counted as zero.
 
 ## Timing
 

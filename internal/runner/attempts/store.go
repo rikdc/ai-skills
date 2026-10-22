@@ -431,6 +431,19 @@ func isIgnorableAttemptError(err error) bool {
 // numeric sequence. Directories without a valid started.json are failed
 // allocations and are ignored; they are not attempts.
 func (s *Store) Enumerate() ([]*Attempt, error) {
+	return s.enumerate(func(model.AttemptKind, int) bool { return true })
+}
+
+// newerExecutions lists the agent and hook attempts with a sequence above
+// after, read exactly like Enumerate. Older attempts are never read, so damage
+// to them cannot affect a decision about the accepted attempt.
+func (s *Store) newerExecutions(after int) ([]*Attempt, error) {
+	return s.enumerate(func(kind model.AttemptKind, sequence int) bool {
+		return sequence > after && (kind == model.KindAgent || kind == model.KindHook)
+	})
+}
+
+func (s *Store) enumerate(include func(model.AttemptKind, int) bool) ([]*Attempt, error) {
 	entries, err := os.ReadDir(s.AttemptsDir())
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
@@ -444,7 +457,7 @@ func (s *Store) Enumerate() ([]*Attempt, error) {
 			continue
 		}
 		kind, sequence, ok := parseAttemptID(entry.Name())
-		if !ok {
+		if !ok || !include(kind, sequence) {
 			continue
 		}
 		id := entry.Name()

@@ -137,8 +137,7 @@ func newGradeCommand() *cobra.Command {
 				}
 				printGradeResult(cmd, run.Result)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Grading: %d, graded: %d, already complete: %d, failed: %d\n",
-				suite.Total, suite.Graded, suite.AlreadyComplete, suite.Failed)
+			fmt.Fprintln(cmd.OutOrStdout(), gradeSummaryLine(suite))
 			if err != nil {
 				return err
 			}
@@ -204,5 +203,18 @@ func printGradeResult(cmd *cobra.Command, result judge.Result) {
 	case judge.OutcomeGraded:
 		fmt.Fprintf(cmd.ErrOrStderr(), "  graded (%s/%s): %s\n",
 			format(result.Score), format(result.Max), result.RunDir)
+	case judge.OutcomeSuperseded:
+		fmt.Fprintf(cmd.ErrOrStderr(), "  superseded by a failed rerun, not graded: %s\n", result.RunDir)
 	}
+}
+
+// gradeSummaryLine renders the grade --suite totals. The superseded count
+// appears only when non-zero, so the line matches the shell harness otherwise.
+func gradeSummaryLine(suite judge.SuiteResult) string {
+	superseded := ""
+	if suite.Superseded > 0 {
+		superseded = fmt.Sprintf(", superseded: %d", suite.Superseded)
+	}
+	return fmt.Sprintf("Grading: %d, graded: %d, already complete: %d%s, failed: %d",
+		suite.Total, suite.Graded, suite.AlreadyComplete, superseded, suite.Failed)
 }

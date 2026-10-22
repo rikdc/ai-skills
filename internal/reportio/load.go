@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/rikdc/ai-skills/internal/model"
+	"github.com/rikdc/ai-skills/internal/runner/attempts"
 	"github.com/rikdc/ai-skills/internal/skilluse"
 )
 
@@ -455,6 +456,14 @@ func loadV3Run(runDir, rel string, ri model.RunInput, rubric []model.Criterion, 
 		return ri, nil
 	}
 
+	// A newer finished, non-ok execution attempt is the run's outcome; the
+	// accepted pointer is then provenance only (see attempts.SupersedingAttempt).
+	if id, started, finished, err := supersedingAttempt(runDir, current.AgentAttempt); err != nil {
+		return ri, err
+	} else if id != "" {
+		return supersededRun(ri, runDir, id, started, finished)
+	}
+
 	agentDir := filepath.Join(runDir, "attempts", current.AgentAttempt)
 	started, finished, err := readAttempt(agentDir)
 	if err != nil {
@@ -581,6 +590,64 @@ func loadV3Run(runDir, rel string, ri model.RunInput, rubric []model.Criterion, 
 		ri.JudgeUsage = notApplicableUsage()
 		ri.CombinedUsage = notApplicableUsage()
 	}
+	return ri, nil
+}
+
+// supersedingAttempt returns the attempt that replaces the accepted one as the
+// run's outcome (see attempts.SupersedingAttempt), or "" when the accepted
+// attempt is still the outcome. A missing or unreadable accepted attempt is
+// left to the accepted-attempt checks below; a damaged newer attempt fails the
+// load like any other damaged attempt record.
+func supersedingAttempt(runDir, accepted string) (string, *startedFile, *finishedFile, error) {
+	store := attempts.New(runDir)
+	acceptedAttempt, err := store.LoadAttempt(accepted)
+	if err != nil {
+		return "", nil, nil, nil
+	}
+	superseding, err := store.SupersedingFor(acceptedAttempt)
+	if err != nil {
+		return "", nil, nil, err
+	}
+	if superseding == nil {
+		return "", nil, nil, nil
+	}
+	started, finished, err := readAttempt(superseding.Dir)
+	if err != nil {
+		return "", nil, nil, err
+	}
+	return superseding.ID, started, finished, nil
+}
+
+// supersededRun reports a failed rerun as the run's outcome.
+// Like any failed run, it has no accepted usage or judgement.
+func supersededRun(ri model.RunInput, runDir, id string, started *startedFile, finished *finishedFile) (model.RunInput, error) {
+	// Mechanical items and evidence come from the failed rerun, as in the
+	// suite summary row.
+	attemptDir := filepath.Join(runDir, "attempts", id)
+	items, err := readMechanical(attemptDir, nil)
+	if err != nil {
+		return ri, err
+	}
+	ri.MechanicalItems = items
+	if _, err := os.Stat(filepath.Join(attemptDir, "evidence.json")); err == nil {
+		ri.Evidence = filepath.ToSlash(filepath.Join(ri.Evidence, "attempts", id, "evidence.json"))
+	}
+	ri.AgentAttempt = id
+	ri.JudgeAttempt = ""
+	ri.Complete = false
+	ri.Status = string(finished.Status)
+	ri.StopReason = finished.StopReason
+	ri.TimedOut = finished.TimedOut || finished.Status == model.StatusTimedOut ||
+		finished.StopReason == model.StopTimeout
+	ri.AgentExit = finished.AgentExit
+	ri.DurationSeconds = finished.DurationSeconds
+	if ri.DurationSeconds == nil {
+		ri.DurationSeconds = durationBetween(started, finished)
+	}
+	ri.Usage = notApplicableUsage()
+	ri.AgentUsage = notApplicableUsage()
+	ri.JudgeUsage = notApplicableUsage()
+	ri.CombinedUsage = notApplicableUsage()
 	return ri, nil
 }
 

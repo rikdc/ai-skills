@@ -240,6 +240,67 @@ func TestExpenditureClassifiesEveryAttemptOnce(t *testing.T) {
 	}
 }
 
+func TestExpenditureIncompleteWhenAKnownAttemptLacksCost(t *testing.T) {
+	in := input([]model.Criterion{{Name: "A", MaxScore: 100}}, nil, "comparison", 1)
+	costless := knownAttempt(0, 50, 5, model.KindJudge)
+	costless.Usage.CostUSD = nil
+	in.Attempts = []model.AttemptInput{knownAttempt(0.01, 100, 10, model.KindAgent), costless}
+	expenditure := report.Build(in).Expenditure
+	if expenditure.UnknownAttempts != 0 {
+		t.Fatalf("expenditure = %+v", expenditure)
+	}
+	if expenditure.Complete || expenditure.KnownTotal.State != model.UsageUnknown {
+		t.Fatalf("a known attempt without cost left expenditure complete: %+v", expenditure)
+	}
+	if expenditure.KnownTotal.CostUSD == nil || *expenditure.KnownTotal.CostUSD != 0.01 {
+		t.Fatalf("lower bound cost = %v, want 0.01", expenditure.KnownTotal.CostUSD)
+	}
+}
+
+func TestCostTotalsIgnoreRunsWithoutApplicableUsage(t *testing.T) {
+	rubric := []model.Criterion{{Name: "A", MaxScore: 100}}
+	items := []model.JudgedItem{{Name: "A", Score: 50, Max: 100}}
+	failed := run("with", 3, "agent-failed", nil)
+	na := model.Usage{State: model.UsageNotApplicable, Source: "none"}
+	failed.Usage, failed.AgentUsage, failed.JudgeUsage, failed.CombinedUsage = na, na, na, na
+	in := input(rubric, []model.RunInput{
+		run("with", 1, "ok", items), run("with", 2, "ok", items), failed,
+		run("without", 1, "ok", items), run("without", 2, "ok", items),
+	}, "comparison", 3)
+	built := report.Build(in)
+	cost := built.Cost
+	with := cost.With.Combined
+	if with.RunsTotal != 2 || cost.With.Agent.RunsTotal != 2 {
+		t.Fatalf("applicable runs = %d/%d, want 2", with.RunsTotal, cost.With.Agent.RunsTotal)
+	}
+	if cli := report.RenderCLI(built, false); !strings.Contains(cli, "total 4/4") || strings.Contains(cli, "(partial)") {
+		t.Fatalf("coverage line counts the failed run:\n%s", cli)
+	}
+	if with.Cost.Total == nil || math.Abs(*with.Cost.Total-0.024) > 1e-9 || with.Cost.RunsTotal != 2 {
+		t.Fatalf("with combined cost = %+v, want the two ok runs", with.Cost)
+	}
+	if with.Tokens.Total == nil {
+		t.Fatalf("with combined tokens = %+v, want a total", with.Tokens)
+	}
+	if cost.With.Agent.Cost.Total == nil || cost.With.Judge.Cost.Total == nil {
+		t.Fatalf("agent/judge totals blanked by a failed run: %+v / %+v", cost.With.Agent.Cost, cost.With.Judge.Cost)
+	}
+}
+
+func TestCombinedStatsUseCombine(t *testing.T) {
+	rubric := []model.Criterion{{Name: "A", MaxScore: 100}}
+	items := []model.JudgedItem{{Name: "A", Score: 50, Max: 100}}
+	r := run("with", 1, "ok", items)
+	r.JudgeUsage.CostUSD = nil // the judge reports tokens but no cost
+	cost := report.Build(input(rubric, []model.RunInput{r, run("without", 1, "ok", items)}, "comparison", 1)).Cost
+	// Both report tokens, so combined tokens are exact; only the agent reports
+	// cost, so there is no combined cost.
+	if combined := cost.With.Combined; combined.Cost.Total != nil || combined.Tokens.Input.Total == nil ||
+		*combined.Tokens.Input.Total != 980 {
+		t.Fatalf("combined = %+v, want tokens 980 and no cost", combined)
+	}
+}
+
 func TestCompareMatchesByNameAndRubric(t *testing.T) {
 	rubric := []model.Criterion{{Name: "A", MaxScore: 100}}
 	build := func(withScore, withoutScore float64, extra bool) model.Report {

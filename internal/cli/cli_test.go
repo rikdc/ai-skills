@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rikdc/ai-skills/internal/judge"
 	"github.com/rikdc/ai-skills/internal/model"
 	"github.com/rikdc/ai-skills/internal/platform/errs"
 )
@@ -303,5 +304,86 @@ func TestRootHelp(t *testing.T) {
 func TestExecuteReturnsNilOnSuccess(t *testing.T) {
 	if err := Execute(context.Background(), []string{"version"}); err != nil {
 		t.Fatalf("Execute(version) = %v", err)
+	}
+}
+
+func TestPositionalArgErrorsExitTwo(t *testing.T) {
+	for _, args := range [][]string{
+		{"report"},
+		{"report", "a", "b"},
+		{"run", "extra"},
+		{"version", "extra"},
+		{"completion", "bash", "extra"},
+	} {
+		err := Execute(context.Background(), args)
+		if code := errs.Code(err); code != 2 {
+			t.Errorf("%v: exit code = %d, want 2 (err=%v)", args, code, err)
+		}
+	}
+}
+
+func TestUnknownCommandSuggests(t *testing.T) {
+	err := Execute(context.Background(), []string{"verison"})
+	if code := errs.Code(err); code != 2 {
+		t.Fatalf("exit code = %d, want 2 (err=%v)", code, err)
+	}
+	if !strings.Contains(err.Error(), `unknown command "verison" for "evalctl"`) ||
+		!strings.Contains(err.Error(), "Did you mean this?\n\tversion") {
+		t.Fatalf("err = %q", err)
+	}
+}
+
+func TestBareRootPrintsHelp(t *testing.T) {
+	stdout, _, err := executeCommand(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout, "Available Commands") {
+		t.Fatalf("stdout = %q", stdout)
+	}
+}
+
+func TestVersionWithoutWorkingDirectory(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	gone := t.TempDir()
+	if err := os.Chdir(gone); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(cwd) })
+	if err := os.Remove(gone); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Getwd(); err == nil {
+		t.Skip("this platform still resolves a deleted working directory")
+	}
+	t.Setenv("EVALCTL_ROOT", "")
+
+	if _, _, err := executeCommand(t, "version"); err != nil {
+		t.Fatalf("version must not need a working directory: %v", err)
+	}
+	stdout, _, _ := executeCommand(t, "doctor")
+	if !strings.Contains(stdout, "root: not found") {
+		t.Fatalf("doctor stdout = %q, want missing root", stdout)
+	}
+}
+
+func TestEmptyLogFormatRejected(t *testing.T) {
+	_, _, err := executeCommand(t, "--log-format", "", "version")
+	if code := errs.Code(err); code != 2 {
+		t.Fatalf("exit code = %d, want 2 (err=%v)", code, err)
+	}
+}
+
+func TestGradeSummaryLine(t *testing.T) {
+	plain := gradeSummaryLine(judge.SuiteResult{Total: 3, Graded: 2, AlreadyComplete: 1})
+	if plain != "Grading: 3, graded: 2, already complete: 1, failed: 0" {
+		t.Fatalf("line = %q", plain)
+	}
+	with := gradeSummaryLine(judge.SuiteResult{Total: 4, Graded: 2, AlreadyComplete: 1, Superseded: 1})
+	if with != "Grading: 4, graded: 2, already complete: 1, superseded: 1, failed: 0" {
+		t.Fatalf("line = %q", with)
 	}
 }

@@ -29,6 +29,7 @@ import (
 	"github.com/rikdc/ai-skills/internal/runner/attempts"
 	"github.com/rikdc/ai-skills/internal/scenario"
 	"github.com/rikdc/ai-skills/internal/skilluse"
+	"github.com/rikdc/ai-skills/internal/usage"
 )
 
 // Resume policies.
@@ -616,15 +617,24 @@ func (r *Runner) planRuns(selected []scenario.Selected, fingerprints map[string]
 					if err != nil {
 						return nil, errs.Operational("enumerate %s: %v", dir, err)
 					}
-					// Retain interrupted and non-ok work; stale successful
-					// work is retained but rerun (it is not a failure).
-					_, _, currentErr := store.LoadCurrent()
-					if currentErr != nil && len(list) > 0 {
-						if latest := latestExecution(list); latest != nil &&
-							(latest.Finished == nil || latest.Finished.Status != model.StatusOK) {
-							decisions[key] = decision{retain: true, reason: "kept-failure"}
-							continue
+					// Retain interrupted and non-ok work. With an accepted
+					// attempt only a failed rerun that supersedes it counts;
+					// an unfinished newer attempt never does, so stale
+					// successful work is rerun (it is not a failure).
+					retain := false
+					if accepted := acceptedAttempt(store); accepted != nil {
+						superseding, err := store.SupersedingFor(accepted)
+						if err != nil {
+							return nil, errs.Operational("read newer attempts in %s: %v", dir, err)
 						}
+						retain = superseding != nil
+					} else if latest := attempts.LatestExecution(list); latest != nil &&
+						(latest.Finished == nil || latest.Finished.Status != model.StatusOK) {
+						retain = true
+					}
+					if retain {
+						decisions[key] = decision{retain: true, reason: "kept-failure"}
+						continue
 					}
 				}
 				if r.cfg.ResumePolicy == PolicyRetryFailed {
@@ -637,6 +647,20 @@ func (r *Runner) planRuns(selected []scenario.Selected, fingerprints map[string]
 		}
 	}
 	return decisions, nil
+}
+
+// acceptedAttempt returns the attempt current.json accepts, or nil when there
+// is no readable accepted attempt.
+func acceptedAttempt(store *attempts.Store) *attempts.Attempt {
+	pointer, _, err := store.LoadCurrent()
+	if err != nil {
+		return nil
+	}
+	accepted, err := store.LoadAttempt(pointer.AgentAttempt)
+	if err != nil {
+		return nil
+	}
+	return accepted
 }
 
 // ensureProjections rebuilds result.json and grading-request.json when they
@@ -800,6 +824,9 @@ func (r *Runner) runScenario(ctx context.Context, item scenario.Selected,
 	// Inline judging runs only for runs that finished ok in this pass.
 	if r.cfg.JudgeCmd != "" && summary != nil && ctx.Err() == nil {
 		for _, run := range summary.Runs {
+			if ctx.Err() != nil {
+				break
+			}
 			if run.Status != model.StatusOK {
 				continue
 			}
@@ -840,6 +867,12 @@ func keyString(k runKey) string {
 // gradeRun grades one run and emits its progress pair. The judge key attributes
 // are logged here so inline and final grading share one shape.
 func gradeRun(ctx context.Context, cfg Config, key runKey, runDir string, regrade bool) error {
+	if superseding, _ := attempts.New(runDir).Superseded(); superseding != nil {
+		logInfo(cfg.Logger, "judge skipped",
+			"plugin", key.plugin, "scenario", key.scenario, "arm", key.arm, "run", key.run,
+			"reason", "superseded by failed rerun "+superseding.ID)
+		return nil
+	}
 	logInfo(cfg.Logger, "judge started",
 		"plugin", key.plugin, "scenario", key.scenario, "arm", key.arm, "run", key.run)
 	_, err := judge.Grade(ctx, judge.Config{
@@ -930,6 +963,11 @@ func (r *Runner) finalGrading(ctx context.Context, selected []scenario.Selected,
 	for _, item := range selected {
 		for _, arm := range armsFor(item.Mode(), r.cfg.Arm) {
 			for n := 1; n <= r.cfg.Runs; n++ {
+				// The caller reports the cancellation; grading more runs would
+				// only record cancelled judge attempts.
+				if ctx.Err() != nil {
+					return nil
+				}
 				key := runKey{item.Scenario.Plugin, item.Scenario.Name, arm, n}
 				dir := key.runDir(r.cfg.Out)
 				store := attempts.New(dir)
@@ -963,6 +1001,14 @@ func (r *Runner) checkJudgeProvenance(selected []scenario.Selected, identity str
 				store := attempts.New(dir)
 				pointer, _, err := store.LoadCurrent()
 				if err != nil || pointer.JudgeAttempt == "" {
+					continue
+				}
+				// A replaced result's judgement is never shown or reused.
+				superseding, err := store.Superseded()
+				if err != nil {
+					return errs.Operational("read newer attempts in %s: %v", dir, err)
+				}
+				if superseding != nil {
 					continue
 				}
 				if pointer.JudgeIdentitySHA256 != identity {
@@ -1120,6 +1166,7 @@ func (r *Runner) suiteConfig() (model.SuiteConfig, error) {
 		UsageCmd:             r.cfg.UsageCmd,
 		JudgeUsageCmd:        r.cfg.JudgeUsageCmd,
 		PricingSHA256:        r.cfg.PricingSHA256,
+		PricingFormula:       pricingFormula(r.cfg.PricingSHA256),
 		AttemptArtifacts:     r.cfg.AttemptArtifacts,
 		HarnessVersion:       model.Version,
 	}, nil
@@ -1139,6 +1186,14 @@ func resumeTimeoutNotice(old, current model.SuiteConfig) string {
 	add("checks", old.ChecksTimeoutSeconds, current.ChecksTimeoutSeconds)
 	add("judge", old.JudgeTimeoutSeconds, current.JudgeTimeoutSeconds)
 	return strings.Join(parts, ", ")
+}
+
+// pricingFormula records the cost formula only when a price sheet is in use.
+func pricingFormula(pricingSHA256 string) string {
+	if pricingSHA256 == "" {
+		return ""
+	}
+	return usage.PricingFormula
 }
 
 func compareConfigs(old, current model.SuiteConfig, regrade bool) []string {
@@ -1172,6 +1227,10 @@ func compareConfigs(old, current model.SuiteConfig, regrade bool) []string {
 	add("units", strings.Join(old.Units, ","), strings.Join(current.Units, ","))
 	add("usage_cmd", old.UsageCmd, current.UsageCmd)
 	add("judge_usage_cmd", old.JudgeUsageCmd, current.JudgeUsageCmd)
+	// Reused runs keep their recorded cost, so a different price sheet would
+	// mix cost bases within one suite.
+	add("pricing_sha256", old.PricingSHA256, current.PricingSHA256)
+	add("pricing_formula", old.PricingFormula, current.PricingFormula)
 	add("harness_version", old.HarnessVersion, current.HarnessVersion)
 	if !regrade {
 		add("judge.backend", old.Judge.Backend, current.Judge.Backend)

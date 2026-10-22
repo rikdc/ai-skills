@@ -19,6 +19,7 @@ import (
 	"github.com/rikdc/ai-skills/internal/model"
 	"github.com/rikdc/ai-skills/internal/platform/errs"
 	"github.com/rikdc/ai-skills/internal/provider/command"
+	"github.com/rikdc/ai-skills/internal/reportio"
 	"github.com/rikdc/ai-skills/internal/runner/attempts"
 	"github.com/rikdc/ai-skills/internal/scenario"
 )
@@ -470,6 +471,192 @@ func TestResumeRerunAllCreatesNewAttempts(t *testing.T) {
 	}
 }
 
+func TestFailedRerunOfAcceptedRunIsReportedAndRetried(t *testing.T) {
+	fx := newFixture(t)
+	out := filepath.Join(t.TempDir(), "suite")
+	if _, _, err := runSuite(t, fx.suiteConfig(t, out)); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, fx.agentScript, fmt.Sprintf(
+		"#!/usr/bin/env bash\nprintf 'call\\n' >> %q\nexit 1\n", fx.agentCalls), 0o755)
+
+	cfg := fx.suiteConfig(t, out)
+	cfg.Resume = true
+	cfg.ResumePolicy = PolicyRerunAll
+	if _, _, err := runSuite(t, cfg); errs.Code(err) != 1 {
+		t.Fatalf("failed rerun-all exit = %v, want runner failure (1)", err)
+	}
+	if doc := readSuiteJSON(t, out); doc.Counts["runner_failures"] != 2 {
+		t.Fatalf("runner_failures = %+v, want 2", doc.Counts)
+	}
+	for _, row := range readResults(t, out) {
+		if row.Status != "runner-failed" {
+			t.Fatalf("%s status = %q, want runner-failed", row.Scenario, row.Status)
+		}
+		for _, run := range row.Runs {
+			if run.Status != string(model.StatusAgentFailed) || run.Score != nil ||
+				run.SupersededAttempt == "" || run.AgentAttempt == run.SupersededAttempt || run.SkillUse != nil {
+				t.Fatalf("%s %s/run-%d = %+v, want the failed rerun without a score or skill use",
+					row.Scenario, run.Arm, run.Run, run)
+			}
+			dir := runKey{"demo", row.Scenario, run.Arm, run.Run}.runDir(out)
+			result := readJSONFile[model.RunResult](t, filepath.Join(dir, "result.json"))
+			if result.Complete || result.AgentAttempt != run.AgentAttempt || result.SupersededAttempt != run.SupersededAttempt {
+				t.Fatalf("%s result.json = %+v, want the failed rerun", dir, result)
+			}
+		}
+	}
+	loaded, err := reportio.Load(out, reportio.Options{RepoRoot: fx.root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, sc := range loaded.Scenarios {
+		for _, run := range sc.Runs {
+			if run.Status != string(model.StatusAgentFailed) || run.Complete || len(run.JudgedItems) != 0 {
+				t.Fatalf("report %s %s/run-%d = %+v, want the failed rerun", sc.Scenario, run.Arm, run.Run, run)
+			}
+		}
+	}
+
+	// A run directory written before failed reruns rewrote result.json still
+	// carries the replaced attempt's skill use; the row must not show it.
+	withDir := runKey{"demo", "compare", "with", 1}.runDir(out)
+	stale := readJSONFile[map[string]any](t, filepath.Join(withDir, "result.json"))
+	stale["skill_use"] = map[string]any{"state": "invoked"}
+	data, err := json.Marshal(stale)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(withDir, "result.json"), string(data), 0o600)
+	if err := Refresh(fx.root, out); err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range readResults(t, out) {
+		for _, run := range row.Runs {
+			if run.SkillUse != nil {
+				t.Fatalf("%s %s/run-%d shows the replaced attempt's skill use %+v", row.Scenario, run.Arm, run.Run, run.SkillUse)
+			}
+		}
+	}
+
+	before := fx.callCount(t, fx.agentCalls)
+	writeFile(t, fx.agentScript, fmt.Sprintf(
+		"#!/usr/bin/env bash\nprintf 'call\\n' >> %q\n", fx.agentCalls), 0o755)
+	cfg = fx.suiteConfig(t, out)
+	cfg.Resume = true
+	cfg.ResumePolicy = PolicyRetryFailed
+	if _, _, err := runSuite(t, cfg); err != nil {
+		t.Fatalf("retry after failed rerun: %v", err)
+	}
+	if got := fx.callCount(t, fx.agentCalls); got != before+3 {
+		t.Fatalf("failed reruns were not retried: %d → %d", before, got)
+	}
+	for _, row := range readResults(t, out) {
+		if row.Status != "ok" {
+			t.Fatalf("%s status = %q after retry", row.Scenario, row.Status)
+		}
+	}
+}
+
+func TestKeepFailuresRetainsFailedRerunOfAcceptedRun(t *testing.T) {
+	fx := newFixture(t)
+	out := filepath.Join(t.TempDir(), "suite")
+	if _, _, err := runSuite(t, fx.suiteConfig(t, out)); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, fx.agentScript, fmt.Sprintf(
+		"#!/usr/bin/env bash\nprintf 'call\\n' >> %q\nexit 1\n", fx.agentCalls), 0o755)
+	cfg := fx.suiteConfig(t, out)
+	cfg.Resume = true
+	cfg.ResumePolicy = PolicyRerunAll
+	if _, _, err := runSuite(t, cfg); errs.Code(err) != 1 {
+		t.Fatalf("failed rerun-all exit = %v, want 1", err)
+	}
+
+	before := fx.callCount(t, fx.agentCalls)
+	writeFile(t, fx.agentScript, fmt.Sprintf(
+		"#!/usr/bin/env bash\nprintf 'call\\n' >> %q\n", fx.agentCalls), 0o755)
+	cfg = fx.suiteConfig(t, out)
+	cfg.Resume = true
+	cfg.ResumePolicy = PolicyKeepFailures
+	if _, _, err := runSuite(t, cfg); errs.Code(err) != 1 {
+		t.Fatalf("keep-failures exit = %v, want the kept failures (1)", err)
+	}
+	if got := fx.callCount(t, fx.agentCalls); got != before {
+		t.Fatalf("keep-failures reran a failed rerun: %d → %d calls", before, got)
+	}
+	if doc := readSuiteJSON(t, out); doc.Counts["kept_failures"] != 3 {
+		t.Fatalf("kept_failures = %+v, want 3", doc.Counts)
+	}
+}
+
+func TestKeepFailuresRerunsStaleRunBehindUnfinishedAttempt(t *testing.T) {
+	fx := newFixture(t)
+	out := filepath.Join(t.TempDir(), "suite")
+	if _, _, err := runSuite(t, fx.suiteConfig(t, out)); err != nil {
+		t.Fatal(err)
+	}
+	runDir := filepath.Join(out, "runs", "demo", "compare", "with", "run-1")
+	writeFile(t, filepath.Join(fx.root, "plugins", "demo", "evals", "compare", "task.md"), "# Task\n\nChanged.\n", 0o644)
+	fp, err := scenario.Fingerprint(fx.root, "demo", "compare")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A crashed newer attempt never supersedes, so it cannot keep the stale
+	// accepted result alive.
+	if _, err := attempts.New(runDir).Allocate(model.StartedAttempt{
+		Kind: model.KindAgent, RunID: "demo/compare/with/run-1", Fingerprint: fp,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	cfg := fx.suiteConfig(t, out)
+	cfg.Resume = true
+	cfg.ResumePolicy = PolicyKeepFailures
+	if _, _, err := runSuite(t, cfg); err != nil {
+		t.Fatalf("keep-failures resume: %v", err)
+	}
+	list, err := attempts.New(runDir).Enumerate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if latest := attempts.LatestExecution(list); latest == nil || latest.Finished == nil ||
+		latest.Finished.Status != model.StatusOK || latest.Finished.Fingerprint != fp {
+		t.Fatalf("with/run-1 was not rerun for the new fingerprint: latest = %+v", latest)
+	}
+}
+
+func TestSummaryRowSurvivesCorruptOlderAttempt(t *testing.T) {
+	fx := newFixture(t)
+	writeFile(t, fx.agentScript, fmt.Sprintf(
+		"#!/usr/bin/env bash\nprintf 'call\\n' >> %q\nexit 1\n", fx.agentCalls), 0o755)
+	out := filepath.Join(t.TempDir(), "suite")
+	if _, _, err := runSuite(t, fx.suiteConfig(t, out)); err == nil {
+		t.Fatal("expected the failing suite to report runner failures")
+	}
+	writeFile(t, fx.agentScript, fmt.Sprintf(
+		"#!/usr/bin/env bash\nprintf 'call\\n' >> %q\n", fx.agentCalls), 0o755)
+	cfg := fx.suiteConfig(t, out)
+	cfg.Resume = true
+	if _, _, err := runSuite(t, cfg); err != nil {
+		t.Fatal(err)
+	}
+	runDir := filepath.Join(out, "runs", "demo", "compare", "with", "run-1")
+	writeFile(t, filepath.Join(runDir, "attempts", "agent-000001", "finished.json"), "{", 0o600)
+	if err := Refresh(fx.root, out); err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range readResults(t, out) {
+		if row.Scenario != "compare" {
+			continue
+		}
+		for _, run := range row.Runs {
+			if run.Arm == "with" && run.Status != string(model.StatusOK) {
+				t.Fatalf("accepted run hidden by a corrupt older attempt: %+v", run)
+			}
+		}
+	}
+}
+
 func TestFingerprintInvalidationReruns(t *testing.T) {
 	fx := newFixture(t)
 	out := filepath.Join(t.TempDir(), "suite")
@@ -878,6 +1065,37 @@ func TestResumeJudgeChangeWithoutRegradeIsRefused(t *testing.T) {
 	_, runErr := runner.Run(context.Background())
 	if runErr == nil || errs.Code(runErr) != 2 {
 		t.Fatalf("judge change exit = %v, want 2", runErr)
+	}
+}
+
+func TestJudgeProvenanceIgnoresSupersededRuns(t *testing.T) {
+	fx := newFixture(t)
+	out := filepath.Join(t.TempDir(), "suite")
+	cfg := fx.suiteConfig(t, out)
+	cfg.JudgeCmd = fx.judgeScript
+	cfg.JudgeExec = fx.judgeExecutor(t, fx.judgeScript)
+	if _, _, err := runSuite(t, cfg); err != nil {
+		t.Fatal(err)
+	}
+	r := &Runner{cfg: Config{Out: out, Arm: "both", Runs: 1}}
+	selected := []scenario.Selected{{Scenario: &scenario.Scenario{Plugin: "demo", Name: "compare"}}}
+	if err := r.checkJudgeProvenance(selected, "other-judge"); errs.Code(err) != 2 {
+		t.Fatalf("judged run with a different judge = %v, want a provenance error", err)
+	}
+
+	writeFile(t, fx.agentScript, fmt.Sprintf(
+		"#!/usr/bin/env bash\nprintf 'call\\n' >> %q\nexit 1\n", fx.agentCalls), 0o755)
+	cfg = fx.suiteConfig(t, out)
+	cfg.Resume = true
+	cfg.ResumePolicy = PolicyRerunAll
+	cfg.JudgeCmd = fx.judgeScript
+	cfg.JudgeExec = fx.judgeExecutor(t, fx.judgeScript)
+	if _, _, err := runSuite(t, cfg); errs.Code(err) != 1 {
+		t.Fatalf("failed rerun-all exit = %v, want 1", err)
+	}
+	// The judgement now belongs to a replaced result that no reader shows.
+	if err := r.checkJudgeProvenance(selected, "other-judge"); err != nil {
+		t.Fatalf("superseded runs still demand --regrade: %v", err)
 	}
 }
 
@@ -1333,4 +1551,33 @@ func TestResumeAllowsTimeoutChangesButNotContractChanges(t *testing.T) {
 	if problems := compareConfigs(base, changed, false); len(problems) == 0 {
 		t.Fatal("a RUNS change must still be refused")
 	}
+	changed = base
+	changed.PricingSHA256 = "b"
+	if problems := compareConfigs(base, changed, false); len(problems) == 0 {
+		t.Fatal("a pricing change must be refused")
+	}
+	// A suite priced before the formula was versioned has no pricing_formula.
+	priced := base
+	priced.PricingSHA256 = "a"
+	upgraded := priced
+	upgraded.PricingFormula = pricingFormula(priced.PricingSHA256)
+	if problems := compareConfigs(priced, upgraded, false); len(problems) == 0 {
+		t.Fatal("a pricing formula change must be refused")
+	}
+	if pricingFormula("") != "" {
+		t.Fatal("an unpriced suite must not record a formula")
+	}
+}
+
+func readJSONFile[T any](t *testing.T, path string) T {
+	t.Helper()
+	var value T
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &value); err != nil {
+		t.Fatal(err)
+	}
+	return value
 }

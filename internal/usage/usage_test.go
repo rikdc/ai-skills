@@ -265,6 +265,8 @@ func TestCombine(t *testing.T) {
 	known.CostUSD = float64Ptr(0.25)
 	unknown := model.Unknown("judge", "no usage")
 	unknown.InputTokens = int64Ptr(3)
+	costOnly := model.KnownUsage("hook")
+	costOnly.CostUSD = float64Ptr(0.5)
 
 	cases := []struct {
 		name       string
@@ -279,6 +281,7 @@ func TestCombine(t *testing.T) {
 		{"known sum", known, known, model.UsageKnown, int64Ptr(20), int64Ptr(8), float64Ptr(0.5)},
 		{"known plus unknown", known, unknown, model.UsageUnknown, int64Ptr(13), int64Ptr(4), nil},
 		{"unknown plus not applicable", unknown, na, model.UsageUnknown, int64Ptr(3), nil, nil},
+		{"known with one-sided components", known, costOnly, model.UsageKnown, nil, nil, float64Ptr(0.75)},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -363,6 +366,27 @@ func TestPricing(t *testing.T) {
 	unknown := model.Unknown("provider", "")
 	if _, ok := p.CostFor("gpt-4.1-mini", unknown); ok {
 		t.Fatal("unknown usage must not be priced")
+	}
+}
+
+func TestPricingDisjointInputSources(t *testing.T) {
+	p := Pricing{Models: map[string]ModelPrice{
+		"m": {Input: 3, Output: 15, CacheRead: 0.30, CacheWrite: 3.75},
+	}}
+	for _, source := range []string{SourceClaude, SourceOpencode} {
+		u := model.KnownUsage(source)
+		u.InputTokens = int64Ptr(1_200)
+		u.OutputTokens = int64Ptr(1_000)
+		u.CacheReadTokens = int64Ptr(50_000)
+		cost, ok := p.CostFor("m", u)
+		if !ok {
+			t.Fatalf("%s: expected a price", source)
+		}
+		// input 1.2k * 3 + cache read 50k * 0.30 + output 1k * 15, per million.
+		want := 0.0036 + 0.015 + 0.015
+		if diff := cost - want; diff > 1e-12 || diff < -1e-12 {
+			t.Fatalf("%s: cost %f, want %f", source, cost, want)
+		}
 	}
 }
 

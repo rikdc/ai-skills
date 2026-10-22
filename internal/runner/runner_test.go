@@ -452,6 +452,49 @@ func TestRunCancellation(t *testing.T) {
 	}
 }
 
+func TestRunStopsStartingRunsAfterCancellation(t *testing.T) {
+	fx := newFixture(t, fixtureOptions{})
+	out := t.TempDir()
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(200 * time.Millisecond)
+		cancel()
+	}()
+	summary, err := executeCtx(t, fx, runOptions{
+		out: out, arm: "both", runs: 3, command: "sleep 5", timeout: 10 * time.Second,
+	}, ctx)
+	if err == nil {
+		t.Fatal("expected operational error")
+	}
+	if len(summary.Runs) != 1 || summary.Runs[0].Status != model.StatusCancelled {
+		t.Fatalf("runs after cancellation = %+v, want only the cancelled one", summary.Runs)
+	}
+	for _, arm := range []string{"without", "with"} {
+		for run := 1; run <= 3; run++ {
+			dir := runPath(out, arm, run)
+			if dir == summary.Runs[0].Dir {
+				continue
+			}
+			if _, err := os.Stat(dir); err == nil {
+				t.Errorf("%s/run-%d was started after cancellation", arm, run)
+			}
+		}
+	}
+}
+
+func TestRunAlreadyCancelledStartsNothing(t *testing.T) {
+	fx := newFixture(t, fixtureOptions{})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	summary, err := executeCtx(t, fx, runOptions{out: t.TempDir(), runs: 2}, ctx)
+	if err == nil || !strings.Contains(err.Error(), "cancelled") {
+		t.Fatalf("err = %v, want cancelled", err)
+	}
+	if len(summary.Runs) != 0 {
+		t.Fatalf("runs = %+v, want none", summary.Runs)
+	}
+}
+
 func TestRunEvidenceFailure(t *testing.T) {
 	fx := newFixture(t, fixtureOptions{})
 	out := t.TempDir()
@@ -515,6 +558,41 @@ func TestRunChecksFailure(t *testing.T) {
 	}
 }
 
+func TestRunChecksFailureKeepsAgentFailure(t *testing.T) {
+	fx := newFixture(t, fixtureOptions{checks: "#!/usr/bin/env bash\nexit 4\n"})
+	out := t.TempDir()
+	summary, err := execute(t, fx, runOptions{out: out, command: "exit 3"})
+	if err == nil {
+		t.Fatal("expected operational error")
+	}
+	if summary.Runs[0].Status != model.StatusAgentFailed {
+		t.Fatalf("outcome = %+v, want agent_failed", summary.Runs[0])
+	}
+	result := readJSON[model.RunResult](t, filepath.Join(runPath(out, "with", 1), "result.json"))
+	if result.Status != model.StatusAgentFailed || result.StopReason == model.StopChecksError {
+		t.Fatalf("result = %+v", result)
+	}
+	if !strings.Contains(result.Error, "checks:") {
+		t.Fatalf("error %q does not mention the checks failure", result.Error)
+	}
+}
+
+func TestRunChecksFailureKeepsTimeout(t *testing.T) {
+	fx := newFixture(t, fixtureOptions{checks: "#!/usr/bin/env bash\nexit 4\n"})
+	out := t.TempDir()
+	summary, err := execute(t, fx, runOptions{out: out, command: "sleep 5", timeout: 300 * time.Millisecond})
+	if err == nil {
+		t.Fatal("expected operational error")
+	}
+	if summary.Runs[0].Status != model.StatusTimedOut {
+		t.Fatalf("outcome = %+v, want timed_out", summary.Runs[0])
+	}
+	result := readJSON[model.RunResult](t, filepath.Join(runPath(out, "with", 1), "result.json"))
+	if !result.TimedOut || result.StopReason != model.StopTimeout {
+		t.Fatalf("result = %+v", result)
+	}
+}
+
 func TestInterruptedAttemptRestart(t *testing.T) {
 	fx := newFixture(t, fixtureOptions{})
 	out := t.TempDir()
@@ -555,6 +633,23 @@ func TestInterruptedAttemptRestart(t *testing.T) {
 	}
 }
 
+func TestFailedRerunWithUnreadableAcceptedAttemptIsAnOrdinaryFailure(t *testing.T) {
+	fx := newFixture(t, fixtureOptions{})
+	out := t.TempDir()
+	if _, err := execute(t, fx, runOptions{out: out}); err != nil {
+		t.Fatal(err)
+	}
+	dir := runPath(out, "with", 1)
+	// current.json now names an attempt that is not on disk.
+	if err := os.RemoveAll(filepath.Join(dir, "attempts", "agent-000001")); err != nil {
+		t.Fatal(err)
+	}
+	_, err := execute(t, fx, runOptions{out: out, command: "exit 9"})
+	if err == nil || !strings.Contains(err.Error(), "did not complete ok") {
+		t.Fatalf("err = %v, want the ordinary run failure", err)
+	}
+}
+
 func TestFailedRerunKeepsAcceptedCurrent(t *testing.T) {
 	fx := newFixture(t, fixtureOptions{})
 	out := t.TempDir()
@@ -581,12 +676,16 @@ func TestFailedRerunKeepsAcceptedCurrent(t *testing.T) {
 	if string(before) != string(after) {
 		t.Fatal("failed rerun replaced the accepted pointer")
 	}
-	afterResult, err := os.ReadFile(filepath.Join(dir, "result.json"))
-	if err != nil {
+	// The failed rerun is the run's outcome: the projection now describes it,
+	// naming the accepted attempt it replaced.
+	var accepted model.RunResult
+	if err := json.Unmarshal(beforeResult, &accepted); err != nil {
 		t.Fatal(err)
 	}
-	if string(beforeResult) != string(afterResult) {
-		t.Fatal("failed rerun replaced the accepted result projection")
+	result := readJSON[model.RunResult](t, filepath.Join(dir, "result.json"))
+	if result.Complete || result.Status != model.StatusAgentFailed || result.AgentAttempt == accepted.AgentAttempt ||
+		result.SupersededAttempt != accepted.AgentAttempt || result.CurrentSHA256 != "" {
+		t.Fatalf("result after failed rerun = %+v, want the rerun superseding %s", result, accepted.AgentAttempt)
 	}
 	all, err := attempts.New(dir).Enumerate()
 	if err != nil {
@@ -685,8 +784,9 @@ func TestAttemptArtifactsRetention(t *testing.T) {
 			case "failed":
 				wantPruned["agent-000001"] = true
 			case "none":
+				// agent-000003 failed after agent-000002 was accepted, so it
+				// supersedes it as the run's outcome and keeps its evidence.
 				wantPruned["agent-000001"] = true
-				wantPruned["agent-000003"] = true
 			}
 			for _, attempt := range all {
 				_, snapErr := os.Stat(filepath.Join(attempt.Dir, "snapshot.tar"))

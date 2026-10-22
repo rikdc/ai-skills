@@ -71,6 +71,9 @@ type RunRow struct {
 	Evidence             string           `json:"evidence"`
 	SkillUse             *model.SkillUse  `json:"skill_use,omitempty"`
 	Error                string           `json:"error,omitempty"`
+	// SupersededAttempt is the accepted attempt a newer failed or interrupted
+	// attempt replaced; the row reports the newer attempt.
+	SupersededAttempt string `json:"superseded_attempt,omitempty"`
 }
 
 // JudgedBlock is the accepted judgement for one run.
@@ -114,8 +117,10 @@ type AcceptedUsage struct {
 	Combined UsageTotals `json:"combined"`
 }
 
-// UsageTotals sums one usage stream. Unknown is never zero: runs_known counts
-// only known records, and totals cover those records.
+// UsageTotals sums one usage stream over the runs where it applies (a run that
+// needed no judge has no judge usage). Unknown is never zero: runs_known counts
+// only known records, and a total is present only when every applicable run
+// reports that component, so a sum over a subset never reads as a total.
 type UsageTotals struct {
 	RunsKnown        int      `json:"runs_known"`
 	RunsTotal        int      `json:"runs_total"`
@@ -257,18 +262,6 @@ func (r *Runner) aggregate(selected []scenario.Selected, fingerprints map[string
 			usageKnown += list.known
 			usageUnknown += list.unknown
 			usageNotApplicable += list.notApplicable
-			for _, run := range row.Runs {
-				if run.Status != "ok" {
-					stats.RunnerFailures += 0
-				}
-			}
-		}
-	}
-	// RunnerFailures counts scenarios, not runs; recompute explicitly.
-	stats.RunnerFailures = 0
-	for _, row := range stats.Scenarios {
-		if row.Status != "ok" {
-			stats.RunnerFailures++
 		}
 	}
 	stats.PendingRuns = pendingRuns
@@ -361,6 +354,9 @@ func runFailureLines(stats aggregateStats) []string {
 				row.Plugin, row.Scenario, run.Arm, run.Run, run.Status)
 			if run.Error != "" {
 				line += ": " + run.Error
+			}
+			if run.SupersededAttempt != "" {
+				line += " (supersedes accepted " + run.SupersededAttempt + ")"
 			}
 			lines = append(lines, line)
 		}
@@ -480,21 +476,42 @@ func loadRunRow(runDir, arm string, run int, rubric []model.Criterion, denominat
 		return row
 	}
 	store := attempts.New(runDir)
-	list, err := store.Enumerate()
-	if err != nil || len(list) == 0 {
+	pointer, raw, currentErr := store.LoadCurrent()
+	// With an accepted attempt the full list is only a fallback, so damage to
+	// an older attempt does not hide an accepted run.
+	list, listErr := store.Enumerate()
+	if currentErr != nil && (listErr != nil || len(list) == 0) {
 		return row
 	}
-	pointer, raw, currentErr := store.LoadCurrent()
-	if currentErr == nil {
+	useCurrent := currentErr == nil
+	execution := attempts.LatestExecution(list)
+	if useCurrent {
+		agent, err := store.LoadAttempt(pointer.AgentAttempt)
+		if err == nil {
+			execution = agent
+			superseding, err := store.SupersedingFor(agent)
+			if err != nil {
+				// A damaged newer attempt may be the outcome: report nothing
+				// rather than the accepted result.
+				return row
+			}
+			if superseding != nil {
+				// A failed rerun is the run's outcome; the accepted pointer is
+				// provenance only, and its recorded skill use describes the
+				// replaced attempt.
+				execution = superseding
+				row.SupersededAttempt = agent.ID
+				row.SkillUse = nil
+				useCurrent = false
+			}
+		}
+	}
+	if useCurrent {
 		row.CurrentSHA256 = attempts.SHA256Hex(raw)
 		row.AgentAttempt = pointer.AgentAttempt
 		row.JudgeAttempt = pointer.JudgeAttempt
-	}
-	execution := latestExecution(list)
-	if currentErr == nil {
-		if agent, err := store.LoadAttempt(pointer.AgentAttempt); err == nil {
-			execution = agent
-		}
+	} else if execution != nil {
+		row.AgentAttempt = execution.ID
 	}
 	if execution == nil {
 		return row
@@ -633,19 +650,6 @@ func skillUnused(row ScenarioRow) bool {
 	}
 	coverage := skillCoverageOf(row.Runs)
 	return coverage != nil && !coverage.Exercised
-}
-
-func latestExecution(list []*attempts.Attempt) *attempts.Attempt {
-	var latest *attempts.Attempt
-	for _, attempt := range list {
-		if attempt.Kind != model.KindAgent && attempt.Kind != model.KindHook {
-			continue
-		}
-		if latest == nil || attempt.Sequence > latest.Sequence {
-			latest = attempt
-		}
-	}
-	return latest
 }
 
 func pendingCriteria(store *attempts.Store, rubric []model.Criterion, mechanical []model.JudgedItem) []model.Criterion {
@@ -816,54 +820,24 @@ func acceptedUsage(runs []RunRow) AcceptedUsage {
 }
 
 func usageTotals(usages []model.Usage) UsageTotals {
-	out := UsageTotals{RunsTotal: len(usages)}
-	var cost float64
-	var total, input, output, reasoning, cacheRead, cacheWrite int64
-	var hasTotal, hasInput, hasOutput, hasReasoning, hasCacheRead, hasCacheWrite bool
+	var out UsageTotals
 	for _, usage := range usages {
-		usage = usage.NormalizeState()
-		if usage.State != model.UsageKnown {
+		switch usage.NormalizeState().State {
+		case model.UsageNotApplicable:
 			continue
+		case model.UsageKnown:
+			out.RunsKnown++
 		}
-		out.RunsKnown++
-		if usage.CostUSD != nil {
-			cost += *usage.CostUSD
-			out.CostUSD = floatPtr(cost)
-		}
-		addInt := func(dst *int64, src *int64) bool {
-			if src == nil {
-				return false
-			}
-			*dst += *src
-			return true
-		}
-		hasTotal = addInt(&total, usage.TotalTokens) || hasTotal
-		hasInput = addInt(&input, usage.InputTokens) || hasInput
-		hasOutput = addInt(&output, usage.OutputTokens) || hasOutput
-		hasReasoning = addInt(&reasoning, usage.ReasoningTokens) || hasReasoning
-		hasCacheRead = addInt(&cacheRead, usage.CacheReadTokens) || hasCacheRead
-		hasCacheWrite = addInt(&cacheWrite, usage.CacheWriteTokens) || hasCacheWrite
+		out.RunsTotal++
 	}
-	// Assign totals only when the component appeared in at least one known
-	// record, so "no data" stays nil while a known zero stays zero.
-	if hasTotal {
-		out.TotalTokens = int64Ptr(total)
-	}
-	if hasInput {
-		out.InputTokens = int64Ptr(input)
-	}
-	if hasOutput {
-		out.OutputTokens = int64Ptr(output)
-	}
-	if hasReasoning {
-		out.ReasoningTokens = int64Ptr(reasoning)
-	}
-	if hasCacheRead {
-		out.CacheReadTokens = int64Ptr(cacheRead)
-	}
-	if hasCacheWrite {
-		out.CacheWriteTokens = int64Ptr(cacheWrite)
-	}
+	total := model.SumUsage("accepted", usages)
+	out.CostUSD = total.CostUSD
+	out.TotalTokens = total.TotalTokens
+	out.InputTokens = total.InputTokens
+	out.OutputTokens = total.OutputTokens
+	out.ReasoningTokens = total.ReasoningTokens
+	out.CacheReadTokens = total.CacheReadTokens
+	out.CacheWriteTokens = total.CacheWriteTokens
 	return out
 }
 
@@ -1032,7 +1006,7 @@ func enumerateRunAttempts(scenarioDir string) (attemptList, error) {
 }
 
 func expenditure(item scenario.Selected, outRoot string) ExpenditureSummary {
-	summary := ExpenditureSummary{Complete: true}
+	summary := ExpenditureSummary{}
 	scenarioDir := filepath.Join(outRoot, "runs", item.Scenario.Plugin, item.Scenario.Name)
 	entries, _ := os.ReadDir(scenarioDir)
 	var usages []model.Usage
@@ -1068,68 +1042,17 @@ func expenditure(item scenario.Selected, outRoot string) ExpenditureSummary {
 					summary.KnownAttempts++
 				case model.UsageUnknown:
 					summary.UnknownAttempts++
-					summary.Complete = false
 				case model.UsageNotApplicable:
 					summary.NotApplicableAttempts++
 				}
 			}
 		}
 	}
-	summary.KnownTotal = sumKnownUsage(usages)
+	summary.KnownTotal, summary.Complete = model.SumLowerBound("expenditure", usages)
+	if !summary.Complete {
+		summary.KnownTotal = summary.KnownTotal.WithState(model.UsageUnknown)
+	}
 	return summary
-}
-
-func sumKnownUsage(usages []model.Usage) model.Usage {
-	out := model.KnownUsage("expenditure")
-	var total, input, output, reasoning, cacheRead, cacheWrite int64
-	var cost float64
-	hasCost := false
-	var hasTotal, hasInput, hasOutput, hasReasoning, hasCacheRead, hasCacheWrite bool
-	for _, usage := range usages {
-		usage = usage.NormalizeState()
-		if usage.State != model.UsageKnown {
-			continue
-		}
-		add := func(dst *int64, src *int64) bool {
-			if src == nil {
-				return false
-			}
-			*dst += *src
-			return true
-		}
-		hasTotal = add(&total, usage.TotalTokens) || hasTotal
-		hasInput = add(&input, usage.InputTokens) || hasInput
-		hasOutput = add(&output, usage.OutputTokens) || hasOutput
-		hasReasoning = add(&reasoning, usage.ReasoningTokens) || hasReasoning
-		hasCacheRead = add(&cacheRead, usage.CacheReadTokens) || hasCacheRead
-		hasCacheWrite = add(&cacheWrite, usage.CacheWriteTokens) || hasCacheWrite
-		if usage.CostUSD != nil {
-			cost += *usage.CostUSD
-			hasCost = true
-		}
-	}
-	if hasTotal {
-		out.TotalTokens = int64Ptr(total)
-	}
-	if hasInput {
-		out.InputTokens = int64Ptr(input)
-	}
-	if hasOutput {
-		out.OutputTokens = int64Ptr(output)
-	}
-	if hasReasoning {
-		out.ReasoningTokens = int64Ptr(reasoning)
-	}
-	if hasCacheRead {
-		out.CacheReadTokens = int64Ptr(cacheRead)
-	}
-	if hasCacheWrite {
-		out.CacheWriteTokens = int64Ptr(cacheWrite)
-	}
-	if hasCost {
-		out.CostUSD = floatPtr(cost)
-	}
-	return out
 }
 
 func writeGradingIndex(path string, rows []ScenarioRow) error {

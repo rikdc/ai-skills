@@ -10,15 +10,18 @@ type Mechanical struct {
 // RunResult is the derived result.json projection. The authoritative source is
 // current.json plus immutable attempt directories.
 type RunResult struct {
-	SchemaVersion        int        `json:"schema_version"`
-	Plugin               string     `json:"plugin"`
-	Scenario             string     `json:"scenario"`
-	Arm                  string     `json:"arm"`
-	Mode                 string     `json:"mode"`
-	Run                  int        `json:"run"`
-	AgentAttempt         string     `json:"agent_attempt"`
-	JudgeAttempt         string     `json:"judge_attempt,omitempty"`
-	CurrentSHA256        string     `json:"current_sha256"`
+	SchemaVersion int    `json:"schema_version"`
+	Plugin        string `json:"plugin"`
+	Scenario      string `json:"scenario"`
+	Arm           string `json:"arm"`
+	Mode          string `json:"mode"`
+	Run           int    `json:"run"`
+	AgentAttempt  string `json:"agent_attempt"`
+	JudgeAttempt  string `json:"judge_attempt,omitempty"`
+	CurrentSHA256 string `json:"current_sha256"`
+	// SupersededAttempt is the accepted attempt this failed rerun replaced as
+	// the run's outcome; current.json still names it as provenance.
+	SupersededAttempt    string     `json:"superseded_attempt,omitempty"`
 	Complete             bool       `json:"complete"`
 	Status               RunStatus  `json:"status"`
 	StopReason           string     `json:"stop_reason,omitempty"`

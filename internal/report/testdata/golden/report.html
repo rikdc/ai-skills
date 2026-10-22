@@ -46,10 +46,10 @@ ul.links{columns:2}
 <div class="card"><div class="k">Pending</div><div class="v">96</div><div class="note">points unjudged</div></div>
 <div class="card"><div class="k">Coverage</div><div class="v">66.7%</div></div>
 <div class="card"><div class="k">Failures</div><div class="v">0</div></div>
-<div class="card"><div class="k">Cost with</div><div class="v">$0.165</div><div class="note">4/5 runs</div></div>
-<div class="card"><div class="k">Cost without</div><div class="v">$0.029</div><div class="note">2/3 runs</div></div>
-<div class="card"><div class="k">Cost delta</div><div class="v neg">-$0.004</div></div>
-<div class="card"><div class="k">Tokens</div><div class="v">3.4k / 2.2k</div><div class="note">with / without</div></div>
+<div class="card"><div class="k">Cost with</div><div class="v">—</div><div class="note">4/5 runs</div></div>
+<div class="card"><div class="k">Cost without</div><div class="v">—</div><div class="note">2/3 runs</div></div>
+<div class="card"><div class="k">Cost delta</div><div class="v">—</div></div>
+<div class="card"><div class="k">Tokens</div><div class="v">— / —</div><div class="note">with / without</div></div>
 </div>
 <h2>Criteria</h2>
 <table><thead><tr><th>Scenario</th><th>Criterion</th><th>With</th><th>Without</th><th>Delta</th><th>Status</th></tr></thead><tbody>
@@ -70,13 +70,13 @@ ul.links{columns:2}
 <h2>Cost</h2>
 <table><thead><tr><th>Cost</th><th>With</th><th>Without</th><th>Delta</th><th>Coverage</th></tr></thead><tbody>
 <tr><td>agent</td><td class="num">$0.131</td><td class="num">$0.035</td><td class="num">-$0.004</td><td>5/5 / 3/3</td></tr>
-<tr><td>judge</td><td class="num">$0.044</td><td class="num">$0.004</td><td class="num">$0.000</td><td>4/5 / 2/3</td></tr>
-<tr><td>total</td><td class="num">$0.165</td><td class="num">$0.029</td><td class="num">-$0.004</td><td>4/5 / 2/3</td></tr>
-<tr><td>input tokens</td><td class="num">3.0k</td><td class="num">2.0k</td><td class="num">0</td><td></td></tr>
-<tr><td>output tokens</td><td class="num">360</td><td class="num">240</td><td class="num">0</td><td></td></tr>
+<tr><td>judge</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td>4/5 / 2/3</td></tr>
+<tr><td>total</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td>4/5 / 2/3</td></tr>
+<tr><td>input tokens</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td></td></tr>
+<tr><td>output tokens</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td></td></tr>
 <tr><td>reasoning tokens</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td></td></tr>
 <tr><td>cache read</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td></td></tr>
-<tr><td>total tokens</td><td class="num">3.4k</td><td class="num">2.2k</td><td class="num">0</td><td></td></tr>
+<tr><td>total tokens</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td></td></tr>
 </tbody></table>
 <p class="note">Unknown usage is never counted as zero. Coverage is known runs / total runs.</p>
 <p class="note">Cost totals include functional runs; delta and efficiency use comparison scenarios only.</p>
@@ -85,7 +85,7 @@ ul.links{columns:2}
 <table><thead><tr><th>Attempts</th><th>Agent</th><th>Hook</th><th>Judge</th><th>Known</th><th>Unknown</th><th>Not applicable</th><th>Known total</th></tr></thead><tbody>
 <tr><td class="num">4</td><td class="num">2</td><td class="num">0</td><td class="num">2</td><td class="num">2</td><td class="num">1</td><td class="num">1</td><td class="num">$0.012</td></tr>
 </tbody></table>
-<p class="note">The known total is a lower bound: at least one applicable attempt has unknown usage. Unknown is never counted as zero.</p>
+<p class="note">The known total is a lower bound: at least one applicable attempt has unknown usage or did not report every component. Missing usage is never counted as zero.</p>
 <h2>Timing</h2>
 <p class="note">Wall 43s · agent 1m · judge — · 8 run(s), 0 timed out.</p>
 <h2>Evidence</h2>

@@ -49,9 +49,7 @@ func buildCost(scenarios []model.ScenarioResult, totals model.Totals) model.Cost
 	}
 
 	var costPerPoint *float64
-	if compWith.Combined.Cost.RunsKnown == compWith.RunsTotal &&
-		compWithout.Combined.Cost.RunsKnown == compWithout.RunsTotal &&
-		compWith.RunsTotal > 0 && compWithout.RunsTotal > 0 &&
+	if compWith.Combined.Cost.Total != nil && compWithout.Combined.Cost.Total != nil &&
 		totals.Delta != nil && *totals.Delta > Epsilon &&
 		delta.CombinedCost != nil && *delta.CombinedCost > 0 {
 		value := *delta.CombinedCost / *totals.Delta
@@ -96,11 +94,16 @@ func costStats(runs []model.RunRow) model.CostStats {
 }
 
 func fieldStats(runs []model.RunRow, get func(model.RunRow) model.Usage) model.FieldStats {
-	stats := model.FieldStats{RunsTotal: len(runs)}
+	var stats model.FieldStats
 	var costs, totals []float64
 	var inputs, outputs, reasonings, reads, writes []float64
+	applicable := 0
 	for _, run := range runs {
 		usage := get(run)
+		if usage.NormalizeState().State == model.UsageNotApplicable {
+			continue
+		}
+		applicable++
 		if usageKnown(usage) {
 			stats.RunsKnown++
 		}
@@ -126,11 +129,17 @@ func fieldStats(runs []model.RunRow, get func(model.RunRow) model.Usage) model.F
 			writes = append(writes, *value)
 		}
 	}
-	stats.Cost = metricStats(costs, len(runs))
-	stats.Tokens = tokenStats(totals, inputs, outputs, reasonings, reads, writes, len(runs))
+	stats.RunsTotal = applicable
+	stats.Cost = metricStats(costs, applicable)
+	stats.Tokens = tokenStats(totals, inputs, outputs, reasonings, reads, writes, applicable)
 	return stats
 }
 
+// metricStats summarises one metric over the runs where the usage applies (a
+// failed run or one that needed no judge has none). The mean covers the runs
+// that reported it (runs_known of runs_total); the total is present only when
+// every applicable run reported it, so a sum over a subset never reads as a
+// total.
 func metricStats(values []float64, runsTotal int) model.MetricStats {
 	out := model.MetricStats{RunsKnown: len(values), RunsTotal: runsTotal}
 	if len(values) == 0 {
@@ -141,8 +150,10 @@ func metricStats(values []float64, runsTotal int) model.MetricStats {
 		total += value
 	}
 	mean := total / float64(len(values))
-	out.Total = &total
 	out.Mean = &mean
+	if len(values) == runsTotal {
+		out.Total = &total
+	}
 	return out
 }
 
@@ -157,36 +168,41 @@ func tokenStats(totals, inputs, outputs, reasonings, reads, writes []float64, ru
 	}
 }
 
+// combinedStats summarises agent plus judge usage per run through
+// model.Combine, so a combined component is present only when both
+// invocations report it, exactly as in the suite summary.
 func combinedStats(runs []model.RunRow) model.CombinedStats {
-	stats := model.CombinedStats{RunsTotal: len(runs)}
+	var stats model.CombinedStats
 	var costs, totals, inputs, outputs, reasonings, reads, writes []float64
-	for _, run := range runs {
-		agent, judge := run.AgentUsage, run.JudgeUsage
-		if cost := combinedMetric(agent, judge, func(u model.Usage) *float64 { return u.CostUSD }); cost != nil {
-			costs = append(costs, *cost)
-		}
-		if value := combinedTokenMetric(agent, judge, func(u model.Usage) *int64 { return u.TotalTokens }); value != nil {
-			totals = append(totals, *value)
-		}
-		if value := combinedTokenMetric(agent, judge, func(u model.Usage) *int64 { return u.InputTokens }); value != nil {
-			inputs = append(inputs, *value)
-		}
-		if value := combinedTokenMetric(agent, judge, func(u model.Usage) *int64 { return u.OutputTokens }); value != nil {
-			outputs = append(outputs, *value)
-		}
-		if value := combinedTokenMetric(agent, judge, func(u model.Usage) *int64 { return u.ReasoningTokens }); value != nil {
-			reasonings = append(reasonings, *value)
-		}
-		if value := combinedTokenMetric(agent, judge, func(u model.Usage) *int64 { return u.CacheReadTokens }); value != nil {
-			reads = append(reads, *value)
-		}
-		if value := combinedTokenMetric(agent, judge, func(u model.Usage) *int64 { return u.CacheWriteTokens }); value != nil {
-			writes = append(writes, *value)
+	applicable := 0
+	add := func(dst *[]float64, value *int64) {
+		if value != nil {
+			*dst = append(*dst, float64(*value))
 		}
 	}
+	for _, run := range runs {
+		combined := model.Combine(run.AgentUsage, run.JudgeUsage)
+		if combined.State == model.UsageNotApplicable {
+			continue
+		}
+		applicable++
+		if combined.State != model.UsageKnown {
+			continue
+		}
+		if combined.CostUSD != nil {
+			costs = append(costs, *combined.CostUSD)
+		}
+		add(&totals, combined.TotalTokens)
+		add(&inputs, combined.InputTokens)
+		add(&outputs, combined.OutputTokens)
+		add(&reasonings, combined.ReasoningTokens)
+		add(&reads, combined.CacheReadTokens)
+		add(&writes, combined.CacheWriteTokens)
+	}
 	stats.RunsKnown = len(costs)
-	stats.Cost = metricStats(costs, len(runs))
-	stats.Tokens = tokenStats(totals, inputs, outputs, reasonings, reads, writes, len(runs))
+	stats.RunsTotal = applicable
+	stats.Cost = metricStats(costs, applicable)
+	stats.Tokens = tokenStats(totals, inputs, outputs, reasonings, reads, writes, applicable)
 	return stats
 }
 
@@ -210,24 +226,15 @@ func usageIntMetric(usage model.Usage, value *int64) *float64 {
 	return &f
 }
 
+// combinedMetric reads one metric of agent plus judge usage combined by
+// model.Combine; it is nil unless the combination is known.
 func combinedMetric(agent, judge model.Usage, get func(model.Usage) *float64) *float64 {
-	if judge.State == model.UsageNotApplicable {
-		return usageMetric(agent, get(agent))
-	}
-	if agent.State == model.UsageNotApplicable {
-		return usageMetric(judge, get(judge))
-	}
-	a := usageMetric(agent, get(agent))
-	j := usageMetric(judge, get(judge))
-	if a == nil || j == nil {
-		return nil
-	}
-	value := *a + *j
-	return &value
+	combined := model.Combine(agent, judge)
+	return usageMetric(combined, get(combined))
 }
 
 func usageKnown(usage model.Usage) bool {
-	return usage.State == model.UsageKnown && usage.Known
+	return usage.NormalizeState().State == model.UsageKnown
 }
 
 func usageMetric(usage model.Usage, value *float64) *float64 {
@@ -239,8 +246,7 @@ func usageMetric(usage model.Usage, value *float64) *float64 {
 
 func buildExpenditure(attempts []model.AttemptInput) model.Expenditure {
 	out := model.Expenditure{Currency: "USD"}
-	known := model.Usage{State: model.UsageUnknown, Known: false, Source: "expenditure"}
-	known.Currency = "USD"
+	usages := make([]model.Usage, 0, len(attempts))
 	for _, attempt := range attempts {
 		out.TotalAttempts++
 		switch attempt.Kind {
@@ -251,53 +257,27 @@ func buildExpenditure(attempts []model.AttemptInput) model.Expenditure {
 		case model.KindJudge:
 			out.JudgeAttempts++
 		}
-		usage := attempt.Usage
+		usage := attempt.Usage.NormalizeState()
+		usages = append(usages, usage)
 		switch usage.State {
 		case model.UsageNotApplicable:
 			out.NotApplicableAttempts++
-			continue
 		case model.UsageKnown:
-			if usage.Known {
-				out.KnownAttempts++
-			} else {
-				out.UnknownAttempts++
-			}
+			out.KnownAttempts++
 		default:
 			out.UnknownAttempts++
 		}
-		// Known totals include every numeric component, including a partial
-		// component carried by an otherwise unknown attempt.
-		if usage.CostUSD != nil {
-			known.CostUSD = addFloat(known.CostUSD, *usage.CostUSD)
-		}
-		if usage.InputTokens != nil {
-			known.InputTokens = addInt(known.InputTokens, *usage.InputTokens)
-		}
-		if usage.OutputTokens != nil {
-			known.OutputTokens = addInt(known.OutputTokens, *usage.OutputTokens)
-		}
-		if usage.ReasoningTokens != nil {
-			known.ReasoningTokens = addInt(known.ReasoningTokens, *usage.ReasoningTokens)
-		}
-		if usage.CacheReadTokens != nil {
-			known.CacheReadTokens = addInt(known.CacheReadTokens, *usage.CacheReadTokens)
-		}
-		if usage.CacheWriteTokens != nil {
-			known.CacheWriteTokens = addInt(known.CacheWriteTokens, *usage.CacheWriteTokens)
-		}
-		if usage.TotalTokens != nil {
-			known.TotalTokens = addInt(known.TotalTokens, *usage.TotalTokens)
-		}
 	}
-	out.Complete = out.UnknownAttempts == 0
-	if out.Complete {
-		known.State = model.UsageKnown
-		known.Known = true
+	// The known total includes partial components of unknown attempts; it is
+	// complete only when every applicable attempt reports every component.
+	known, complete := model.SumLowerBound("expenditure", usages)
+	out.Complete = complete
+	if complete {
+		out.KnownTotal = known
 	} else {
-		known.State = model.UsageUnknown
-		known.Known = false
+		out.KnownTotal = known.WithState(model.UsageUnknown)
 	}
-	out.KnownTotal = known
+	out.KnownTotal.Currency = "USD"
 	return out
 }
 

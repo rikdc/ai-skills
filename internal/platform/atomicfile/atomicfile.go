@@ -3,12 +3,23 @@
 package atomicfile
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 )
 
-// Write atomically replaces path with data using perm.
+// ErrNotDurable reports that path already holds the new content but the
+// directory fsync after the rename failed, so the replacement may not survive
+// a crash. Callers must not treat it as "not written".
+var ErrNotDurable = errors.New("content replaced but directory sync failed")
+
+// syncDirFunc is replaced in tests to simulate a directory fsync failure.
+var syncDirFunc = syncDir
+
+// Write atomically replaces path with data using perm. An error wrapping
+// ErrNotDurable means the content was replaced; any other error means path is
+// unchanged.
 func Write(path string, data []byte, perm os.FileMode) (err error) {
 	dir := filepath.Dir(path)
 	base := filepath.Base(path)
@@ -45,8 +56,8 @@ func Write(path string, data []byte, perm os.FileMode) (err error) {
 	}
 	cleanup = false
 
-	if err := syncDir(dir); err != nil {
-		return fmt.Errorf("atomic write %s: sync directory: %w", path, err)
+	if err := syncDirFunc(dir); err != nil {
+		return fmt.Errorf("atomic write %s: %w: %w", path, ErrNotDurable, err)
 	}
 	return nil
 }

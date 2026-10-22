@@ -107,24 +107,24 @@
         "runs_known": 4,
         "runs_total": 5,
         "cost": {
-          "total": 0.044,
+          "total": null,
           "runs_known": 4,
           "runs_total": 5,
           "mean": 0.011
         },
         "tokens": {
-          "total": 300,
+          "total": null,
           "runs_known": 4,
           "runs_total": 5,
           "mean": 75,
           "input": {
-            "total": 240,
+            "total": null,
             "runs_known": 4,
             "runs_total": 5,
             "mean": 60
           },
           "output": {
-            "total": 60,
+            "total": null,
             "runs_known": 4,
             "runs_total": 5,
             "mean": 15
@@ -153,24 +153,24 @@
         "runs_known": 4,
         "runs_total": 5,
         "cost": {
-          "total": 0.165,
+          "total": null,
           "runs_known": 4,
           "runs_total": 5,
           "mean": 0.04125
         },
         "tokens": {
-          "total": 3400,
+          "total": null,
           "runs_known": 4,
           "runs_total": 5,
           "mean": 850,
           "input": {
-            "total": 3040,
+            "total": null,
             "runs_known": 4,
             "runs_total": 5,
             "mean": 760
           },
           "output": {
-            "total": 360,
+            "total": null,
             "runs_known": 4,
             "runs_total": 5,
             "mean": 90
@@ -248,24 +248,24 @@
         "runs_known": 2,
         "runs_total": 3,
         "cost": {
-          "total": 0.004,
+          "total": null,
           "runs_known": 2,
           "runs_total": 3,
           "mean": 0.002
         },
         "tokens": {
-          "total": 200,
+          "total": null,
           "runs_known": 2,
           "runs_total": 3,
           "mean": 100,
           "input": {
-            "total": 160,
+            "total": null,
             "runs_known": 2,
             "runs_total": 3,
             "mean": 80
           },
           "output": {
-            "total": 40,
+            "total": null,
             "runs_known": 2,
             "runs_total": 3,
             "mean": 20
@@ -294,24 +294,24 @@
         "runs_known": 2,
         "runs_total": 3,
         "cost": {
-          "total": 0.029,
+          "total": null,
           "runs_known": 2,
           "runs_total": 3,
           "mean": 0.0145
         },
         "tokens": {
-          "total": 2200,
+          "total": null,
           "runs_known": 2,
           "runs_total": 3,
           "mean": 1100,
           "input": {
-            "total": 1960,
+            "total": null,
             "runs_known": 2,
             "runs_total": 3,
             "mean": 980
           },
           "output": {
-            "total": 240,
+            "total": null,
             "runs_known": 2,
             "runs_total": 3,
             "mean": 120
@@ -390,24 +390,24 @@
           "runs_known": 2,
           "runs_total": 3,
           "cost": {
-            "total": 0.004,
+            "total": null,
             "runs_known": 2,
             "runs_total": 3,
             "mean": 0.002
           },
           "tokens": {
-            "total": 200,
+            "total": null,
             "runs_known": 2,
             "runs_total": 3,
             "mean": 100,
             "input": {
-              "total": 160,
+              "total": null,
               "runs_known": 2,
               "runs_total": 3,
               "mean": 80
             },
             "output": {
-              "total": 40,
+              "total": null,
               "runs_known": 2,
               "runs_total": 3,
               "mean": 20
@@ -436,24 +436,24 @@
           "runs_known": 2,
           "runs_total": 3,
           "cost": {
-            "total": 0.025,
+            "total": null,
             "runs_known": 2,
             "runs_total": 3,
             "mean": 0.0125
           },
           "tokens": {
-            "total": 2200,
+            "total": null,
             "runs_known": 2,
             "runs_total": 3,
             "mean": 1100,
             "input": {
-              "total": 1960,
+              "total": null,
               "runs_known": 2,
               "runs_total": 3,
               "mean": 980
             },
             "output": {
-              "total": 240,
+              "total": null,
               "runs_known": 2,
               "runs_total": 3,
               "mean": 120
@@ -531,24 +531,24 @@
           "runs_known": 2,
           "runs_total": 3,
           "cost": {
-            "total": 0.004,
+            "total": null,
             "runs_known": 2,
             "runs_total": 3,
             "mean": 0.002
           },
           "tokens": {
-            "total": 200,
+            "total": null,
             "runs_known": 2,
             "runs_total": 3,
             "mean": 100,
             "input": {
-              "total": 160,
+              "total": null,
               "runs_known": 2,
               "runs_total": 3,
               "mean": 80
             },
             "output": {
-              "total": 40,
+              "total": null,
               "runs_known": 2,
               "runs_total": 3,
               "mean": 20
@@ -577,24 +577,24 @@
           "runs_known": 2,
           "runs_total": 3,
           "cost": {
-            "total": 0.029,
+            "total": null,
             "runs_known": 2,
             "runs_total": 3,
             "mean": 0.0145
           },
           "tokens": {
-            "total": 2200,
+            "total": null,
             "runs_known": 2,
             "runs_total": 3,
             "mean": 1100,
             "input": {
-              "total": 1960,
+              "total": null,
               "runs_known": 2,
               "runs_total": 3,
               "mean": 980
             },
             "output": {
-              "total": 240,
+              "total": null,
               "runs_known": 2,
               "runs_total": 3,
               "mean": 120
@@ -623,13 +623,13 @@
     },
     "delta_totals": {
       "agent_cost": -0.0040000000000000036,
-      "judge_cost": 0,
-      "combined_cost": -0.004,
-      "combined_input_tokens": 0,
-      "combined_output_tokens": 0,
+      "judge_cost": null,
+      "combined_cost": null,
+      "combined_input_tokens": null,
+      "combined_output_tokens": null,
       "combined_reasoning_tokens": null,
       "combined_cache_read_tokens": null,
-      "combined_tokens": 0
+      "combined_tokens": null
     },
     "delta": {
       "agent_cost": -0.001333333333333334,
@@ -706,24 +706,24 @@
         "runs_known": 4,
         "runs_total": 5,
         "cost": {
-          "total": 0.044,
+          "total": null,
           "runs_known": 4,
           "runs_total": 5,
           "mean": 0.011
         },
         "tokens": {
-          "total": 300,
+          "total": null,
           "runs_known": 4,
           "runs_total": 5,
           "mean": 75,
           "input": {
-            "total": 240,
+            "total": null,
             "runs_known": 4,
             "runs_total": 5,
             "mean": 60
           },
           "output": {
-            "total": 60,
+            "total": null,
             "runs_known": 4,
             "runs_total": 5,
             "mean": 15
@@ -752,24 +752,24 @@
         "runs_known": 4,
         "runs_total": 5,
         "cost": {
-          "total": 0.165,
+          "total": null,
           "runs_known": 4,
           "runs_total": 5,
           "mean": 0.04125
         },
         "tokens": {
-          "total": 3400,
+          "total": null,
           "runs_known": 4,
           "runs_total": 5,
           "mean": 850,
           "input": {
-            "total": 3040,
+            "total": null,
             "runs_known": 4,
             "runs_total": 5,
             "mean": 760
           },
           "output": {
-            "total": 360,
+            "total": null,
             "runs_known": 4,
             "runs_total": 5,
             "mean": 90
@@ -847,24 +847,24 @@
         "runs_known": 2,
         "runs_total": 3,
         "cost": {
-          "total": 0.004,
+          "total": null,
           "runs_known": 2,
           "runs_total": 3,
           "mean": 0.002
         },
         "tokens": {
-          "total": 200,
+          "total": null,
           "runs_known": 2,
           "runs_total": 3,
           "mean": 100,
           "input": {
-            "total": 160,
+            "total": null,
             "runs_known": 2,
             "runs_total": 3,
             "mean": 80
           },
           "output": {
-            "total": 40,
+            "total": null,
             "runs_known": 2,
             "runs_total": 3,
             "mean": 20
@@ -893,24 +893,24 @@
         "runs_known": 2,
         "runs_total": 3,
         "cost": {
-          "total": 0.029,
+          "total": null,
           "runs_known": 2,
           "runs_total": 3,
           "mean": 0.0145
         },
         "tokens": {
-          "total": 2200,
+          "total": null,
           "runs_known": 2,
           "runs_total": 3,
           "mean": 1100,
           "input": {
-            "total": 1960,
+            "total": null,
             "runs_known": 2,
             "runs_total": 3,
             "mean": 980
           },
           "output": {
-            "total": 240,
+            "total": null,
             "runs_known": 2,
             "runs_total": 3,
             "mean": 120

@@ -29,6 +29,9 @@ const (
 	OutcomeAlreadyComplete Outcome = "already-complete"
 	// OutcomeNothingPending means the grading request has no pending criteria.
 	OutcomeNothingPending Outcome = "nothing-pending"
+	// OutcomeSuperseded means a newer failed rerun replaced the accepted
+	// attempt, so there is no current result to grade.
+	OutcomeSuperseded Outcome = "superseded"
 )
 
 // Result is the outcome of grading one run directory.
@@ -65,6 +68,7 @@ type SuiteResult struct {
 	Total           int
 	Graded          int
 	AlreadyComplete int
+	Superseded      int
 	Failed          int
 }
 
@@ -122,6 +126,14 @@ func Grade(ctx context.Context, cfg Config) (Result, error) {
 	if agent.Kind != model.KindAgent && agent.Kind != model.KindHook {
 		return empty, errs.Operational("%s: accepted attempt %s is not an execution attempt",
 			runDir, agent.ID)
+	}
+	// Grading a replaced result would pay the judge for a score no reader shows.
+	superseding, err := store.SupersedingFor(agent)
+	if err != nil {
+		return empty, errs.Operational("%s: read newer attempts: %v", runDir, err)
+	}
+	if superseding != nil {
+		return Result{RunDir: runDir, Outcome: OutcomeSuperseded}, nil
 	}
 	if agent.Finished == nil || agent.Finished.EvidenceSHA256 != pointer.AgentEvidenceSHA256 ||
 		agent.Finished.GradingRequestSHA256 != pointer.AgentGradingRequestSHA256 {
@@ -644,6 +656,11 @@ func GradeSuite(ctx context.Context, cfg Config) (SuiteResult, error) {
 	provenance := false
 	firstProvenance := ""
 	for _, runDir := range matches {
+		// Grading more runs after cancellation would only record cancelled
+		// judge attempts, which later read as judge history.
+		if ctx.Err() != nil {
+			break
+		}
 		runCfg := cfg
 		runCfg.RunDir = runDir
 		runCfg.SuiteDir = ""
@@ -660,17 +677,23 @@ func GradeSuite(ctx context.Context, cfg Config) (SuiteResult, error) {
 			}
 			continue
 		}
-		if result.Outcome == OutcomeGraded {
+		switch result.Outcome {
+		case OutcomeGraded:
 			suite.Graded++
-		} else {
+		case OutcomeSuperseded:
+			suite.Superseded++
+		default:
 			suite.AlreadyComplete++
 		}
 	}
 	switch {
+	case ctx.Err() != nil:
+		return suite, errs.Operational("grading cancelled after %d of %d runs: %v",
+			suite.Total, len(matches), ctx.Err())
 	case provenance:
 		return suite, errs.WithCode(errs.CodeUsage, fmt.Errorf(
-			"%s (graded: %d, already complete: %d, failed: %d)",
-			firstProvenance, suite.Graded, suite.AlreadyComplete, suite.Failed))
+			"%s (graded: %d, already complete: %d, superseded: %d, failed: %d)",
+			firstProvenance, suite.Graded, suite.AlreadyComplete, suite.Superseded, suite.Failed))
 	case suite.Failed > 0:
 		return suite, errs.Operational("grading failed for %d of %d runs",
 			suite.Failed, suite.Total)

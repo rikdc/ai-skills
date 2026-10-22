@@ -145,6 +145,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `evalctl` now exits 2 for every positional-argument error (for example
+  `evalctl report a b`), not only the ones whose cobra message happened to
+  start with "unknown command", and no longer matches error text to choose an
+  exit code.
+- `evalctl` no longer fails every command when the working directory is gone;
+  the missing directory surfaces as a missing repository root only for
+  commands that need one, so `evalctl version` still works.
+- An atomic write whose directory fsync fails after the rename now returns an
+  error wrapping `atomicfile.ErrNotDurable`, so callers can tell "content
+  replaced but not yet durable" from "not written".
+- A usage record's `known` flag is now always derived from its `state` when
+  serialised or updated, so the two can no longer disagree.
+- A rerun of an accepted run that finishes with a non-ok status
+  (`--resume-policy rerun-all`, a changed scenario, a cancel or a timeout)
+  is now the run's result everywhere: `summary.md`, `results.jsonl`
+  (`superseded_attempt` names the replaced attempt) and `evalctl report` show
+  the failure with no score, and the suite exits 1. Previously the old
+  accepted score was reported and the suite exited 0. `current.json` is kept
+  only as provenance; the run is no longer reusable or adoptable, so
+  `--resume` retries it and `keep-failures` keeps it. `evalctl grade` skips
+  it (`superseded`) instead of paying the judge for a hidden score, and
+  `--attempt-artifacts none` keeps its evidence. `result.json` describes the
+  failed rerun (`superseded_attempt` names the replaced one) and is never
+  rebuilt from the replaced pointer. Reuse, grading and superseding read only
+  attempts newer than the accepted one, so a damaged older attempt cannot
+  block them, while a damaged newer one is reported as an error rather than
+  silently restoring the accepted result. An unfinished newer attempt
+  (in flight or crashed) neither replaces the accepted result nor hides an
+  earlier failed rerun.
+- After an interrupt, `evalctl run`, `suite`, and `grade --suite` stop
+  starting new runs and judge calls instead of recording a cancelled attempt
+  for every remaining one.
+- A failed `checks.sh` no longer replaces the status of a failed or timed-out
+  agent run with `checks-failed`; the checks error is appended to the run's
+  error instead.
+- Pricing no longer subtracts cache-read tokens from input tokens for Claude
+  and opencode logs, which already count them separately; that undercharged
+  input and could price it at zero.
+- `evalctl suite --resume` refuses a different pricing file or pricing formula
+  (`pricing_formula` in the manifest), so one suite never mixes cost bases. A
+  priced suite started before this release cannot be resumed.
+- Usage totals are never reported over incomplete data. Combining agent and
+  judge usage keeps a component (cost included) only when both report it, so
+  a one-sided value never reads as the combined total. Report cost and token
+  totals, and the deltas between them, are shown only when every run whose
+  usage applies reported the metric (otherwise "—", with the coverage line);
+  a failed run, or one that needed no judge, is not counted as missing, and
+  the coverage line and efficiency use the same denominators. Means still
+  cover the runs that reported. Expenditure is complete only when every applicable attempt
+  reported every component, so a known attempt without a cost now makes the
+  total a lower bound. The attempt store's `result.json` projection and the
+  suite's accepted-usage totals use the same rules as the report.
 - `evalctl grade` now refreshes `summary.md`, `suite.json` counts,
   `results.jsonl` and the grading index after grading, so a suite graded after
   the run no longer reports 0% and every run pending.

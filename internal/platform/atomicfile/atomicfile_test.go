@@ -1,6 +1,7 @@
 package atomicfile
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -68,5 +69,31 @@ func TestWriteLeavesNoTempFiles(t *testing.T) {
 			names = append(names, entry.Name())
 		}
 		t.Fatalf("unexpected files: %s", strings.Join(names, ", "))
+	}
+}
+
+func TestWriteDirSyncFailureReportsReplacedContent(t *testing.T) {
+	syncErr := errors.New("sync failed")
+	syncDirFunc = func(string) error { return syncErr }
+	t.Cleanup(func() { syncDirFunc = syncDir })
+
+	path := filepath.Join(t.TempDir(), "data.json")
+	err := Write(path, []byte("new"), 0o644)
+	if !errors.Is(err, ErrNotDurable) || !errors.Is(err, syncErr) {
+		t.Fatalf("err = %v, want ErrNotDurable wrapping the sync error", err)
+	}
+	data, readErr := os.ReadFile(path)
+	if readErr != nil {
+		t.Fatal(readErr)
+	}
+	if string(data) != "new" {
+		t.Fatalf("content = %q, want new", data)
+	}
+}
+
+func TestWriteEarlyFailureIsNotErrNotDurable(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "missing", "data.json")
+	if err := Write(path, []byte("x"), 0o644); errors.Is(err, ErrNotDurable) {
+		t.Fatalf("err = %v, want a plain failure", err)
 	}
 }
