@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eval report</title>
+<style>
+:root{--bg:#fff;--fg:#1a1a1a;--muted:#555;--line:#d8d8d8;--card:#f5f5f5;--good:#0a7a3d;--bad:#b3261e;--warn:#8a5a00}
+@media (prefers-color-scheme:dark){:root{--bg:#111417;--fg:#e8e8e8;--muted:#a0a6ad;--line:#333a40;--card:#1a1f24;--good:#5cd68a;--bad:#ff8a80;--warn:#ffd166}}
+*{box-sizing:border-box}
+body{margin:0 auto;max-width:1100px;padding:2rem 1.25rem 4rem;background:var(--bg);color:var(--fg);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+h1,h2{line-height:1.2}h2{margin-top:2rem;border-bottom:1px solid var(--line);padding-bottom:.35rem}
+.meta{color:var(--muted)}.note{color:var(--muted);font-size:.9rem}
+.verdict{border:1px solid var(--line);border-left:6px solid var(--warn);background:var(--card);padding:1rem 1.25rem;border-radius:8px}
+.verdict.incomplete,.verdict.hurts{border-left-color:var(--bad)}
+.verdict.helps,.verdict.functional{border-left-color:var(--good)}
+.verdict .state{font-size:1.4rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.verdict .reason{color:var(--muted);margin-top:.35rem}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;margin-top:1rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:.75rem .9rem}
+.card .k{color:var(--muted);font-size:.8rem;text-transform:uppercase;letter-spacing:.05em}
+.card .v{font-size:1.35rem;font-weight:600}.pos{color:var(--good)}.neg{color:var(--bad)}
+table{width:100%;border-collapse:collapse;margin-top:.75rem;font-size:.92rem}
+th,td{text-align:left;padding:.45rem .55rem;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+ul.links{columns:2}
+</style>
+</head>
+<body>
+<h1>Eval report: skills/fixture</h1>
+<p class="meta">Suite: <code>testdata/golden/suite</code><br>Agent: <code>claude -p --model fixture-model</code> · Model: <code>fixture-model</code><br>Git: <code>deadbee</code> · Created: 2026-01-02T03:04:05Z · n: 2 · Agent invocations: 6</p>
+<p class="note"><strong>Fixed denominator.</strong> Scores use the full rubric max_score sum; a run with only part of its checklist judged is reported as <code>52/100 + 48 pending</code>, never renormalised to <code>52/52</code>.</p>
+<section class="verdict incomplete"><div class="state">incomplete</div><div class="reason">runner failures or unjudged criteria remain; a verdict would be made up</div></section>
+<div class="cards">
+<div class="card"><div class="k">With</div><div class="v">73.5</div></div>
+<div class="card"><div class="k">Without</div><div class="v">67.2</div></div>
+<div class="card"><div class="k">Delta</div><div class="v pos">+6.2</div></div>
+<div class="card"><div class="k">Criteria</div><div class="v">1 / 0 / 2</div><div class="note">won / lost / tied</div></div>
+<div class="card"><div class="k">Pending</div><div class="v">96</div><div class="note">points unjudged</div></div>
+<div class="card"><div class="k">Coverage</div><div class="v">66.7%</div></div>
+<div class="card"><div class="k">Failures</div><div class="v">0</div></div>
+<div class="card"><div class="k">Cost with</div><div class="v">$0.165</div><div class="note">4/5 runs</div></div>
+<div class="card"><div class="k">Cost without</div><div class="v">$0.029</div><div class="note">2/3 runs</div></div>
+<div class="card"><div class="k">Cost delta</div><div class="v neg">-$0.004</div></div>
+<div class="card"><div class="k">Tokens</div><div class="v">3.4k / 2.2k</div><div class="note">with / without</div></div>
+</div>
+<h2>Criteria</h2>
+<table><thead><tr><th>Scenario</th><th>Criterion</th><th>With</th><th>Without</th><th>Delta</th><th>Status</th></tr></thead><tbody>
+<tr><td>demo/compare</td><td>B</td><td class="num">40.0</td><td class="num">40.0</td><td class="num ">= 0.0</td><td>comparable</td></tr>
+<tr><td>demo/pending</td><td>Scored</td><td class="num">52.0</td><td class="num">52.0</td><td class="num ">= 0.0</td><td>comparable</td></tr>
+<tr><td>demo/compare</td><td>A</td><td class="num">55.0</td><td class="num">42.5</td><td class="num pos">▲ +12.5</td><td>comparable</td></tr>
+<tr><td>demo/functional</td><td>A</td><td class="num">85.0</td><td class="num">—</td><td class="num ">— —</td><td>scored</td></tr>
+<tr><td>demo/pending</td><td>Unjudged</td><td class="num">—</td><td class="num">—</td><td class="num ">— —</td><td>pending</td></tr>
+</tbody></table>
+<h2>Scenarios</h2>
+<table><thead><tr><th>Scenario</th><th>With</th><th>Without</th><th>Delta</th><th>Pending</th><th>Status</th></tr></thead><tbody>
+<tr><td>demo/compare</td><td class="num">95.0</td><td class="num">82.5</td><td class="num pos">▲ +12.5</td><td class="num">0 pts</td><td>ok</td></tr>
+<tr><td>demo/pending</td><td class="num">52.0</td><td class="num">52.0</td><td class="num ">= 0.0</td><td class="num">96 pts</td><td>ok</td></tr>
+<tr><td>demo/functional</td><td class="num">85.0</td><td class="num">—</td><td class="num ">— —</td><td class="num">0 pts</td><td>functional</td></tr>
+</tbody></table>
+<h2>Regressions</h2>
+<p class="note">None.</p>
+<h2>Cost</h2>
+<table><thead><tr><th>Cost</th><th>With</th><th>Without</th><th>Delta</th><th>Coverage</th></tr></thead><tbody>
+<tr><td>agent</td><td class="num">$0.131</td><td class="num">$0.035</td><td class="num">-$0.004</td><td>5/5 / 3/3</td></tr>
+<tr><td>judge</td><td class="num">$0.044</td><td class="num">$0.004</td><td class="num">$0.000</td><td>4/5 / 2/3</td></tr>
+<tr><td>total</td><td class="num">$0.165</td><td class="num">$0.029</td><td class="num">-$0.004</td><td>4/5 / 2/3</td></tr>
+<tr><td>input tokens</td><td class="num">3.0k</td><td class="num">2.0k</td><td class="num">0</td><td></td></tr>
+<tr><td>output tokens</td><td class="num">360</td><td class="num">240</td><td class="num">0</td><td></td></tr>
+<tr><td>reasoning tokens</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td></td></tr>
+<tr><td>cache read</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td></td></tr>
+<tr><td>total tokens</td><td class="num">3.4k</td><td class="num">2.2k</td><td class="num">0</td><td></td></tr>
+</tbody></table>
+<p class="note">Unknown usage is never counted as zero. Coverage is known runs / total runs.</p>
+<p class="note">Cost totals include functional runs; delta and efficiency use comparison scenarios only.</p>
+<p class="note">Efficiency: — (partial cost coverage or no positive score delta).</p>
+<h2>Timing</h2>
+<p class="note">Wall 43s · agent 1m · judge — · 8 run(s), 0 timed out.</p>
+<h2>Evidence</h2>
+<p class="note">Relative links; open from the suite directory. The raw JSON is beside this file.</p>
+<ul class="links">
+<li><a href="../runs/demo/compare">demo/compare</a></li>
+<li><a href="../runs/demo/functional">demo/functional</a></li>
+<li><a href="../runs/demo/pending">demo/pending</a></li>
+<li><a href="report.json">report.json</a></li>
+</ul>
+</body>
+</html>

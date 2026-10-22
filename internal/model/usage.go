@@ -25,3 +25,132 @@ type Usage struct {
 	CostUSD          *float64   `json:"cost_usd,omitempty"`
 	Currency         string     `json:"currency,omitempty"`
 }
+
+// Unknown returns an applicable-but-unmeasured usage record. It is never zero.
+func Unknown(source, reason string) Usage {
+	return Usage{State: UsageUnknown, Known: false, Source: source, Reason: reason}
+}
+
+// NotApplicable returns the usage for an invocation that never happened.
+func NotApplicable(source string) Usage {
+	return Usage{State: UsageNotApplicable, Known: false, Source: source}
+}
+
+// KnownUsage returns a known-state usage record with no numeric components yet.
+func KnownUsage(source string) Usage {
+	return Usage{State: UsageKnown, Known: true, Source: source}
+}
+
+// IsApplicable reports whether the invocation happened.
+func (u Usage) IsApplicable() bool { return u.State != UsageNotApplicable }
+
+// IsUnknown reports whether the invocation happened without usable usage.
+func (u Usage) IsUnknown() bool { return u.State == UsageUnknown }
+
+// NormalizeState fills State from the compatibility Known flag when the state
+// is empty. It never invents numerics.
+func (u Usage) NormalizeState() Usage {
+	if u.State == "" {
+		if u.Known {
+			u.State = UsageKnown
+		} else {
+			u.State = UsageUnknown
+		}
+	}
+	u.Known = u.State == UsageKnown
+	return u
+}
+
+// Combine merges usage from two invocations according to the v3 contract:
+//   - both not_applicable -> not_applicable
+//   - one not_applicable  -> the other, unchanged
+//   - both known          -> known, numeric components summed
+//   - any applicable unknown -> unknown, retaining partial numeric components
+//
+// A summed cost is present only when both sides carry a cost. Components that
+// only one side carries are retained; they are a partial lower bound when the
+// combined state is unknown. Unknown is never treated as zero.
+func Combine(a, b Usage) Usage {
+	a = a.NormalizeState()
+	b = b.NormalizeState()
+
+	if a.State == UsageNotApplicable {
+		return b
+	}
+	if b.State == UsageNotApplicable {
+		return a
+	}
+
+	out := Usage{
+		State:            UsageKnown,
+		Source:           combineSource(a.Source, b.Source),
+		InputTokens:      sumInt64(a.InputTokens, b.InputTokens),
+		OutputTokens:     sumInt64(a.OutputTokens, b.OutputTokens),
+		ReasoningTokens:  sumInt64(a.ReasoningTokens, b.ReasoningTokens),
+		CacheReadTokens:  sumInt64(a.CacheReadTokens, b.CacheReadTokens),
+		CacheWriteTokens: sumInt64(a.CacheWriteTokens, b.CacheWriteTokens),
+		TotalTokens:      sumInt64(a.TotalTokens, b.TotalTokens),
+	}
+	if a.State != UsageKnown || b.State != UsageKnown {
+		out.State = UsageUnknown
+		out.Reason = combineReason(a.Reason, b.Reason)
+	}
+	out.Known = out.State == UsageKnown
+	out.CostUSD = sumFloat64(a.CostUSD, b.CostUSD)
+	if out.CostUSD != nil {
+		out.Currency = combineCurrency(a.Currency, b.Currency)
+	}
+	return out
+}
+
+func combineSource(a, b string) string {
+	switch {
+	case a == "":
+		return b
+	case b == "", a == b:
+		return a
+	default:
+		return a + "+" + b
+	}
+}
+
+func combineReason(a, b string) string {
+	switch {
+	case a == "":
+		return b
+	case b == "", a == b:
+		return a
+	default:
+		return a + "; " + b
+	}
+}
+
+func combineCurrency(a, b string) string {
+	switch {
+	case a == "":
+		return b
+	case b == "", a == b:
+		return a
+	default:
+		return ""
+	}
+}
+
+func sumInt64(a, b *int64) *int64 {
+	if a == nil {
+		return b
+	}
+	if b == nil {
+		return a
+	}
+	v := *a + *b
+	return &v
+}
+
+func sumFloat64(a, b *float64) *float64 {
+	if a == nil || b == nil {
+		return nil
+	}
+	v := *a + *b
+	return &v
+}
