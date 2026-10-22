@@ -1,0 +1,56 @@
+[
+  {
+    "name": "Verdict stated",
+    "score": 8,
+    "max": 8,
+    "note": "review.md opens with \"Verdict: Not acceptable. Do not merge as written.\" and §4 repeats \"Block the merge. Reject the module as written.\""
+  },
+  {
+    "name": "Identifies Nix store exposure",
+    "score": 14,
+    "max": 14,
+    "note": "Review explains the turn secret is interpolated at eval time into a world-readable store path via environment.etc, the systemd unit (\"the store path behind it... world-readable\") leaks JVB_XMPP_PASSWORD, and states \"the Nix store is world-readable by design\" (store paths 0444/0555)."
+  },
+  {
+    "name": "Flags both leak sites",
+    "score": 10,
+    "max": 10,
+    "note": "Dedicated sections trace JVB_XMPP_PASSWORD (git history, systemd unit Environment=, running process) and SHAREDTURNSECRET (git history, world-readable store path via environment.etc), so neither embedded secret is missed."
+  },
+  {
+    "name": "Recommends agenix or sops-nix",
+    "score": 16,
+    "max": 16,
+    "note": "§2 names agenix (or sops-nix) as the encrypted-at-rest/decrypted-at-activation pattern with committed .age files, explicitly rejecting value-based alternatives."
+  },
+  {
+    "name": "Correct consumption shape",
+    "score": 16,
+    "max": 16,
+    "note": "Corrected module sets environmentFile = config.age.secrets.jitsiVideobridgeEnv.path, and for the TURN secret says to \"hand the *path* to whatever consumes it\", stating nothing secret enters the store, unit file, or eval output."
+  },
+  {
+    "name": "Rejects the easy fix at filesystem level",
+    "score": 18,
+    "max": 18,
+    "note": "§3 states \"It does not solve the problem\" and that a Nix-path reference copies the plaintext into the store as a world-readable object, \"the chmod 600 on the working-tree copy is irrelevant to the store copy\"."
+  },
+  {
+    "name": "Declarative-not-imperative framing",
+    "score": 8,
+    "max": 8,
+    "note": "Recommendation is a declarative age.secrets.<name> declaration plus committed encrypted file and public-key map (secrets.nix), with runtime path consumption only via EnvironmentFile= rather than an escape-hatch script writing/sourcing secrets."
+  },
+  {
+    "name": "No invented commands",
+    "score": 5,
+    "max": 5,
+    "note": "All commands (agenix -e, nixos-rebuild dry-build) are framed as one-time/author-run steps, and the review closes with \"No network commands were run; this review is static.\""
+  },
+  {
+    "name": "Actionable correction for the author",
+    "score": 5,
+    "max": 5,
+    "note": "§4 gives numbered next steps (add agenix/sops-nix, path-based consumption for both secrets, rotate the two named values, validate with dry-build) backed by the concrete repo layout and module code in §2."
+  }
+]

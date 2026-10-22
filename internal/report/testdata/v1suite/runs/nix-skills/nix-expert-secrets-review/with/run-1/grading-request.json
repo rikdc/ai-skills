@@ -1,0 +1,106 @@
+{
+  "plugin": "nix-skills",
+  "scenario": "nix-expert-secrets-review",
+  "arm": "with",
+  "run": 1,
+  "criteria": {
+    "context": "Baseline failure mode: without the skill's secrets rule, an agent reviews the module as fine cosmetically ('it compiles') or accepts the teammate's chmod-600 + untracked plaintext file as a fix, because both look 'secure enough' at the filesystem level. The skill's documented rule is that everything in the Nix store is world-readable, so plaintext secrets in a .nix file are unacceptable regardless of file permissions, and agenix or sops-nix with path-reference consumption is the required pattern. Items below fail (0) on those baseline answers.",
+    "type": "weighted_checklist",
+    "checklist": [
+      {
+        "name": "Verdict stated",
+        "description": "review.md exists and states plainly that the change as written is not acceptable.",
+        "max_score": 8
+      },
+      {
+        "name": "Identifies Nix store exposure",
+        "description": "The review says the plaintext values land in the Nix store (through the systemd environment and the generated environment.etc file) and that the store is world-readable.",
+        "max_score": 14
+      },
+      {
+        "name": "Flags both leak sites",
+        "description": "Both embedded secrets (JVB_XMPP_PASSWORD and the turn secret) are identified as leaks; neither is missed.",
+        "max_score": 10
+      },
+      {
+        "name": "Recommends agenix or sops-nix",
+        "description": "The recommended pattern names agenix or sops-nix (an encrypted-secrets-in-repo solution), not 'move to an environment variable', 'chmod', or a vault-with-network-fetch scheme.",
+        "max_score": 16
+      },
+      {
+        "name": "Correct consumption shape",
+        "description": "The corrected module shows the service consuming the secret by path reference, e.g. an environmentFile / passwordFile / config.age.secrets.<name>.path style, never interpolating the decrypted value into the derivation or store.",
+        "max_score": 16
+      },
+      {
+        "name": "Rejects the easy fix at filesystem level",
+        "description": "The review states that an untracked, chmod 600 plaintext secrets.env does NOT solve the problem — once referenced by the store/derivation the value is world-readable again — rather than accepting it as adequate.",
+        "max_score": 18
+      },
+      {
+        "name": "Declarative-not-imperative framing",
+        "description": "The recommendation replaces the imperative value-in-module approach with a declarative encrypted-file declaration, not with an escape hatch such as a postStart script writing/sourcing the secret.",
+        "max_score": 8
+      },
+      {
+        "name": "No invented commands",
+        "description": "The review does not present commands claiming to have verified the build (it is an offline review), or, if it lists commands, they are framed as what the author should run, not as executed.",
+        "max_score": 5
+      },
+      {
+        "name": "Actionable correction for the author",
+        "description": "The review gives the module author concrete next steps (which tooling to add and how to re-key/migrate the two secrets), not just criticism.",
+        "max_score": 5
+      }
+    ]
+  },
+  "covered_by_checks": [],
+  "judgement_pending": [
+    {
+      "name": "Verdict stated",
+      "description": "review.md exists and states plainly that the change as written is not acceptable.",
+      "max_score": 8
+    },
+    {
+      "name": "Identifies Nix store exposure",
+      "description": "The review says the plaintext values land in the Nix store (through the systemd environment and the generated environment.etc file) and that the store is world-readable.",
+      "max_score": 14
+    },
+    {
+      "name": "Flags both leak sites",
+      "description": "Both embedded secrets (JVB_XMPP_PASSWORD and the turn secret) are identified as leaks; neither is missed.",
+      "max_score": 10
+    },
+    {
+      "name": "Recommends agenix or sops-nix",
+      "description": "The recommended pattern names agenix or sops-nix (an encrypted-secrets-in-repo solution), not 'move to an environment variable', 'chmod', or a vault-with-network-fetch scheme.",
+      "max_score": 16
+    },
+    {
+      "name": "Correct consumption shape",
+      "description": "The corrected module shows the service consuming the secret by path reference, e.g. an environmentFile / passwordFile / config.age.secrets.<name>.path style, never interpolating the decrypted value into the derivation or store.",
+      "max_score": 16
+    },
+    {
+      "name": "Rejects the easy fix at filesystem level",
+      "description": "The review states that an untracked, chmod 600 plaintext secrets.env does NOT solve the problem — once referenced by the store/derivation the value is world-readable again — rather than accepting it as adequate.",
+      "max_score": 18
+    },
+    {
+      "name": "Declarative-not-imperative framing",
+      "description": "The recommendation replaces the imperative value-in-module approach with a declarative encrypted-file declaration, not with an escape hatch such as a postStart script writing/sourcing the secret.",
+      "max_score": 8
+    },
+    {
+      "name": "No invented commands",
+      "description": "The review does not present commands claiming to have verified the build (it is an offline review), or, if it lists commands, they are framed as what the author should run, not as executed.",
+      "max_score": 5
+    },
+    {
+      "name": "Actionable correction for the author",
+      "description": "The review gives the module author concrete next steps (which tooling to add and how to re-key/migrate the two secrets), not just criticism.",
+      "max_score": 5
+    }
+  ],
+  "evidence": "runs/nix-skills/nix-expert-secrets-review/with/run-1"
+}

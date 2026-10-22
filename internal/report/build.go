@@ -178,6 +178,14 @@ func buildRun(ri model.RunInput, rubric []model.Criterion, names map[string]bool
 	if ri.JudgedItems != nil {
 		row.Judged = &model.ItemList{Items: ri.JudgedItems}
 	}
+	if ri.Status != string(model.StatusOK) {
+		// Accepted usage covers successful runs only. A failed attempt still
+		// contributes to expenditure, never to accepted score/cost.
+		row.Usage = model.NotApplicable("run not ok")
+		row.AgentUsage = model.NotApplicable("run not ok")
+		row.JudgeUsage = model.NotApplicable("run not ok")
+		row.CombinedUsage = model.NotApplicable("run not ok")
+	}
 	pendingPoints := 0.0
 	pendingCount := 0
 	for _, criterion := range rubric {

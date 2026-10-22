@@ -410,3 +410,108 @@ func TestRunnerFailureForcesIncomplete(t *testing.T) {
 		t.Fatalf("failure counts = %+v", got.Totals)
 	}
 }
+
+func TestFailedRunUsageIsExpenditureOnly(t *testing.T) {
+	rubric := []model.Criterion{{Name: "A", MaxScore: 100}}
+	in := input(rubric, []model.RunInput{
+		run("with", 1, "ok", []model.JudgedItem{{Name: "A", Score: 100, Max: 100}}),
+		run("without", 1, "agent-failed", nil),
+	}, "comparison", 1)
+	in.Attempts = []model.AttemptInput{
+		knownAttempt(5, 1000, 100, model.KindAgent),
+		knownAttempt(1, 100, 10, model.KindJudge),
+	}
+	got := report.Build(in)
+	if got.Cost.Without.Agent.Cost.Total != nil || got.Cost.Without.Agent.Cost.RunsKnown != 0 {
+		t.Fatalf("failed run leaked into accepted cost: %+v", got.Cost.Without.Agent)
+	}
+	if got.Cost.With.Agent.Cost.Total == nil || *got.Cost.With.Agent.Cost.Total != 0.01 {
+		t.Fatalf("accepted cost = %v", got.Cost.With.Agent.Cost.Total)
+	}
+	if got.Expenditure.KnownTotal.CostUSD == nil || *got.Expenditure.KnownTotal.CostUSD != 6 {
+		t.Fatalf("expenditure = %+v", got.Expenditure.KnownTotal)
+	}
+}
+
+func TestExpenditureRenderedInEveryFormat(t *testing.T) {
+	in := input([]model.Criterion{{Name: "A", MaxScore: 100}}, []model.RunInput{
+		run("with", 1, "ok", []model.JudgedItem{{Name: "A", Score: 100, Max: 100}}),
+		run("without", 1, "ok", []model.JudgedItem{{Name: "A", Score: 90, Max: 100}}),
+	}, "comparison", 1)
+	in.Attempts = []model.AttemptInput{
+		knownAttempt(0.02, 100, 10, model.KindAgent),
+		{Kind: model.KindAgent, Usage: model.Usage{State: model.UsageUnknown, Known: false}},
+		{Kind: model.KindJudge, Usage: model.Usage{State: model.UsageNotApplicable}},
+	}
+	got := report.Build(in)
+	if got.Expenditure.Complete {
+		t.Fatal("expenditure with an unknown attempt is not complete")
+	}
+	for name, doc := range map[string]string{
+		"cli":  report.RenderCLI(got, false),
+		"md":   report.RenderMarkdown(got),
+		"html": report.RenderHTML(got),
+	} {
+		if !strings.Contains(doc, "Expenditure") {
+			t.Errorf("%s: expenditure section missing", name)
+		}
+		if !strings.Contains(doc, "unknown") {
+			t.Errorf("%s: unknown attempt count missing", name)
+		}
+		if !strings.Contains(strings.ToLower(doc), "lower bound") {
+			t.Errorf("%s: lower-bound label missing", name)
+		}
+	}
+}
+
+func TestCompareWithholdsWallClockWhenScenariosAreExcluded(t *testing.T) {
+	rubric := []model.Criterion{{Name: "A", MaxScore: 100}}
+	baseInput := input(rubric, []model.RunInput{
+		run("with", 1, "ok", []model.JudgedItem{{Name: "A", Score: 100, Max: 100}}),
+		run("without", 1, "ok", []model.JudgedItem{{Name: "A", Score: 90, Max: 100}}),
+	}, "comparison", 1)
+	baseInput.State.DurationSeconds = fptr(10)
+	base := report.Build(baseInput)
+
+	currentInput := input(rubric, []model.RunInput{
+		run("with", 1, "ok", []model.JudgedItem{{Name: "A", Score: 100, Max: 100}}),
+		run("without", 1, "ok", []model.JudgedItem{{Name: "A", Score: 95, Max: 100}}),
+	}, "comparison", 1)
+	currentInput.State.DurationSeconds = fptr(20)
+	currentInput.Scenarios = append(currentInput.Scenarios, model.ScenarioInput{
+		Plugin: "demo", Scenario: "extra", Mode: "comparison", Rubric: rubric,
+		Runs: []model.RunInput{
+			run("with", 1, "ok", []model.JudgedItem{{Name: "A", Score: 100, Max: 100}}),
+			run("without", 1, "ok", []model.JudgedItem{{Name: "A", Score: 100, Max: 100}}),
+		},
+	})
+	comparison := report.Compare(report.Build(currentInput), base)
+	if comparison.Delta.WallSeconds != nil {
+		t.Fatalf("wall-clock delta was not withheld: %v", *comparison.Delta.WallSeconds)
+	}
+	if comparison.Status != "comparable" || comparison.ComparableScenarios != 1 {
+		t.Fatalf("comparison = %+v", comparison)
+	}
+}
+
+func TestBaselineNotComparableWhenCurrentIsNotOK(t *testing.T) {
+	rubric := []model.Criterion{{Name: "A", MaxScore: 100}}
+	base := report.Build(input(rubric, []model.RunInput{
+		run("with", 1, "ok", []model.JudgedItem{{Name: "A", Score: 100, Max: 100}}),
+		run("without", 1, "ok", []model.JudgedItem{{Name: "A", Score: 90, Max: 100}}),
+	}, "comparison", 1))
+	current := report.Build(input(rubric, []model.RunInput{
+		run("with", 1, "agent-failed", []model.JudgedItem{{Name: "A", Score: 100, Max: 100}}),
+		run("without", 1, "ok", []model.JudgedItem{{Name: "A", Score: 90, Max: 100}}),
+	}, "comparison", 1))
+	comparison := report.Compare(current, base)
+	if comparison.Comparable || comparison.Status != "not comparable" {
+		t.Fatalf("comparison = %+v", comparison)
+	}
+	if comparison.Delta.Effect != nil || comparison.Delta.WithScore != nil {
+		t.Fatal("baseline deltas must be withheld without a comparable scenario")
+	}
+	if len(comparison.Excluded) != 1 || comparison.Excluded[0].Reason != "not comparable in current" {
+		t.Fatalf("excluded = %+v", comparison.Excluded)
+	}
+}

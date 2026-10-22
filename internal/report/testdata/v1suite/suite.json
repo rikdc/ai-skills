@@ -1,0 +1,15 @@
+{
+  "counts": {
+    "planned": 1,
+    "executed": 1,
+    "skipped": 0,
+    "runner_failures": 0,
+    "agent_invocations": 2,
+    "judged_runs": 2,
+    "pending_runs": 0,
+    "cost_known_runs": 2,
+    "cost_total_runs": 2,
+    "duration_seconds": 300,
+    "timed_out_runs": 0
+  }
+}

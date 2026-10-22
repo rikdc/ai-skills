@@ -1,0 +1,27 @@
+{
+  "plugin": "nix-skills",
+  "scenario": "nix-expert-secrets-review",
+  "arm": "with",
+  "run": 1,
+  "agent_exit": 0,
+  "timed_out": false,
+  "duration_seconds": 145,
+  "mechanical": {
+    "score": 0,
+    "max": 0,
+    "items": null
+  },
+  "usage": {
+    "input_tokens": 37161,
+    "output_tokens": 3208,
+    "reasoning_tokens": 6118,
+    "cache_read_tokens": 160432,
+    "cache_write_tokens": 0,
+    "total_tokens": 206919,
+    "cost_usd": 0.01505011,
+    "known": true,
+    "source": "opencode-json",
+    "currency": "USD"
+  },
+  "evidence": "runs/nix-skills/nix-expert-secrets-review/with/run-1"
+}

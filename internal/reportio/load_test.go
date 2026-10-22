@@ -1,6 +1,8 @@
 package reportio_test
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -357,7 +359,8 @@ func newV3Suite(t *testing.T) string {
 			SchemaVersion: 3, AttemptID: "agent-000001", Kind: model.KindAgent,
 			FinishedAt: "2026-02-02T00:00:20Z", Status: model.StatusOK,
 			StopReason: model.StopCompleted, ChecksStatus: model.ChecksOK,
-			Usage: model.Usage{State: model.UsageKnown, Known: true, Source: "x"},
+			DurationSeconds: ptrFloat(21.5),
+			Usage:           model.Usage{State: model.UsageKnown, Known: true, Source: "x"},
 		})
 		writeJSON(t, filepath.Join(runDir, "attempts", "agent-000001", "usage.json"), model.Usage{
 			State: model.UsageKnown, Known: true, Source: "x",
@@ -386,6 +389,17 @@ func newV3Suite(t *testing.T) string {
 		SchemaVersion: 3, AttemptID: "judge-000002", Kind: model.KindJudge,
 		StartedAt: "2026-02-02T00:00:20Z",
 	})
+	writeJSON(t, filepath.Join(judgeDir, "judge-usage.json"), model.Usage{
+		State: model.UsageKnown, Known: true, Source: "judge",
+		CostUSD: ptrFloat(0.005), TotalTokens: ptrInt(50),
+	})
+	judgementPath := filepath.Join(judgeDir, "judgement.json")
+	writeJSON(t, judgementPath, []model.JudgedItem{{Name: "B", Score: 30, Max: 40}})
+	judgementData, err := os.ReadFile(judgementPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	judgementSHA := sha256.Sum256(judgementData)
 	writeJSON(t, filepath.Join(judgeDir, "finished.json"), model.FinishedAttempt{
 		SchemaVersion: 3, AttemptID: "judge-000002", Kind: model.KindJudge,
 		FinishedAt: "2026-02-02T00:00:26Z", Status: model.StatusOK,
@@ -394,12 +408,8 @@ func newV3Suite(t *testing.T) string {
 		GradedEvidenceSHA256: "ev1",
 		GradingRequestSHA256: "req1",
 		JudgeIdentitySHA256:  "jid",
+		JudgementSHA256:      hex.EncodeToString(judgementSHA[:]),
 	})
-	writeJSON(t, filepath.Join(judgeDir, "judge-usage.json"), model.Usage{
-		State: model.UsageKnown, Known: true, Source: "judge",
-		CostUSD: ptrFloat(0.005), TotalTokens: ptrInt(50),
-	})
-	writeJSON(t, filepath.Join(judgeDir, "judgement.json"), []model.JudgedItem{{Name: "B", Score: 30, Max: 40}})
 	writeJSON(t, filepath.Join(judgeDir, "judge-result.json"), map[string]any{"duration_seconds": 6.0})
 
 	interrupted := filepath.Join(dir, "runs", "demo", "v3case", "with", "run-1", "attempts", "agent-000003")

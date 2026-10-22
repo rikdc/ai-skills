@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "created_at": "2026-10-19T14:23:44Z",
+  "config": {
+    "agent_cmd": "opencode run --auto --format json -m opencode-go/glm-5.3-flash \"$(cat)\"",
+    "arm": "both",
+    "runs": 1,
+    "timeout": 900,
+    "skill_dir": ".claude/skills",
+    "auth": 1,
+    "auth_paths": [],
+    "units": [
+      "skills/nix-expert"
+    ],
+    "harness": "46e3a31804f2daa22283cca3faeb18495eb178c6a9e8655a1b1bf92722cd0032",
+    "judge_cmd": "opencode run --auto --format json -m opencode-go/glm-5.3-flash \"$(cat)\"",
+    "usage_cmd": "",
+    "judge_usage_cmd": "",
+    "judge_timeout": 600,
+    "git_sha": "60b7a86",
+    "git_dirty": true
+  },
+  "scenarios": [
+    {
+      "plugin": "nix-skills",
+      "scenario": "nix-expert-secrets-review",
+      "fingerprint": "01f6a0efc819a5aa60e99fff121dd376c9546ebe8deea5cda28e24365023623c",
+      "units": [
+        "skills/nix-expert"
+      ]
+    }
+  ]
+}

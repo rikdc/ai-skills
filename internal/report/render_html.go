@@ -151,6 +151,7 @@ func RenderHTML(report model.Report) string {
 			b.WriteString("<p class=\"note\">Efficiency: — (partial cost coverage or no positive score delta).</p>\n")
 		}
 	}
+	b.WriteString(renderExpenditureHTML(report))
 	b.WriteString(renderComparisonHTML(report))
 
 	b.WriteString("<h2>Timing</h2>\n")
@@ -166,6 +167,26 @@ func RenderHTML(report model.Report) string {
 			urlEscape(sc.Plugin), urlEscape(sc.Scenario), esc(sc.Plugin), esc(sc.Scenario))
 	}
 	b.WriteString("<li><a href=\"report.json\">report.json</a></li>\n</ul>\n</body>\n</html>\n")
+	return b.String()
+}
+
+func renderExpenditureHTML(report model.Report) string {
+	e := report.Expenditure
+	if e.TotalAttempts == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("<h2>Expenditure</h2>\n")
+	b.WriteString("<table><thead><tr><th>Attempts</th><th>Agent</th><th>Hook</th><th>Judge</th><th>Known</th><th>Unknown</th><th>Not applicable</th><th>Known total</th></tr></thead><tbody>\n")
+	fmt.Fprintf(&b, "<tr><td class=\"num\">%d</td><td class=\"num\">%d</td><td class=\"num\">%d</td><td class=\"num\">%d</td><td class=\"num\">%d</td><td class=\"num\">%d</td><td class=\"num\">%d</td><td class=\"num\">%s</td></tr>\n",
+		e.TotalAttempts, e.AgentAttempts, e.HookAttempts, e.JudgeAttempts,
+		e.KnownAttempts, e.UnknownAttempts, e.NotApplicableAttempts, fmtMoney(e.KnownTotal.CostUSD))
+	b.WriteString("</tbody></table>\n")
+	if e.Complete {
+		b.WriteString("<p class=\"note\">Every applicable attempt has known usage. Expenditure includes superseded, failed and regraded attempts.</p>\n")
+	} else {
+		b.WriteString("<p class=\"note\">The known total is a lower bound: at least one applicable attempt has unknown usage. Unknown is never counted as zero.</p>\n")
+	}
 	return b.String()
 }
 

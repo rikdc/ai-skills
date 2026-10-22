@@ -55,6 +55,14 @@ Efficiency: — (partial cost coverage or no positive score delta).
 
 Cost totals include functional runs; delta and efficiency use comparison scenarios only.
 
+## Expenditure
+
+| Attempts | Agent | Hook | Judge | Known | Unknown | Not applicable | Known total |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 4 | 2 | 0 | 2 | 2 | 1 | 1 | $0.012 |
+
+The known total is a lower bound: at least one applicable attempt has unknown usage. Unknown is never counted as zero.
+
 ## Timing
 
 - Wall clock: 43s

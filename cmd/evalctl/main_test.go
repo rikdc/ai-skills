@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -42,5 +43,24 @@ func TestRunPrintsCommandErrorsOnce(t *testing.T) {
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("version wrote to stderr: %q", stderr.String())
+	}
+}
+
+func TestReportExitCodes(t *testing.T) {
+	var stderr bytes.Buffer
+	missing := filepath.Join(t.TempDir(), "missing")
+	if code := runWithStderr([]string{"report", missing}, &stderr); code != 1 {
+		t.Fatalf("missing suite exit code = %d, want 1", code)
+	}
+	if !strings.Contains(stderr.String(), "no such suite directory") {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+
+	stderr.Reset()
+	if code := runWithStderr([]string{"report", missing, "--format", "yaml"}, &stderr); code != 2 {
+		t.Fatalf("bad format exit code = %d, want 2", code)
+	}
+	if !strings.Contains(stderr.String(), "--format must be") {
+		t.Fatalf("stderr = %q", stderr.String())
 	}
 }

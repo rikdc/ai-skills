@@ -101,6 +101,23 @@ func RenderCLI(report model.Report, color bool) string {
 		}
 	}
 
+	if report.Expenditure.TotalAttempts > 0 {
+		e := report.Expenditure
+		fmt.Fprintf(&b, "\n%s\n", bold("1", "Expenditure (all immutable attempts)"))
+		fmt.Fprintf(&b, "  attempts %d · agent %d · hook %d · judge %d\n",
+			e.TotalAttempts, e.AgentAttempts, e.HookAttempts, e.JudgeAttempts)
+		fmt.Fprintf(&b, "  known %d · unknown %d · not applicable %d · known total %s",
+			e.KnownAttempts, e.UnknownAttempts, e.NotApplicableAttempts, fmtMoney(e.KnownTotal.CostUSD))
+		if e.Complete {
+			b.WriteString(" (complete)\n")
+		} else {
+			b.WriteString(" (lower bound; unknown usage is never zero)\n")
+		}
+		if report.Totals.Functional > 0 {
+			b.WriteString("  Includes functional runs and superseded/regraded attempts.\n")
+		}
+	}
+
 	b.WriteString(renderComparisonCLI(report))
 
 	fmt.Fprintf(&b, "\n%s\n", bold("1", "Timing"))
