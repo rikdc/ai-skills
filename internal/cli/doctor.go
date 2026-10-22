@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/rikdc/ai-skills/internal/config"
 	"github.com/rikdc/ai-skills/internal/platform/errs"
 )
 
@@ -36,6 +37,27 @@ func newDoctorCommand(opts *GlobalOptions) *cobra.Command {
 
 			fmt.Fprintf(out, "api key env: EVALCTL_API_KEY=%s OPENAI_API_KEY=%s\n",
 				presence("EVALCTL_API_KEY"), presence("OPENAI_API_KEY"))
+			backend := config.ResolveString("", false, "command", os.Getenv, "EVALCTL_BACKEND")
+			modelName := os.Getenv("EVALCTL_MODEL")
+			if modelName == "" {
+				modelName = "(unset)"
+			}
+			baseURL := os.Getenv("EVALCTL_OPENAI_BASE_URL")
+			if baseURL == "" {
+				baseURL = os.Getenv("OPENAI_BASE_URL")
+			}
+			if baseURL == "" {
+				baseURL = "https://api.openai.com/v1"
+			}
+			apiKeyEnv := os.Getenv("EVALCTL_API_KEY_ENV")
+			if apiKeyEnv == "" {
+				apiKeyEnv = "(default: EVALCTL_API_KEY then OPENAI_API_KEY)"
+			}
+			fmt.Fprintf(out, "backend: %s\n", backend)
+			fmt.Fprintf(out, "model: %s\n", modelName)
+			fmt.Fprintf(out, "base url: %s\n", baseURL)
+			fmt.Fprintf(out, "api key env var: %s\n", apiKeyEnv)
+			fmt.Fprintf(out, "archive limits: snapshot %d MiB\n", 256)
 
 			if !bashOK {
 				return errs.Operational("required tool missing: bash")
