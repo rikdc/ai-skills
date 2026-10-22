@@ -17,7 +17,7 @@ Worked example: `plugins/git-workflow/evals/`.
 
 ## Deterministic gate
 
-`tests/test-evals.sh`, run by `make test` and in CI: scenario layout and
+`bin/evalctl check`, run by `make test` and in CI: scenario layout and
 naming, unit metadata (every declared skill/command/hook must exist), rubric
 arithmetic, fixture hygiene, plugin manifests, and skill frontmatter
 conventions. `--changes <ref>` lists the skills and scenarios a ref touched.
@@ -28,7 +28,7 @@ Running an eval needs a model, so it happens on a contributor's machine, never
 in CI:
 
 ```bash
-scripts/eval-run.sh --plugin git-workflow --scenario pr-draft-read-replica \
+bin/evalctl run --plugin git-workflow --scenario pr-draft-read-replica \
     --agent-cmd 'claude -p'
 ```
 
@@ -56,9 +56,9 @@ genuinely exercises several units. Pass `--unit` (repeatable) to install only
 the selected units in the with-arm:
 
 ```bash
-scripts/eval-run.sh --plugin git-workflow --scenario pr-draft-read-replica \
+bin/evalctl run --plugin git-workflow --scenario pr-draft-read-replica \
     --agent-cmd 'claude -p' --unit skills/pr
-scripts/eval-run.sh --plugin code-quality --scenario review-empty-changeset \
+bin/evalctl run --plugin code-quality --scenario review-empty-changeset \
     --agent-cmd 'claude -p' --unit commands/review
 ```
 
@@ -77,18 +77,18 @@ command in the plugin.
 The workspace `HOME` starts empty, so tools that write to `$HOME` land in the
 workspace rather than your home directory. That redirection is not filesystem
 isolation: absolute paths still reach the host. Immediately before the agent
-runs, login state for the common CLIs
+runs, `--auth-cli` copies login state for the common CLIs
 (`~/.claude.json`, `~/.claude/.credentials.json`, `~/.codex/auth.json`,
 `~/.config/gh/hosts.yml`, `~/.local/share/opencode/auth.json`, and their
-settings) is copied in, and on macOS the login Keychains directory is linked
-into the workspace because the CLI looks it up under `$HOME/Library`. That
+settings) into the workspace, and `--keychain` links the macOS login Keychains
+directory into it because the CLI looks it up under `$HOME/Library`. That
 symlink grants the agent full access to your keychains, so it is a deliberate
-tradeoff for authenticated runs. `--no-auth` skips the credential copying and
-the link; it does not isolate the process. The copied files and link are
+tradeoff for authenticated runs. Without `--auth-cli` no credentials are
+copied and the process is not isolated. The copied files and link are
 deleted again as soon as the agent exits (or on interrupt), and `home/` is
 excluded from the evidence bundle. Pass `--auth-path PATH` (repeatable) for
 any other credential or config file under your home; a suite forwards every
-path. Pass `--no-auth` when the agent authenticates from the environment (for
+path. Omit `--auth-cli` when the agent authenticates from the environment (for
 example an API key).
 
 Any agent CLI works if it reads the task on **stdin**, does its work in the
@@ -96,7 +96,7 @@ Any agent CLI works if it reads the task on **stdin**, does its work in the
 prompt as an argument, wrap it:
 
 ```bash
-scripts/eval-suite.sh --agent-cmd 'opencode run --auto "$(cat)"'
+bin/evalctl suite --agent-cmd 'opencode run --auto "$(cat)"'
 ```
 
 The with-arm writes the plugin's skills to `--skill-dir` and its commands to
@@ -117,35 +117,35 @@ eval credits are involved: the only cost is whatever `--agent-cmd` charges.
 
 ```bash
 # What would run, and how many agent invocations it costs
-scripts/eval-suite.sh --agent-cmd 'claude -p' --plan
+bin/evalctl suite --agent-cmd 'claude -p' --plan
 
 # Everything, four scenarios at a time
-scripts/eval-suite.sh --agent-cmd 'claude -p' --jobs 4
+bin/evalctl suite --agent-cmd 'claude -p' --jobs 4
 
 # Only the plugins and scenarios a ref touched (plus the working tree)
-scripts/eval-suite.sh --agent-cmd 'claude -p' --changed origin/main
+bin/evalctl suite --agent-cmd 'claude -p' --changed origin/main
 
 # One plugin, with a model grading every run it finishes
-scripts/eval-suite.sh --agent-cmd 'claude -p' --plugin git-workflow \
+bin/evalctl suite --agent-cmd 'claude -p' --plugin git-workflow \
     --judge-cmd 'claude -p --permission-mode acceptEdits'
 
 # One unit, across every scenario that declares it
-scripts/eval-suite.sh --agent-cmd 'claude -p' --unit skills/pr
-scripts/eval-suite.sh --agent-cmd 'claude -p' --plugin code-quality \
+bin/evalctl suite --agent-cmd 'claude -p' --unit skills/pr
+bin/evalctl suite --agent-cmd 'claude -p' --plugin code-quality \
     --unit commands/review
 
 # A deterministic slice, for fanning out across machines
-scripts/eval-suite.sh --agent-cmd 'claude -p' --shard 1/3
+bin/evalctl suite --agent-cmd 'claude -p' --shard 1/3
 ```
 
 Selection is every `plugins/*/evals/*/` scenario, narrowed by `--plugin`
 (repeatable), `--unit` (repeatable), `--scenario` (a regex over
 `plugin/scenario`), `--changed REF`, and `--shard I/N`. `--unit` keeps only
 scenarios whose declared `unit`/`units` include the request and forwards the
-intersection to every `eval-run.sh`, so the with-arm installs exactly the unit
+intersection to every `bin/evalctl run`, so the with-arm installs exactly the unit
 being measured. A scenario without unit metadata is rejected when `--unit` is
 used. Execution is `--arm`, `--runs`, `--jobs`, and `--timeout`; staging and
-scoring still happen in `eval-run.sh`.
+scoring still happen in `bin/evalctl run`.
 
 `--jobs` parallelizes scenarios, not the arms or runs inside one scenario. A
 three-scenario, three-run, both-arm suite is 18 agent invocations plus up to 18
@@ -167,7 +167,7 @@ Each suite writes one directory under `results/eval-suite/`:
 | `summary.md` | per-plugin and per-scenario with/without table |
 | `criteria/` | the rubric each scenario ran with, so reports stay readable |
 | `grading/index.tsv` | every run whose criteria are still pending |
-| `runs/`, `logs/` | the evidence `eval-run.sh` produced, per-run `usage.json`/`judge-usage.json`, and per-scenario logs |
+| `runs/`, `logs/` | the evidence `bin/evalctl run` produced, per-run `usage.json`/`judge-usage.json`, and per-scenario logs |
 
 `--resume --out DIR` skips a scenario only when its result files exist **and**
 its fingerprint still matches. It also requires the same units, agent, arm,
@@ -184,10 +184,9 @@ still pending or a scenario scores no better with its unit than without it.
 
 ## evalctl (Milestone A)
 
-`make eval` now runs `evalctl`, the Go harness under `cmd/evalctl` and
-`internal/`. The shell harness is still installed and is the documented
-fallback, so both paths read the same `plugins/*/evals/` scenarios and both
-remain reportable. Nothing was deleted in the cutover.
+`make eval` runs `evalctl`, the Go harness under `cmd/evalctl` and
+`internal/`. It reads the `plugins/*/evals/` scenarios and renders their
+reports.
 
 Milestone A is the **command backend**: `--agent-cmd` and `--judge-cmd` are
 the only real backends. It does not call a model API and does not execute
@@ -204,8 +203,6 @@ make evalctl-test        # go test ./...
 make evalctl-check       # gofmt check, go vet ./..., evalctl check
 make evalctl-selftest    # deterministic end-to-end run + every fixture setup
 make check               # evalctl-check + evalctl-selftest
-
-make evalctl-parity      # shell-vs-Go selection, plan, gate, and stub campaigns
 ```
 
 `evalctl selftest --quick` skips repository fixture coverage when you want a
@@ -223,18 +220,16 @@ bin/evalctl report results/eval-suite/<stamp>-<sha> --format all
 ```
 
 The command adapter passes the prompt on stdin and runs in the temporary
-workspace, exactly like `eval-run.sh`. `bin/evalctl suite` keeps credentials
-off by default: `--auth-cli` copies the known CLI login state, `--keychain`
-links the macOS Keychains directory, and `--auth-path` adds one path.
+workspace. `bin/evalctl suite` keeps credentials off by default: `--auth-cli`
+copies the known CLI login state, `--keychain` links the macOS Keychains
+directory, and `--auth-path` adds one path.
 
-`make eval` opts in for you, because the shell harness it replaces copies CLI
-login state by default (`scripts/eval-suite.sh` `AUTH=1`) and most agent CLIs
-cannot run without it. Set `AUTH_CLI=0` to run without credentials,
-`AUTH_CLI=1` (the default) to copy them, `AUTH_PATH=<relative path>` to add
-files, and `KEYCHAIN=1` to link the macOS Keychains directory (`KEYCHAIN=1`
-requires the evalctl backend). If a credential file cannot be read, the
-suite-level error names it instead of only counting failed runs. The legacy
-shell path keeps its own default (`--no-auth` disables it).
+`make eval` opts in for you, because most agent CLIs cannot run without
+credentials. Set `AUTH_CLI=0` to run without credentials, `AUTH_CLI=1` (the
+default) to copy them, `AUTH_PATH=<relative path>` to add files, and
+`KEYCHAIN=1` to link the macOS Keychains directory. If a credential file
+cannot be read, the suite-level error names it instead of only counting failed
+runs.
 
 `suite` and `run` also report progress on stderr while they work — one line per
 event (`scenario started`, `run started`, `run finished`, `judge started`,
@@ -253,123 +248,10 @@ over the runs this pass executes, and `scenario started`/`scenario finished`
 include `progress="i/N"` over the scenarios that will run. A run skipped by
 resume consumes no position, so the denominator stays honest.
 
-### `make eval` cutover and `EVALCTL_LEGACY=1`
+### History
 
-`make eval` keeps its existing variables and maps them to the Go suite and
-report:
-
-| Make variable | evalctl flag |
-| --- | --- |
-| `PLUGIN` | `--plugin` |
-| `SKILL=<name>` / `UNIT=<unit>` | `--unit skills/<name>` / `--unit <unit>` |
-| `RUNS` / `JOBS` | `--runs` / `--jobs` |
-| `TIMEOUT` | `--timeout` (duration or seconds) |
-| `AGENT` / `JUDGE` | `--agent-cmd` / `--judge-cmd` |
-| `USAGE_CMD` / `JUDGE_USAGE_CMD` | `--usage-cmd` / `--judge-usage-cmd` |
-| `AUTH_CLI=1` (default) / `AUTH_CLI=0` | `--auth-cli` / no credential flag |
-| `AUTH_PATH=<relative path>...` | `--auth-path` (repeatable) |
-| `KEYCHAIN=1` | `--keychain` (evalctl backend only) |
-| `OUT=<dir>` | `--out` (reuse that suite directory; report goes to `<dir>/report`) |
-| `RESUME=1` / `RESUME_POLICY` | `--resume` / `--resume-policy` (default `retry-failed`) |
-| `DRY=1` | `suite --plan` (no agent, no writes) |
-| `REPORT` | `report --format` |
-
-`make eval` renders the report even when the suite fails. A suite with runner
-failures (a timed-out or failed agent run) still writes `manifest.json`,
-`results.jsonl`, `summary.md` and the report, and make then exits with the
-suite's exit code; only a suite that dies before writing any artifact skips
-the report, and its own error is what you see.
-
-A partial suite is resumed, not re-run. `summary.md` and the suite-level error
-both name the fix: `evalctl suite --resume --resume-policy retry-failed` with
-the suite's own recorded configuration. The summary prints the whole command
-in a copy-pasteable fence, and `make eval` takes the same thing:
-
-```bash
-make eval OUT=results/eval-suite/<stamp> RESUME=1 PLUGIN=git-workflow SKILL=pr RUNS=1 \
-  AGENT='claude -p' AUTH_CLI=0
-```
-
-`RESUME=1` requires `OUT` (a resume reuses the existing directory) and only
-re-runs the runs without an accepted attempt; every accepted run and
-judgement is reused. `RESUME_POLICY` selects the policy (`retry-failed` by
-default, or `keep-failures`/`rerun-all`) and the credential flags still apply,
-but operational caps may change: `JOBS` and the per-run timeouts (`TIMEOUT`,
-`--timeout`, `--judge-timeout`) are not part of the measured contract, so a
-retry that keeps timing out can be given a longer cap instead of starting over.
-The suite reports the difference (`resume timeouts differ from the recorded
-suite`) rather than refusing it. Everything that defines the experiment — the
-agent and judge commands with the judge identity, the arm, `RUNS`, the units
-and the credential mode — must match exactly, and a mismatch is refused with
-the differing fields named.
-
-Two traps when setting these from a shell:
-
-- `RUNS` is only read from the make command line. `RUNS=3 make eval ...` puts it
-  in the environment, where `RUNS := 1` discards it silently (Make now warns);
-  write `make eval ... RUNS=3` instead. `JOBS` and `TIMEOUT` behave the same
-  way: pass all three on the make command line.
-- `TIMEOUT` is a duration (`15m`, `90s`) or a number of seconds and defaults to
-  `15m`. The legacy shell harness only takes whole seconds, so
-  `EVALCTL_LEGACY=1` forwards `TIMEOUT` when it is a plain integer and warns
-  that it is ignoring a duration otherwise.
-- Make expands `$(...)` before the shell sees it, so `AGENT='... "$(cat)"'`
-  arrives as `""`. Use the double-dollar form `AGENT='opencode run --auto
-  "$$(cat)"'`; `make eval` rejects the empty-quoted form instead of running an
-  agent with no prompt.
-
-A with-arm run that never invokes the scenario's skill leaves the scenario
-excluded from the headline with/without delta and reported as `incomplete`,
-since the comparison then holds the agent on both sides. The suite warns as it
-runs, lists the scenario under `Skill not exercised` in `summary.md`, and fails
-under `--strict`; rerun with `RUNS>=3` to see whether it was a one-off.
-
-The legacy shell path stays available at any time:
-
-```bash
-EVALCTL_LEGACY=1 make eval PLUGIN=git-workflow RUNS=1 DRY=1
-EVALCTL_LEGACY=1 make eval PLUGIN=git-workflow SKILL=pr AGENT='claude -p'
-```
-
-A real run writes to `results/eval-suite/<timestamp>-<sha>-<pid>/` and prints
-the report plus the HTML path, the same contract as before. Go suites use v3
-attempt directories under `runs/<plugin>/<scenario>/<arm>/run-N/attempts/`;
-`evalctl report` and `eval-report.sh` both read the accepted artifacts.
-
-### Rollback checkpoint
-
-Tag `evalctl-a-parity` is the pre-cutover checkpoint (create it on the commit
-before the cutover). The documented rollback is:
-
-```bash
-EVALCTL_LEGACY=1 make eval ...     # keep working immediately
-```
-
-or revert the cutover commit, not the attempt/report work. There is no
-destructive migration: old shell suite directories remain reportable, and a
-v3 resume uses a new `--out` directory. Deletion criteria for the shell
-orchestration are: all Milestone A gates pass for two consecutive parity
-campaigns, Go tests cover the shell assertions, one release has shipped both
-paths, and the rollback tag has been exercised once.
-
-### Parity gate
-
-`tests/test-evalctl-parity.sh` (run by `make evalctl-parity` and CI) compares
-the shell and Go harnesses with no model or network:
-
-- selection for every scenario and for `--plugin`, `--unit`, `--scenario`,
-  and `--shard 1/4` / `3/4`;
-- full and filtered plan output, including invocation counts;
-- `tests/test-evals.sh` vs `evalctl check`, including `--changes HEAD`;
-- a comparison scenario (`git-workflow/pr-draft-read-replica`) and a
-  functional hook scenario (`security-hooks/scanner-clean-payload-allowed`)
-  run with agent `true`, comparing status, arm/run results, mechanical
-  scores, pending counts, suite counts, criteria, and the grading index.
-
-Recorded result on the Milestone A cutover: **20 checks passed, 0 failed**
-across the 65 repository scenarios. Evidence-path differences are excluded by
-design: the shell writes a run directory and v3 writes an attempt evidence
-path. Formatting and version fields are not compared.
+The shell harness was removed after Milestone A; the shell/evalctl parity gate
+went with it. The `evalctl-a-parity` tag remains as a historical checkpoint.
 
 ### Evaluating the Go code
 
@@ -387,14 +269,11 @@ path. Formatting and version fields are not compared.
 - `internal/selftest`: the synthetic end-to-end fixture.
 
 Run `go test ./...`, `go test -race ./...` (Linux), `go vet ./...`, and
-`gofmt -l cmd internal` to check it. `internal/report/parity_test.go`,
-`internal/report/v3_parity_test.go`, and `tests/test-evalctl-parity.sh` are
-the shell-parity oracles.
+`gofmt -l cmd internal` to check it.
 
 ## `make eval` and the report
 
-`make eval` wraps the suite and the report renderer. It uses `evalctl` unless
-`EVALCTL_LEGACY=1` is set. `SKILL=<name>` is shorthand for
+`make eval` wraps the suite and the report renderer. `SKILL=<name>` is shorthand for
 `--unit skills/<name>`; `UNIT=` names any skill, command or hook. `PLUGIN`,
 `RUNS`, `JOBS`, `TIMEOUT`, `AGENT`, `JUDGE`, `DRY` and `REPORT` map to the
 suite options and the report format. `AGENT` is required for a real run and
@@ -418,7 +297,7 @@ last example. The target captures the suite directory it creates (it never
 picks the newest directory in `results/`), renders the report, and prints the
 CLI report plus the HTML path.
 
-`scripts/eval-report.sh SUITE_DIR [--format cli|json|md|html|all] [--no-color]
+`bin/evalctl report SUITE_DIR [--format cli|json|md|html|all] [--no-color]
 [--out DIR] [--baseline DIR]` is read-only. It never reruns an eval or calls a
 model. `--baseline` compares the suite with an earlier one: score, per-run
 cost, and input/output token deltas for the whole suite and for each scenario
@@ -489,9 +368,8 @@ after the fact reports its judged runs, scores and attempt totals instead of
 the pre-grade state. The recorded duration and planned/executed counts are
 kept.
 
-The largest jq programs live in `scripts/jq/` and load with `jq -f`; the shell
-scripts keep selection, staging and rendering. Both use `set -u`/`pipefail` to
-match the rest of the harness.
+Selection, staging and rendering live in Go under `cmd/evalctl` and
+`internal/`.
 
 ## Cost and tokens
 
@@ -500,22 +378,22 @@ usage hook:
 
 ```bash
 # opencode: one JSONL step_finish event per step
-scripts/eval-run.sh --plugin git-workflow --scenario pr-draft-read-replica \
+bin/evalctl run --plugin git-workflow --scenario pr-draft-read-replica \
     --agent-cmd 'opencode run --auto --format json "$(cat)"'
 
 # Claude: one result object with total_cost_usd and usage
-scripts/eval-run.sh --plugin git-workflow --scenario pr-draft-read-replica \
+bin/evalctl run --plugin git-workflow --scenario pr-draft-read-replica \
     --agent-cmd 'claude -p --output-format json'
 ```
 
-`scripts/eval-usage.sh` parses `agent.log` and `judge.log` into
+`evalctl` parses `agent.log` and `judge.log` into
 `usage.json`/`judge-usage.json`. It understands opencode's JSONL
 `step_finish` events and Claude's result object; anything else is unknown.
 Unknown is reported as `known:false`, never as zero. A CLI whose schema is not
 built in (for example Codex) can supply a hook:
 
 ```bash
-scripts/eval-suite.sh --agent-cmd 'codex exec -' \
+bin/evalctl suite --agent-cmd 'codex exec -' \
     --usage-cmd './scripts/my-usage-hook.sh' \
     --judge-cmd 'claude -p --output-format json' \
     --judge-usage-cmd './scripts/my-judge-usage-hook.sh'
@@ -541,7 +419,7 @@ changes the verdict.
 Compare a fresh run with a baseline to see what changed:
 
 ```bash
-scripts/eval-report.sh results/eval-suite/<new> \
+bin/evalctl report results/eval-suite/<new> \
     --baseline results/eval-suite/<old> --format all
 ```
 
@@ -555,13 +433,13 @@ instead of subtracting different workloads.
 
 ## Grading pending criteria
 
-`scripts/eval-grade.sh` is the judgement half of a run. It builds a prompt from
+`bin/evalctl grade` is the judgement half of a run. It builds a prompt from
 `grading-request.json`, runs your judge command with the evidence directory as
 its working directory, and accepts `judgement.json` only when it covers exactly
 the pending criteria with the rubric's own maxima.
 
 ```bash
-scripts/eval-grade.sh --suite results/eval-suite/<id> \
+bin/evalctl grade --suite results/eval-suite/<id> \
     --judge-cmd 'claude -p --permission-mode acceptEdits'
 ```
 
@@ -570,13 +448,6 @@ folds accepted judgements into the percentages without rerunning the agent.
 `judge-result.json` records the judge command and grader version next to each
 accepted judgement. Reusing a grade with a different judge, or with a changed
 grader, is refused; pass `--regrade` to replace it.
-
-The Go harness offers the same half:
-
-```bash
-bin/evalctl grade --suite results/eval-suite/<id> \
-    --judge-cmd 'opencode run --auto --format json "$(cat)"' --auth-cli
-```
 
 `grade` accepts the same credential flags as `suite` (`--auth-cli`,
 `--keychain`, `--auth-path`, `--pass-env`), because the judge is a CLI running

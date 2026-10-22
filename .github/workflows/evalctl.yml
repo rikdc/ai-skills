@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   go-linux:
-    name: Go tests, race, selftest, parity (Linux)
+    name: Go tests, race, selftest (Linux)
     runs-on: ubuntu-latest
 
     steps:
@@ -45,13 +45,8 @@ jobs:
       - name: Deterministic selftest
         run: make evalctl-selftest
 
-      - name: Shell/evalctl parity
-        run: make evalctl-parity
-
       - name: Verify make eval routing
-        run: |
-          make eval DRY=1 PLUGIN=git-workflow RUNS=1
-          EVALCTL_LEGACY=1 make eval DRY=1 PLUGIN=git-workflow RUNS=1
+        run: make eval DRY=1 PLUGIN=git-workflow RUNS=1
 
   go-macos:
     name: Go tests and process lifecycle (macOS)

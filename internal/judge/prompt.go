@@ -87,7 +87,7 @@ func PromptVersion() string {
 }
 
 // BuildPrompt renders the judge prompt from a grading request. The prompt is
-// passed on stdin, exactly like the legacy eval-grade.sh contract.
+// passed on stdin.
 func BuildPrompt(request model.GradingRequest) string {
 	covered := "(none)"
 	if len(request.CoveredByChecks) > 0 {

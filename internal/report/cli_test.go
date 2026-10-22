@@ -153,6 +153,27 @@ func TestReportCommandErrors(t *testing.T) {
 	if err == nil || errs.Code(err) != errs.CodeUsage {
 		t.Fatalf("bad format error = %v code %d", err, errs.Code(err))
 	}
+
+	// A --out that cannot be created is an error and leaves no partial report
+	// behind.
+	unwritable := filepath.Join(t.TempDir(), "not-a-directory")
+	if err := os.WriteFile(unwritable, []byte("file\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(unwritable, "child")
+	_, _, err = execute(t, "report", suite, "--format", "json", "--out", out)
+	if err == nil || errs.Code(err) != errs.CodeOperational {
+		t.Fatalf("unwritable --out error = %v code %d", err, errs.Code(err))
+	}
+	if !strings.Contains(err.Error(), "cannot create report directory") {
+		t.Fatalf("unwritable --out message = %v", err)
+	}
+	if _, statErr := os.Stat(out); statErr == nil {
+		t.Fatal("a partial report directory was created for an unwritable --out")
+	}
+	if info, statErr := os.Stat(unwritable); statErr != nil || !info.Mode().IsRegular() {
+		t.Fatalf("the blocking file was replaced: %v", statErr)
+	}
 }
 
 func TestReportCommandStreamsPerFormat(t *testing.T) {

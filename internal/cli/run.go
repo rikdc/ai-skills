@@ -172,8 +172,8 @@ func newRunCommand(opts *GlobalOptions) *cobra.Command {
 	return cmd
 }
 
-// parseTimeout accepts a Go duration ("15m") or an integer number of seconds
-// for compatibility with the legacy shell flags.
+// parseTimeout accepts a Go duration ("15m") or an integer number of seconds,
+// so `make eval TIMEOUT` accepts either form.
 func parseTimeout(flag, value string) (time.Duration, error) {
 	if duration, err := time.ParseDuration(value); err == nil {
 		if duration <= 0 {

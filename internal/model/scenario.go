@@ -64,8 +64,8 @@ type Scenario struct {
 	Execution     *Execution `json:"execution,omitempty"`
 }
 
-// DeclaredUnits returns the unit list a scenario declares. As in the legacy
-// harness, "units" wins when both fields are present.
+// DeclaredUnits returns the unit list a scenario declares. When both fields are
+// present, "units" wins.
 func (s Scenario) DeclaredUnits() []string {
 	if len(s.Units) > 0 {
 		return append([]string(nil), s.Units...)

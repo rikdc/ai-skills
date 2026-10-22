@@ -143,6 +143,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved project linting and code quality standards
 - Enhanced security scanning capabilities
 
+### Removed
+
+- Removed the legacy shell eval harness (`scripts/eval-{suite,run,report,grade,usage}.sh`,
+  the `scripts/jq/` programs, and their deterministic shell tests), the
+  shell/evalctl parity gate (`tests/test-evalctl-parity.sh` and
+  `make evalctl-parity`), and `EVALCTL_LEGACY`. `make eval` and `make test`
+  now always use `bin/evalctl`. The `evalctl-a-parity` tag remains as a
+  historical checkpoint.
+
 ### Fixed
 
 - `evalctl` now exits 2 for every positional-argument error (for example

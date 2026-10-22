@@ -33,7 +33,7 @@ const DefaultHookTimeout = 30 * time.Second
 type Options struct {
 	LogPath  string
 	UsageCmd string
-	// Hook context, mirroring the legacy eval-usage.sh variables.
+	// Hook context exposed to the usage hook.
 	RunDir    string
 	Sandbox   string
 	Arm       string
@@ -170,7 +170,7 @@ type fieldSet struct {
 	cost                                                   *float64
 }
 
-// build applies the legacy normalization rules: missing values stay omitted,
+// build applies the normalization rules: missing values stay omitted,
 // a total is derived only when absent, and an object with no usable numbers is
 // unknown source "none".
 func build(source string, f fieldSet) model.Usage {

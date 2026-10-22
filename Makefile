@@ -24,12 +24,6 @@ TEST_SCRIPT := $(TESTS_DIR)/test-scanner.sh
 TEST_PROTECT_BRANCH_SCRIPT := $(TESTS_DIR)/test-protect-main-branch.sh
 TEST_MARKETPLACE_SCRIPT := $(TESTS_DIR)/test-marketplace.sh
 TEST_CODEX_SKILLS_SCRIPT := $(TESTS_DIR)/test-codex-skills.sh
-TEST_EVALS_SCRIPT := $(TESTS_DIR)/test-evals.sh
-TEST_EVAL_SUITE_SCRIPT := $(TESTS_DIR)/test-eval-suite.sh
-TEST_EVAL_REPORT_SCRIPT := $(TESTS_DIR)/test-eval-report.sh
-TEST_EVAL_USAGE_SCRIPT := $(TESTS_DIR)/test-eval-usage.sh
-EVAL_SUITE_SCRIPT := $(SCRIPTS_DIR)/eval-suite.sh
-EVAL_REPORT_SCRIPT := $(SCRIPTS_DIR)/eval-report.sh
 VALIDATE_SCRIPT := $(SCRIPTS_DIR)/validate-config.sh
 SYNC_CODEX_SKILLS_SCRIPT := $(SCRIPTS_DIR)/sync-codex-skills.sh
 
@@ -42,8 +36,7 @@ UNIT :=
 RUNS := 1
 JOBS := 1
 # Per-run agent deadline. evalctl takes a duration (15m, 90s) or a number of
-# seconds; the legacy shell harness only takes whole seconds, so a duration is
-# forwarded to evalctl and reported as ignored by the legacy path.
+# seconds.
 TIMEOUT := 15m
 AGENT :=
 JUDGE :=
@@ -59,16 +52,13 @@ RESUME :=
 RESUME_POLICY := retry-failed
 USAGE_CMD :=
 JUDGE_USAGE_CMD :=
-# Credential forwarding for real runs. The legacy shell harness copies the agent
-# CLI login state into each workspace by default (scripts/eval-suite.sh AUTH=1),
-# so `make eval` keeps that default; AUTH_CLI=0 runs without credentials.
-# AUTH_PATH holds one or more paths relative to the real home. KEYCHAIN links
-# the macOS Keychains directory and is evalctl-only.
+# Credential forwarding for real runs. evalctl copies the agent CLI login state
+# into each workspace by default (--auth-cli), so `make eval` keeps that
+# default; AUTH_CLI=0 runs without credentials. AUTH_PATH holds one or more
+# paths relative to the real home. KEYCHAIN links the macOS Keychains directory.
 AUTH_CLI := 1
 KEYCHAIN :=
 AUTH_PATH :=
-# Empty means the evalctl backend; set to 1 to run the legacy shell harness.
-EVALCTL_LEGACY ?=
 # Extra arguments for `make evalctl-selftest` (for example SELFTEST_ARGS=--quick).
 SELFTEST_ARGS ?=
 
@@ -138,11 +128,6 @@ evalctl-selftest: evalctl-build ## Run the deterministic end-to-end evalctl self
 	@echo -e "$(BLUE)🧪 Running evalctl selftest...$(NC)"
 	@"$(EVALCTL_BIN)" selftest $(SELFTEST_ARGS)
 
-.PHONY: evalctl-parity
-evalctl-parity: evalctl-build ## Compare shell and Go selection, plan, check, and stub runs
-	@echo -e "$(BLUE)🔀 Running shell-vs-evalctl parity checks...$(NC)"
-	@EVALCTL_BIN="$(EVALCTL_BIN)" "$(TESTS_DIR)/test-evalctl-parity.sh"
-
 .PHONY: check
 check: evalctl-check evalctl-selftest ## Run the Go checks and deterministic selftest
 	@echo -e "$(GREEN)✅ check passed$(NC)"
@@ -163,30 +148,15 @@ test: evalctl-test evalctl-check ## Run complete test suite
 	@echo -e "$(BLUE)🧪 Running Codex skill symlink tests...$(NC)"
 	@$(TEST_CODEX_SKILLS_SCRIPT)
 	@echo
-	@echo -e "$(BLUE)🧪 Running eval and skill quality gate...$(NC)"
-	@$(TEST_EVALS_SCRIPT)
-	@echo
-	@echo -e "$(BLUE)🧪 Running eval harness tests...$(NC)"
-	@$(TEST_EVAL_SUITE_SCRIPT)
-	@echo
-	@echo -e "$(BLUE)🧪 Running eval usage tests...$(NC)"
-	@$(TEST_EVAL_USAGE_SCRIPT)
-	@echo
-	@echo -e "$(BLUE)🧪 Running eval report tests...$(NC)"
-	@$(TEST_EVAL_REPORT_SCRIPT)
+	@echo -e "$(BLUE)🧪 Running deterministic evalctl authoring gate...$(NC)"
+	@"$(EVALCTL_BIN)" check
 
 .PHONY: eval
 eval: ## Run eval scenarios with an agent and render the comparison report
 	@set -euo pipefail; \
-	if [[ "$(EVALCTL_LEGACY)" == "1" ]]; then \
-		echo "make eval: using the legacy shell harness (EVALCTL_LEGACY=1)" >&2; \
-		suite_runner=("$(EVAL_SUITE_SCRIPT)"); \
-		report_runner=("$(EVAL_REPORT_SCRIPT)"); \
-	else \
-		$(MAKE) --no-print-directory evalctl-build; \
-		suite_runner=("$(EVALCTL_BIN)" suite); \
-		report_runner=("$(EVALCTL_BIN)" report); \
-	fi; \
+	$(MAKE) --no-print-directory evalctl-build; \
+	suite_runner=("$(EVALCTL_BIN)" suite); \
+	report_runner=("$(EVALCTL_BIN)" report); \
 	unit=""; \
 	if [[ -n "$(SKILL)" && -n "$(UNIT)" ]]; then \
 		echo "make eval: pass SKILL or UNIT, not both" >&2; \
@@ -206,10 +176,6 @@ eval: ## Run eval scenarios with an agent and render the comparison report
 			retry-failed|keep-failures|rerun-all) ;; \
 			*) echo "make eval: RESUME_POLICY must be retry-failed, keep-failures or rerun-all" >&2; exit 2 ;; \
 		esac; \
-		if [[ "$(EVALCTL_LEGACY)" == "1" ]]; then \
-			echo "make eval: RESUME=1 needs the evalctl backend; drop EVALCTL_LEGACY=1" >&2; \
-			exit 2; \
-		fi; \
 	fi; \
 	if [[ -n "$(SKILL)" ]]; then \
 		unit="skills/$(SKILL)"; \
@@ -230,16 +196,8 @@ eval: ## Run eval scenarios with an agent and render the comparison report
 			echo "make eval: KEYCHAIN=1 requires AUTH_CLI=1" >&2; \
 			exit 2; \
 		fi; \
-		if [[ "$(EVALCTL_LEGACY)" == "1" ]]; then \
-			echo "make eval: KEYCHAIN=1 needs the evalctl backend; drop EVALCTL_LEGACY=1" >&2; \
-			exit 2; \
-		fi; \
 	fi; \
-	if [[ "$(EVALCTL_LEGACY)" == "1" ]]; then \
-		if [[ "$(AUTH_CLI)" == "0" ]]; then \
-			auth_args+=(--no-auth); \
-		fi; \
-	elif [[ "$(AUTH_CLI)" != "0" ]]; then \
+	if [[ "$(AUTH_CLI)" != "0" ]]; then \
 		auth_args+=(--auth-cli); \
 		if [[ "$(KEYCHAIN)" == "1" ]]; then \
 			auth_args+=(--keychain); \
@@ -259,13 +217,7 @@ eval: ## Run eval scenarios with an agent and render the comparison report
 	if [[ "$(RESUME)" == "1" ]]; then \
 		suite_args+=(--resume --resume-policy "$(RESUME_POLICY)"); \
 	fi; \
-	if [[ "$(EVALCTL_LEGACY)" == "1" ]]; then \
-		if [[ "$(TIMEOUT)" =~ ^[0-9]+$$ ]]; then \
-			suite_args+=(--timeout "$(TIMEOUT)"); \
-		elif [[ -n "$(TIMEOUT)" ]]; then \
-			echo "make eval: the legacy harness takes --timeout in whole seconds; ignoring TIMEOUT=$(TIMEOUT) (it defaults to 900s)" >&2; \
-		fi; \
-	elif [[ -n "$(TIMEOUT)" ]]; then \
+	if [[ -n "$(TIMEOUT)" ]]; then \
 		suite_args+=(--timeout "$(TIMEOUT)"); \
 	fi; \
 	if [[ -n "$$USAGE_CMD" ]]; then \
@@ -485,7 +437,6 @@ help: ## Display this help
 	@echo "  make evalctl-build     # Build bin/evalctl"
 	@echo "  make evalctl-check     # gofmt, go vet, and evalctl check"
 	@echo "  make evalctl-selftest  # Deterministic end-to-end evalctl selftest"
-	@echo "  make evalctl-parity    # Compare shell and Go selection/plan/stub runs"
 	@echo "  make install           # Make hook scripts executable"
 	@echo "  make sync-codex-skills # Sync .codex/skills symlinks with plugins/*/skills"
 	@echo "  make eval PLUGIN=git-workflow SKILL=pr RUNS=3 AGENT='claude -p --output-format json'"
@@ -494,7 +445,6 @@ help: ## Display this help
 	@echo '  make eval PLUGIN=git-workflow UNIT=commands/review AGENT='"'"'opencode run --auto --format json "$$$$(cat)"'"'"''
 	@echo "  (cost needs structured output or USAGE_CMD; Make consumes \$$(...), so use the double-dollar form above)"
 	@echo "  make eval PLUGIN=git-workflow RUNS=1 DRY=1"
-	@echo "  EVALCTL_LEGACY=1 make eval PLUGIN=git-workflow RUNS=1 DRY=1  # shell path"
 	@echo "  make eval PLUGIN=git-workflow RUNS=1 AUTH_CLI=0 ...           # no credentials"
 	@echo "  make eval OUT=results/eval-suite/<dir> PLUGIN=git-workflow SKILL=pr AGENT=...  # reuse a suite dir"
 	@echo "  make eval OUT=results/eval-suite/<dir> RESUME=1 PLUGIN=git-workflow SKILL=pr AGENT=...  # resume: rerun only runs without an accepted attempt (RESUME_POLICY=retry-failed)"

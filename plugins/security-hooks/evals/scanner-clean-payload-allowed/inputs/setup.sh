@@ -10,7 +10,7 @@ rm -rf hooks payloads
 mkdir -p payloads
 
 if [[ -z "${EVAL_HOOK_SOURCE:-}" || ! -f "$EVAL_HOOK_SOURCE/hooks/mcp-security-scanner.sh" ]]; then
-    echo "setup: EVAL_HOOK_SOURCE does not contain the plugin hook; run through scripts/eval-run.sh" >&2
+    echo "setup: EVAL_HOOK_SOURCE does not contain the plugin hook; run through bin/evalctl run" >&2
     exit 1
 fi
 cp -R "$EVAL_HOOK_SOURCE/hooks" ./hooks

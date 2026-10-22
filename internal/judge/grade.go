@@ -354,9 +354,8 @@ func runJudge(ctx context.Context, cfg Config, store *attempts.Store,
 	}
 
 	// The command judge runs in the accepted agent attempt's evidence
-	// directory, exactly like the legacy contract. Make the grading request
-	// readable there for judges that inspect it, and never inherit a stale
-	// judgement.
+	// directory. Make the grading request readable there for judges that
+	// inspect it, and never inherit a stale judgement.
 	requestCopy := filepath.Join(agent.Dir, requestName)
 	judgementInEvidence := filepath.Join(agent.Dir, judgementName)
 	if err := atomicfile.Write(requestCopy, rawRequest, 0o600); err != nil {
@@ -563,7 +562,7 @@ func refreshResult(store *attempts.Store, request model.GradingRequest, agent *a
 		}
 	}
 	// A suite run's evidence link is relative to the suite root (the parent of
-	// its `runs` directory), matching reportio and the legacy report. A plain
+	// its `runs` directory), matching reportio. A plain
 	// run keeps the evidence path its previous projection used.
 	if rel := suiteRelativePath(store.RunDir); rel != "" {
 		ctx.EvidencePath = rel

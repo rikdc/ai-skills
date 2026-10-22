@@ -209,7 +209,8 @@ func printGradeResult(cmd *cobra.Command, result judge.Result) {
 }
 
 // gradeSummaryLine renders the grade --suite totals. The superseded count
-// appears only when non-zero, so the line matches the shell harness otherwise.
+// appears only when non-zero, so the line is unchanged when nothing was
+// superseded.
 func gradeSummaryLine(suite judge.SuiteResult) string {
 	superseded := ""
 	if suite.Superseded > 0 {

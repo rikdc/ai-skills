@@ -1,6 +1,7 @@
 # Tests
 
-Test suites for the hooks and marketplace configuration in this repository.
+Test coverage for the hooks, plugins, and the `evalctl` Go harness in this
+repository.
 
 Run everything through the Makefile:
 
@@ -8,10 +9,34 @@ Run everything through the Makefile:
 make test
 ```
 
-That runs the suites below in order. Each is a standalone script, so an
-individual suite can also be run directly.
+`make test` runs the Go tests and `go vet`, the deterministic `evalctl` gate,
+and the shell suites below, in order. Each shell suite is a standalone script,
+so it can also be run directly.
 
-## Test Files
+## Go test packages
+
+`go test ./...` exercises the `evalctl` harness:
+
+- `cmd/evalctl`: process entry, signal context, and exit-code mapping.
+- `internal/cli`: Cobra commands and flag wiring.
+- `internal/scenario`, `internal/check`: discovery, selection, plan, and the
+  deterministic authoring gate.
+- `internal/runner`, `internal/runner/attempts`: workspace staging, attempts,
+  `current.json`, projections, and crash recovery.
+- `internal/suite`, `internal/judge`, `internal/report`, `internal/reportio`:
+  orchestration, command judging, report analysis and rendering.
+- `internal/provider/command`, `internal/executor`, `internal/usage`,
+  `internal/platform/*`: the command backend, process lifecycle, and usage
+  normalization.
+- `internal/selftest`: the synthetic end-to-end fixture.
+
+```bash
+go test ./...
+go test -race ./...   # Linux
+make evalctl-check    # gofmt, go vet, and the deterministic evalctl gate
+```
+
+## Shell suites
 
 ### `test-scanner.sh`
 
@@ -54,10 +79,21 @@ failure rather than stopping at the first.
 ./tests/test-marketplace.sh
 ```
 
-### `test-evals.sh`
+### `test-codex-skills.sh`
 
-Deterministic checks over the eval scenarios and skills, with no model and no
-network, so it can run in CI on every pull request:
+Checks that `.codex/skills/*` mirrors `plugins/*/skills/*` exactly, so Codex
+never sees a stale or missing skill. It wraps `scripts/sync-codex-skills.sh
+--check`.
+
+```bash
+./tests/test-codex-skills.sh
+```
+
+## Deterministic eval authoring gate
+
+`bin/evalctl check` runs the deterministic checks over the eval scenarios and
+skills, with no model and no network, so it can run in CI on every pull
+request. `make test` builds `bin/evalctl` and runs it:
 
 - Scenario layout and naming (descriptive names, never `scenario-N`)
 - Rubric arithmetic — 8-13 checklist items whose `max_score` sums to 100
@@ -73,113 +109,18 @@ deliberately out of scope. Those need an LLM and run on a contributor's
 machine, not in public CI.
 
 ```bash
-./tests/test-evals.sh
-./tests/test-evals.sh --root /path/to/copy     # check a copy of the repo
-./tests/test-evals.sh --changes origin/main    # list the skills/scenarios a ref touched
-```
-
-### `test-eval-usage.sh`
-
-Deterministic parser tests for `scripts/eval-usage.sh`, with local fixture
-logs and hook scripts only:
-
-- opencode JSONL `step_finish` summation and Claude result JSON
-- unknown and partial token-only usage, with invalid numbers ignored
-- hooks that write `USAGE_FILE` or print JSON
-- failing/invalid hook fallback to the built-in parser, with the hook's own
-  stderr preserved for the caller's `usage.log`
-
-```bash
-./tests/test-eval-usage.sh
-```
-
-### `test-eval-suite.sh`
-
-Deterministic tests for the local eval harness — no model, no network, so it
-runs in CI:
-
-- the runner's and suite's own selftests
-- discovery matches `plugins/*/evals/*/` and ignores worktrees
-- `--plan` invocation counts, the `--jobs` hint, and shards that partition
-  without overlap
-- `--unit` selection: skills install only the named skill, commands only the
-  named command, hooks are accepted without an install, and unknown units
-  fail clearly
-- manifest/config unit recording and `--resume` equality, including manifest
-  rewriting for a narrowed resume and multiple units forwarded separately
-- an uncreatable `--out` fails before any job starts
-- a bad `--changed` ref fails by name instead of being masked
-- an uncopyable credential source fails the run, hints at `--no-auth`/
-  `--auth-path`, and still removes the sandbox
-- TERM stops the suite with status 143 and kills the in-flight agent and its
-  descendants
-- a failed evidence tar fails the run instead of grading without a snapshot
-- parallel execution, `--resume`, and aggregation, with a partial rubric kept
-  against the fixed 100-point denominator
-- usage capture: suite cost sums, partial coverage, unknown never summed as
-  zero, judge timing, judge-usage backfill, and `--resume` usage backfill
-- the judge adapter rejects invalid judgements and folds valid ones into
-  per-arm percentages
-- `--strict` fails a suite that does not discriminate
-
-```bash
-./tests/test-eval-suite.sh
-```
-
-### `test-eval-report.sh`
-
-Deterministic tests for the report renderer and `make eval`, with synthetic
-suite directories and no model or network:
-
-- the fixed 100-point denominator: `52/100` with unjudged criteria stays
-  pending rather than being renormalised
-- per-criterion pairing by name and mean deltas across runs
-- declared runs with missing directories stay incomplete (never a false
-  `helps`), and `results.jsonl` runner failures reach the verdict
-- regression detection and every verdict state (`incomplete`, `indicative`,
-  `inconclusive`, `helps`, `hurts`, `no measurable effect`)
-- unwritable `--out` directories fail instead of printing success
-- cost/usage in CLI, Markdown, JSON and HTML, including unknown/partial states
-  and the efficiency claim only when the data supports it
-- input/output/reasoning/cache token splits, agent/judge/wall timing, and
-  `--baseline` comparisons of score, per-run cost and token deltas
-- JSON, Markdown and self-contained HTML generation, including escaping of
-  scenario and criterion text
-- `make eval` dry-run selection (`SKILL=`, `UNIT=`), the required-`AGENT`
-  guard, and rejection of `SKILL` with `UNIT`
-
-```bash
-./tests/test-eval-report.sh
-```
-
-### `test-evalctl-parity.sh`
-
-Deterministic shell-vs-Go parity for the Milestone A cutover, with no model,
-network, or credentials. It builds `bin/evalctl` if `EVALCTL_BIN` is not set,
-then compares scenario selection, plan output, the authoring gate, and two
-stub-agent campaigns against `scripts/eval-suite.sh`:
-
-- `--list` for every scenario and for plugin, unit, scenario, and shard filters
-- `--plan` counts for full and filtered selections
-- `tests/test-evals.sh` vs `evalctl check`, including `--changes HEAD`
-- comparison (`git-workflow/pr-draft-read-replica`) and functional
-  (`security-hooks/scanner-clean-payload-allowed`) runs: statuses, arm/run
-  results, mechanical scores, pending counts, suite counts, criteria, and the
-  grading index
-
-```bash
-./tests/test-evalctl-parity.sh
-make evalctl-parity
+bin/evalctl check
+bin/evalctl check --root /path/to/copy      # check a copy of the repo
+bin/evalctl check --changes origin/main     # list the skills/scenarios a ref touched
 ```
 
 ## Related Checks
 
-`make test` covers the shell suites above plus the Go tests, `go vet`, and the
-`evalctl check` gate. These checks run separately, and in CI:
+`make test` covers the Go tests plus the shell suites above. These checks run
+separately, and in CI:
 
 ```bash
 make check         # evalctl-check + the deterministic evalctl selftest
-make evalctl-parity # shell-vs-Go selection, plan, gate, and stub campaigns
 make lint          # ShellCheck, markdownlint, and claudelint
 make validate      # Plugin manifest, hook scripts, and dependencies
 ```
@@ -190,10 +131,9 @@ Reviewing a scenario or skill with judgement, and running an eval, need a model,
 so they run on a contributor's machine rather than in CI:
 
 ```bash
-scripts/eval-run.sh --selftest                 # runner plumbing, no model
-scripts/eval-suite.sh --selftest               # suite plumbing, no model
-scripts/eval-run.sh --plugin <plugin> --scenario <scenario> --agent-cmd 'claude -p'
-scripts/eval-suite.sh --agent-cmd 'claude -p' --jobs 4
+bin/evalctl selftest                                    # harness plumbing, no model
+bin/evalctl run --plugin <plugin> --scenario <scenario> --agent-cmd 'claude -p'
+bin/evalctl suite --agent-cmd 'claude -p' --jobs 4
 ```
 
 See `plugins/eval-workflow/skills/review-evals/SKILL.md` for how the pending
