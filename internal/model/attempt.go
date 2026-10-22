@@ -47,6 +47,12 @@ type FinishedAttempt struct {
 	EvidenceSHA256       string      `json:"evidence_sha256,omitempty"`
 	GradingRequestSHA256 string      `json:"grading_request_sha256,omitempty"`
 
+	// Execution observability. AgentExit is nil when the command never
+	// started. DurationSeconds is the observed whole invocation time.
+	AgentExit       *int     `json:"agent_exit,omitempty"`
+	TimedOut        bool     `json:"timed_out,omitempty"`
+	DurationSeconds *float64 `json:"duration_seconds,omitempty"`
+
 	// Judge attempts only.
 	GradedAgentAttempt   string `json:"graded_agent_attempt,omitempty"`
 	GradedEvidenceSHA256 string `json:"graded_evidence_sha256,omitempty"`

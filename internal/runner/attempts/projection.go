@@ -223,6 +223,17 @@ func (s *Store) BuildResult(ctx RunContext) (model.RunResult, error) {
 		JudgeIdentitySHA256:  pointer.JudgeIdentitySHA256,
 		Error:                agent.Finished.Error,
 	}
+	if agent.Finished.AgentExit != nil {
+		code := *agent.Finished.AgentExit
+		result.AgentExit = &code
+	}
+	if agent.Finished.TimedOut || agent.Finished.Status == model.StatusTimedOut {
+		result.TimedOut = true
+	}
+	if agent.Finished.DurationSeconds != nil {
+		seconds := *agent.Finished.DurationSeconds
+		result.DurationSeconds = &seconds
+	}
 	if judge != nil {
 		result.JudgeAttempt = judge.ID
 	}
