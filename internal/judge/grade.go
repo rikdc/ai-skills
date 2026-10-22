@@ -545,6 +545,9 @@ func refreshResult(store *attempts.Store, request model.GradingRequest, agent *a
 			ctx.Mode = previous.Mode
 			ctx.ChecksRequired = previous.ChecksRequired
 			ctx.EvidencePath = previous.Evidence
+			// Skill use was detected when the agent ran; the log may since
+			// have been pruned, so carry the recorded answer forward.
+			ctx.SkillUse = previous.SkillUse
 		}
 	}
 	// A suite run's evidence link is relative to the suite root (the parent of

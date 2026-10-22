@@ -70,8 +70,19 @@ func mustFinish(t *testing.T, store *Store, id string, finished model.FinishedAt
 // manifest, and the grading request for an execution attempt.
 func addExecutionArtifacts(t *testing.T, store *Store, attempt *Attempt) (ev string, reqSHA string) {
 	t.Helper()
-	if err := os.WriteFile(filepath.Join(attempt.Dir, "agent.log"), []byte("agent output\n"), 0o600); err != nil {
-		t.Fatal(err)
+	return addExecutionArtifactsWithLog(t, store, attempt, "agent output\n")
+}
+
+// addExecutionArtifactsWithLog is addExecutionArtifacts with caller-chosen
+// agent log content; an empty log omits agent.log from the evidence.
+func addExecutionArtifactsWithLog(t *testing.T, store *Store, attempt *Attempt, log string) (ev string, reqSHA string) {
+	t.Helper()
+	evidence := []string{"snapshot.tar", "mechanical.json"}
+	if log != "" {
+		if err := os.WriteFile(filepath.Join(attempt.Dir, "agent.log"), []byte(log), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		evidence = []string{"snapshot.tar", "agent.log", "mechanical.json"}
 	}
 	if err := os.WriteFile(filepath.Join(attempt.Dir, "mechanical.json"), []byte(`{"score":1,"max":2,"items":[]}`), 0o600); err != nil {
 		t.Fatal(err)
@@ -80,7 +91,7 @@ func addExecutionArtifacts(t *testing.T, store *Store, attempt *Attempt) (ev str
 		t.Fatal(err)
 	}
 	var err error
-	ev, err = store.WriteEvidenceManifest(attempt.ID, []string{"snapshot.tar", "agent.log", "mechanical.json"})
+	ev, err = store.WriteEvidenceManifest(attempt.ID, evidence)
 	if err != nil {
 		t.Fatalf("write evidence: %v", err)
 	}

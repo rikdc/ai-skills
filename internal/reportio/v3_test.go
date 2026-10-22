@@ -210,3 +210,100 @@ func TestV3CurrentPointsAtMissingAttempt(t *testing.T) {
 		t.Fatalf("accepted pointer was not preserved: %q", run.AgentAttempt)
 	}
 }
+
+func skillRunInput(t *testing.T, dir, arm string) model.RunInput {
+	t.Helper()
+	in, err := reportio.Load(dir, reportio.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, run := range in.Scenarios[0].Runs {
+		if run.Arm == arm {
+			return run
+		}
+	}
+	t.Fatalf("no %s run", arm)
+	return model.RunInput{}
+}
+
+func agentLogPath(dir, arm string) string {
+	return filepath.Join(dir, "runs", "demo", "v3case", arm, "run-1", "attempts", "agent-000001", "agent.log")
+}
+
+func TestV3SkillUseIsDetectedFromTheAcceptedAgentLog(t *testing.T) {
+	invoked := `{"type":"tool_use","part":{"tool":"skill","state":{"input":{"name":"demo"}}}}` + "\n"
+	idle := `{"type":"text","part":{"text":"hi"}}` + "\n"
+	cases := []struct {
+		name string
+		log  *string
+		want string
+	}{
+		{"invoked", &invoked, model.SkillInvoked},
+		{"not invoked", &idle, model.SkillNotInvoked},
+		{"log missing", nil, model.SkillUnknown},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := newV3Suite(t)
+			if tc.log != nil {
+				writeText(t, agentLogPath(dir, "with"), *tc.log)
+				writeText(t, agentLogPath(dir, "without"), invoked)
+			}
+			with := skillRunInput(t, dir, "with")
+			if with.SkillUse == nil || with.SkillUse.State != tc.want {
+				t.Fatalf("with skill use = %+v, want %s", with.SkillUse, tc.want)
+			}
+			if without := skillRunInput(t, dir, "without"); without.SkillUse != nil {
+				t.Fatalf("the without arm has no skill: %+v", without.SkillUse)
+			}
+		})
+	}
+}
+
+func TestV3RecordedSkillUseWinsWhenLogIsGone(t *testing.T) {
+	dir := newV3Suite(t)
+	runDir := filepath.Join(dir, "runs", "demo", "v3case", "with", "run-1")
+	zero := 0
+	writeJSON(t, filepath.Join(runDir, "result.json"), model.RunResult{
+		SchemaVersion: 3, Plugin: "demo", Scenario: "v3case", Arm: "with", Run: 1,
+		AgentAttempt: "agent-000001", Status: model.StatusOK, AgentExit: &zero,
+		SkillUse: &model.SkillUse{State: model.SkillNotInvoked, Skills: map[string]string{"demo": model.SkillNotInvoked}},
+	})
+	with := skillRunInput(t, dir, "with")
+	if with.SkillUse == nil || with.SkillUse.State != model.SkillNotInvoked {
+		t.Fatalf("skill use = %+v, want the recorded not-invoked", with.SkillUse)
+	}
+}
+
+func TestV3AttemptsCarryFailureStatusAndError(t *testing.T) {
+	dir := newV3Suite(t)
+	runDir := filepath.Join(dir, "runs", "demo", "v3case", "with", "run-1")
+	failed := filepath.Join(runDir, "attempts", "judge-000005")
+	writeJSON(t, filepath.Join(failed, "started.json"), model.StartedAttempt{
+		SchemaVersion: 3, AttemptID: "judge-000005", Kind: model.KindJudge, StartedAt: "2026-02-02T00:02:00Z",
+	})
+	writeJSON(t, filepath.Join(failed, "finished.json"), model.FinishedAttempt{
+		SchemaVersion: 3, AttemptID: "judge-000005", Kind: model.KindJudge,
+		FinishedAt: "2026-02-02T00:02:01Z", Status: model.StatusAgentFailed,
+		Error: "judge invocation failed: Unexpected server error",
+	})
+	in, err := reportio.Load(dir, reportio.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sawFailed, sawInterrupted bool
+	for _, attempt := range in.Attempts {
+		switch attempt.Status {
+		case model.StatusAgentFailed:
+			sawFailed = attempt.Kind == model.KindJudge && attempt.Error == "judge invocation failed: Unexpected server error"
+		case model.StatusInterrupted:
+			sawInterrupted = true
+		}
+	}
+	if !sawFailed {
+		t.Fatal("failed judge attempt lost its status or error")
+	}
+	if !sawInterrupted {
+		t.Fatal("attempt without finished.json must be interrupted")
+	}
+}

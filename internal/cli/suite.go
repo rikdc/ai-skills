@@ -287,6 +287,9 @@ func newSuiteCommand(opts *GlobalOptions) *cobra.Command {
 			for _, warning := range runner.Warnings() {
 				fmt.Fprintf(cmd.ErrOrStderr(), "warning: %s\n", warning)
 			}
+			if strings.TrimSpace(judgeCmd) != "" {
+				warnSameModelJudge(cmd, agentCmd, modelName, judgeCmd, "")
+			}
 			result, runErr := runner.Run(cmd.Context())
 			if result != nil {
 				fmt.Fprint(cmd.OutOrStdout(), suite.SummaryText(result.SummaryPath))

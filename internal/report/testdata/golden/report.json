@@ -1829,5 +1829,11 @@
         "path": "runs/demo/case/with/run"
       }
     ]
-  }
+  },
+  "warnings": [
+    {
+      "code": "low-n",
+      "message": "n=2: fewer than 3 runs per arm, so run-to-run variance cannot be estimated reliably; treat the delta as indicative, not conclusive."
+    }
+  ]
 }

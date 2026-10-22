@@ -21,6 +21,8 @@ import (
 const (
 	evidenceName = "evidence.json"
 	prunedName   = "evidence_pruned.json"
+	// agentLogName is the agent log basename adapters default to.
+	agentLogName = "agent.log"
 )
 
 // EvidenceFile is one graded artifact in the canonical evidence manifest.

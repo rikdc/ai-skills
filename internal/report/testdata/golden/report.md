@@ -11,6 +11,10 @@
 
 runner failures or unjudged criteria remain; a verdict would be made up
 
+## Warnings
+
+- **low-n**: n=2: fewer than 3 runs per arm, so run-to-run variance cannot be estimated reliably; treat the delta as indicative, not conclusive.
+
 | With | Without | Delta | Won | Lost | Tied | Pending | Coverage | Failures |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 73.5 | 67.2 | +6.2 | 1 | 0 | 2 | 96 | 66.7% | 0 |

@@ -11,6 +11,7 @@ import (
 
 	"github.com/rikdc/ai-skills/internal/model"
 	"github.com/rikdc/ai-skills/internal/platform/atomicfile"
+	"github.com/rikdc/ai-skills/internal/skilluse"
 )
 
 // RunContext supplies the scenario metadata that is not stored in attempt
@@ -25,6 +26,14 @@ type RunContext struct {
 	ChecksRequired bool
 	// EvidencePath overrides the default attempts/<id>/evidence.json path.
 	EvidencePath string
+	// Skills names the skill units installed for a with-arm run. When set,
+	// the projection records whether the accepted agent log used them.
+	Skills []string
+	// SkillDir is the workspace skills directory; empty means the default.
+	SkillDir string
+	// SkillUse carries an already-recorded detection, which wins over
+	// re-reading the log (the log may since have been pruned).
+	SkillUse *model.SkillUse
 }
 
 func readMechanical(attemptDir string) (model.Mechanical, error) {
@@ -236,6 +245,16 @@ func (s *Store) BuildResult(ctx RunContext) (model.RunResult, error) {
 	}
 	if judge != nil {
 		result.JudgeAttempt = judge.ID
+	}
+	if ctx.Arm == "with" {
+		switch {
+		case ctx.SkillUse != nil:
+			recorded := *ctx.SkillUse
+			result.SkillUse = &recorded
+		case len(ctx.Skills) > 0:
+			detected := skilluse.DetectPath(filepath.Join(agent.Dir, agentLogName), ctx.Skills, ctx.SkillDir)
+			result.SkillUse = &detected
+		}
 	}
 	return result, nil
 }

@@ -1,20 +1,10 @@
 package report
 
 import (
-	"regexp"
-
 	"github.com/rikdc/ai-skills/internal/model"
 )
 
-var modelFlagPattern = regexp.MustCompile(`(?:--model[ =]|-m )(\S+)`)
-
-func extractModel(agentCmd string) string {
-	match := modelFlagPattern.FindStringSubmatch(agentCmd)
-	if len(match) == 2 {
-		return match[1]
-	}
-	return ""
-}
+func extractModel(agentCmd string) string { return model.ExtractModel(agentCmd) }
 
 func buildCost(scenarios []model.ScenarioResult, totals model.Totals) model.CostReport {
 	allWith := runsFor(scenarios, nil, "with")

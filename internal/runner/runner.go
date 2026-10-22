@@ -25,6 +25,7 @@ import (
 	"github.com/rikdc/ai-skills/internal/platform/errs"
 	"github.com/rikdc/ai-skills/internal/runner/attempts"
 	"github.com/rikdc/ai-skills/internal/scenario"
+	"github.com/rikdc/ai-skills/internal/skilluse"
 	"github.com/rikdc/ai-skills/internal/workspace"
 )
 
@@ -398,7 +399,11 @@ func (r *Runner) runOnce(ctx context.Context, arm string, run int) (outcome RunO
 			Mode:           string(r.scenario.Mode()),
 			Run:            run,
 			ChecksRequired: r.checksPresent(),
+			SkillDir:       r.cfg.SkillDir,
 		},
+	}
+	if arm == "with" {
+		state.runCtx.Skills = skilluse.Installed(filepath.Join(r.cfg.Root, "plugins", r.cfg.Plugin), r.cfg.Units)
 	}
 
 	pluginDir := filepath.Join(r.cfg.Root, "plugins", r.cfg.Plugin)

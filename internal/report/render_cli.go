@@ -40,6 +40,7 @@ func RenderCLI(report model.Report, color bool) string {
 	b.WriteString("\n")
 	fmt.Fprintf(&b, "%s\n", bold("1;33", "Verdict: "+report.Verdict.Status))
 	fmt.Fprintf(&b, "  %s\n\n", report.Verdict.Reason)
+	b.WriteString(renderCaveatsCLI(report, bold))
 	fmt.Fprintf(&b, "With: %s/100    Without: %s/100    Delta: %s\n",
 		fmtScore(report.Totals.With), fmtScore(report.Totals.Without), fmtDelta(report.Totals.Delta))
 	fmt.Fprintf(&b, "Criteria: %d won, %d lost, %d tied    Coverage: %s%%    Pending: %s points (both arms)    Failures: %d\n",
@@ -118,6 +119,7 @@ func RenderCLI(report model.Report, color bool) string {
 		}
 	}
 
+	b.WriteString(renderDetailsCLI(report, bold))
 	b.WriteString(renderComparisonCLI(report))
 
 	fmt.Fprintf(&b, "\n%s\n", bold("1", "Timing"))

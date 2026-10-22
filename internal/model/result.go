@@ -41,4 +41,9 @@ type RunResult struct {
 	GradingRequestSHA256 string     `json:"grading_request_sha256"`
 	JudgeIdentitySHA256  string     `json:"judge_identity_sha256,omitempty"`
 	Error                string     `json:"error,omitempty"`
+
+	// SkillUse records whether the with arm used the installed skill units.
+	// It is derived from the accepted agent log and absent for the without
+	// arm and for scenarios that install no skills.
+	SkillUse *SkillUse `json:"skill_use,omitempty"`
 }

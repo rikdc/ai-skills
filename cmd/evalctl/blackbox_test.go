@@ -232,6 +232,84 @@ func TestBlackBoxSuiteJudgeReceivesCredentials(t *testing.T) {
 	}
 }
 
+func TestBlackBoxGradeRefreshesSuiteSummaryAndCounts(t *testing.T) {
+	root, _ := blackBoxRepo(t)
+	env := []string{"HOME=" + t.TempDir(), "TMPDIR=" + t.TempDir(), "NO_COLOR=1"}
+	out := filepath.Join(t.TempDir(), "results")
+	stdout, stderr, code := runBinary(t, root, env, "suite",
+		"--plugin", "demo", "--scenario", "basic", "--arm", "with",
+		"--agent-cmd", "true", "--runs", "1", "--out", out)
+	if code != 0 {
+		t.Fatalf("suite exit = %d\nstdout=%s\nstderr=%s", code, stdout, stderr)
+	}
+	counts := func() map[string]int {
+		t.Helper()
+		data, err := os.ReadFile(filepath.Join(out, "suite.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var doc struct {
+			Counts map[string]int `json:"counts"`
+		}
+		if err := json.Unmarshal(data, &doc); err != nil {
+			t.Fatal(err)
+		}
+		return doc.Counts
+	}
+	if before := counts(); before["judged_runs"] != 0 || before["pending_runs"] != 1 {
+		t.Fatalf("precondition: counts before grading = %+v", before)
+	}
+
+	judgeCmd := `sh -c 'printf "[{\"name\":\"a\",\"score\":10,\"max\":10}]" > judgement.json'`
+	stdout, stderr, code = runBinary(t, root, env, "grade", "--suite", out, "--judge-cmd", judgeCmd)
+	if code != 0 {
+		t.Fatalf("grade exit = %d\nstdout=%s\nstderr=%s", code, stdout, stderr)
+	}
+
+	after := counts()
+	if after["judged_runs"] != 1 || after["pending_runs"] != 0 || after["judge_attempts"] != 1 || after["total_attempts"] != 2 {
+		t.Fatalf("suite.json counts are stale after grade: %+v", after)
+	}
+	summary, err := os.ReadFile(filepath.Join(out, "summary.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(summary), "still have pending criteria") ||
+		!strings.Contains(string(summary), "Judged runs: 1") ||
+		!strings.Contains(string(summary), "| 100% |") {
+		t.Fatalf("summary.md is stale after grade:\n%s", summary)
+	}
+}
+
+func TestBlackBoxWarnsWhenJudgeAndAgentShareAModel(t *testing.T) {
+	root, _ := blackBoxRepo(t)
+	env := []string{"HOME=" + t.TempDir(), "TMPDIR=" + t.TempDir(), "NO_COLOR=1"}
+	out := filepath.Join(t.TempDir(), "results")
+	judge := func(model string) string {
+		return `sh -c 'printf "[{\"name\":\"a\",\"score\":10,\"max\":10}]" > judgement.json' _ -m ` + model
+	}
+
+	_, stderr, code := runBinary(t, root, env, "suite",
+		"--plugin", "demo", "--scenario", "basic", "--arm", "with",
+		"--agent-cmd", "true -m shared/model", "--judge-cmd", judge("shared/model"),
+		"--runs", "1", "--out", out)
+	if code != 0 || !strings.Contains(stderr, "warning: Same-model judge") || !strings.Contains(stderr, "shared/model") {
+		t.Fatalf("suite exit = %d, want the same-model warning on stderr:\n%s", code, stderr)
+	}
+
+	_, stderr, code = runBinary(t, root, env, "grade", "--suite", out, "--regrade",
+		"--judge-cmd", judge("shared/model"))
+	if code != 0 || !strings.Contains(stderr, "warning: Same-model judge") {
+		t.Fatalf("grade exit = %d, want the same-model warning on stderr:\n%s", code, stderr)
+	}
+
+	_, stderr, code = runBinary(t, root, env, "grade", "--suite", out, "--regrade",
+		"--judge-cmd", judge("other/model"))
+	if code != 0 || strings.Contains(stderr, "Same-model") {
+		t.Fatalf("a different judge model must not warn (exit %d):\n%s", code, stderr)
+	}
+}
+
 func TestBlackBoxSignals(t *testing.T) {
 	for _, test := range []struct {
 		name   string

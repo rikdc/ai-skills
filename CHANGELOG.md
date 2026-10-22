@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `evalctl` records whether the with arm actually used the skill
+  (`skill_use` in `result.json`, detected from the agent log) and the report
+  marks scenarios whose skill was never invoked as `skill-not-exercised`,
+  excluding them from the headline delta.
+- `evalctl report` now states caveats up front: a Warnings block for unused
+  skills, failed or retried attempts (count, kind and first error), a judge
+  that is the same model as the agent, and n below 3. `evalctl suite` and
+  `grade` print the same-model warning on stderr.
 - Added the Go `evalctl` harness as the default `make eval` backend for
   Milestone A (command agent and command judge). `make evalctl-build`,
   `evalctl-test`, `evalctl-check`, `evalctl-selftest`, and `evalctl-parity`
@@ -93,6 +101,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `evalctl grade` now refreshes `summary.md`, `suite.json` counts,
+  `results.jsonl` and the grading index after grading, so a suite graded after
+  the run no longer reports 0% and every run pending.
+- Revised the `nix-expert` eval rubrics to reward the skill's own rules (the
+  five-rung testing ladder, the remote `test` step, the generated update
+  output in lock commits, agenix/sops path consumption) instead of general
+  good practice.
 - Fixed eval tooling edge cases: a report now treats a declared run with no
   directory as missing, the suite keeps the fixed 100-point denominator for a
   partially scored rubric, fractional judgements keep their exact score and
