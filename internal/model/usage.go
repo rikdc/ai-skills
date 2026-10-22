@@ -1,9 +1,6 @@
 package model
 
-import (
-	"encoding/json"
-	"strings"
-)
+import "encoding/json"
 
 // UsageState is the three-state accounting contract. Unknown is never zero.
 type UsageState string
@@ -90,10 +87,12 @@ func (u Usage) NormalizeState() Usage {
 //   - both known          -> known, numeric components summed
 //   - any applicable unknown -> unknown, retaining partial numeric components
 //
-// Two known records that do not report the same components combine to unknown:
-// a one-sided component is a partial sum, never an exact total. An unknown
-// result retains one-sided token components as a partial lower bound; a
-// summed cost needs both costs. Unknown is never treated as zero.
+// Components combine one at a time. In a known result a component (cost
+// included) is present only when both records report it, so a one-sided value
+// never reads as the combined total; it is simply absent, as when a single
+// record does not report it. An unknown result retains one-sided token
+// components as a partial lower bound; a summed cost always needs both costs.
+// Unknown is never treated as zero.
 func Combine(a, b Usage) Usage {
 	a = a.NormalizeState()
 	b = b.NormalizeState()
@@ -105,25 +104,24 @@ func Combine(a, b Usage) Usage {
 		return a
 	}
 
+	known := a.State == UsageKnown && b.State == UsageKnown
+	sum := sumInt64
+	if known {
+		sum = sumBothInt64
+	}
 	out := Usage{
 		State:            UsageKnown,
 		Source:           combineSource(a.Source, b.Source),
-		InputTokens:      sumInt64(a.InputTokens, b.InputTokens),
-		OutputTokens:     sumInt64(a.OutputTokens, b.OutputTokens),
-		ReasoningTokens:  sumInt64(a.ReasoningTokens, b.ReasoningTokens),
-		CacheReadTokens:  sumInt64(a.CacheReadTokens, b.CacheReadTokens),
-		CacheWriteTokens: sumInt64(a.CacheWriteTokens, b.CacheWriteTokens),
-		TotalTokens:      sumInt64(a.TotalTokens, b.TotalTokens),
+		InputTokens:      sum(a.InputTokens, b.InputTokens),
+		OutputTokens:     sum(a.OutputTokens, b.OutputTokens),
+		ReasoningTokens:  sum(a.ReasoningTokens, b.ReasoningTokens),
+		CacheReadTokens:  sum(a.CacheReadTokens, b.CacheReadTokens),
+		CacheWriteTokens: sum(a.CacheWriteTokens, b.CacheWriteTokens),
+		TotalTokens:      sum(a.TotalTokens, b.TotalTokens),
 	}
-	switch {
-	case a.State != UsageKnown || b.State != UsageKnown:
+	if !known {
 		out.State = UsageUnknown
 		out.Reason = combineReason(a.Reason, b.Reason)
-	default:
-		if missing := oneSided(a, b); len(missing) > 0 {
-			out.State = UsageUnknown
-			out.Reason = "not reported by every invocation: " + strings.Join(missing, ", ")
-		}
 	}
 	out.Known = out.State == UsageKnown
 	out.CostUSD = sumFloat64(a.CostUSD, b.CostUSD)
@@ -177,6 +175,14 @@ func sumInt64(a, b *int64) *int64 {
 	return &v
 }
 
+func sumBothInt64(a, b *int64) *int64 {
+	if a == nil || b == nil {
+		return nil
+	}
+	v := *a + *b
+	return &v
+}
+
 func sumFloat64(a, b *float64) *float64 {
 	if a == nil || b == nil {
 		return nil
@@ -201,21 +207,6 @@ func usageComponents(u Usage) []struct {
 		{"cache_write_tokens", u.CacheWriteTokens},
 		{"total_tokens", u.TotalTokens},
 	}
-}
-
-// oneSided names the components exactly one of a and b reports, cost included.
-func oneSided(a, b Usage) []string {
-	var names []string
-	bc := usageComponents(b)
-	for i, component := range usageComponents(a) {
-		if (component.value == nil) != (bc[i].value == nil) {
-			names = append(names, component.name)
-		}
-	}
-	if (a.CostUSD == nil) != (b.CostUSD == nil) {
-		names = append(names, "cost_usd")
-	}
-	return names
 }
 
 // SumUsage totals the applicable records for a comparison. A component is

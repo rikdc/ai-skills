@@ -82,13 +82,17 @@ func RenderMarkdown(report model.Report) string {
 		agentKnown := report.Cost.With.Agent.Cost.RunsKnown + report.Cost.Without.Agent.Cost.RunsKnown
 		judgeKnown := report.Cost.With.Judge.Cost.RunsKnown + report.Cost.Without.Judge.Cost.RunsKnown
 		combinedKnown := report.Cost.With.Combined.Cost.RunsKnown + report.Cost.Without.Combined.Cost.RunsKnown
-		total := report.Cost.With.RunsTotal + report.Cost.Without.RunsTotal
+		// Each denominator counts the runs where that usage applies; a failed
+		// run, or one that needed no judge, has none.
+		agentTotal := report.Cost.With.Agent.Cost.RunsTotal + report.Cost.Without.Agent.Cost.RunsTotal
+		judgeTotal := report.Cost.With.Judge.Cost.RunsTotal + report.Cost.Without.Judge.Cost.RunsTotal
+		combinedTotal := report.Cost.With.Combined.Cost.RunsTotal + report.Cost.Without.Combined.Cost.RunsTotal
 		partial := ""
-		if combinedKnown < total {
+		if combinedKnown < combinedTotal {
 			partial = " (partial)"
 		}
 		fmt.Fprintf(&b, "\nCoverage: agent %d/%d, judge %d/%d, total %d/%d%s. Unknown usage is never counted as zero.\n",
-			agentKnown, total, judgeKnown, total, combinedKnown, total, partial)
+			agentKnown, agentTotal, judgeKnown, judgeTotal, combinedKnown, combinedTotal, partial)
 		if report.Cost.CostPerDeltaPoint != nil {
 			fmt.Fprintf(&b, "Efficiency: %s pts for %s per run (%s per point).\n",
 				fmtDelta(report.Totals.Delta), fmtMoneyDelta(deltaCost(report)),

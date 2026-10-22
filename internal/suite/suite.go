@@ -842,6 +842,12 @@ func keyString(k runKey) string {
 // gradeRun grades one run and emits its progress pair. The judge key attributes
 // are logged here so inline and final grading share one shape.
 func gradeRun(ctx context.Context, cfg Config, key runKey, runDir string, regrade bool) error {
+	if superseding, _ := attempts.New(runDir).Superseded(); superseding != nil {
+		logInfo(cfg.Logger, "judge skipped",
+			"plugin", key.plugin, "scenario", key.scenario, "arm", key.arm, "run", key.run,
+			"reason", "superseded by failed rerun "+superseding.ID)
+		return nil
+	}
 	logInfo(cfg.Logger, "judge started",
 		"plugin", key.plugin, "scenario", key.scenario, "arm", key.arm, "run", key.run)
 	_, err := judge.Grade(ctx, judge.Config{

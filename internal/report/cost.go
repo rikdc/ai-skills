@@ -49,9 +49,7 @@ func buildCost(scenarios []model.ScenarioResult, totals model.Totals) model.Cost
 	}
 
 	var costPerPoint *float64
-	if compWith.Combined.Cost.RunsKnown == compWith.RunsTotal &&
-		compWithout.Combined.Cost.RunsKnown == compWithout.RunsTotal &&
-		compWith.RunsTotal > 0 && compWithout.RunsTotal > 0 &&
+	if compWith.Combined.Cost.Total != nil && compWithout.Combined.Cost.Total != nil &&
 		totals.Delta != nil && *totals.Delta > Epsilon &&
 		delta.CombinedCost != nil && *delta.CombinedCost > 0 {
 		value := *delta.CombinedCost / *totals.Delta
@@ -131,6 +129,7 @@ func fieldStats(runs []model.RunRow, get func(model.RunRow) model.Usage) model.F
 			writes = append(writes, *value)
 		}
 	}
+	stats.RunsTotal = applicable
 	stats.Cost = metricStats(costs, applicable)
 	stats.Tokens = tokenStats(totals, inputs, outputs, reasonings, reads, writes, applicable)
 	return stats
@@ -201,6 +200,7 @@ func combinedStats(runs []model.RunRow) model.CombinedStats {
 		add(&writes, combined.CacheWriteTokens)
 	}
 	stats.RunsKnown = len(costs)
+	stats.RunsTotal = applicable
 	stats.Cost = metricStats(costs, applicable)
 	stats.Tokens = tokenStats(totals, inputs, outputs, reasonings, reads, writes, applicable)
 	return stats

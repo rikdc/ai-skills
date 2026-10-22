@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rikdc/ai-skills/internal/judge"
 	"github.com/rikdc/ai-skills/internal/model"
 	"github.com/rikdc/ai-skills/internal/platform/errs"
 )
@@ -370,5 +371,16 @@ func TestEmptyLogFormatRejected(t *testing.T) {
 	_, _, err := executeCommand(t, "--log-format", "", "version")
 	if code := errs.Code(err); code != 2 {
 		t.Fatalf("exit code = %d, want 2 (err=%v)", code, err)
+	}
+}
+
+func TestGradeSummaryLine(t *testing.T) {
+	plain := gradeSummaryLine(judge.SuiteResult{Total: 3, Graded: 2, AlreadyComplete: 1})
+	if plain != "Grading: 3, graded: 2, already complete: 1, failed: 0" {
+		t.Fatalf("line = %q", plain)
+	}
+	with := gradeSummaryLine(judge.SuiteResult{Total: 4, Graded: 2, AlreadyComplete: 1, Superseded: 1})
+	if with != "Grading: 4, graded: 2, already complete: 1, superseded: 1, failed: 0" {
+		t.Fatalf("line = %q", with)
 	}
 }

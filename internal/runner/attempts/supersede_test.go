@@ -1,6 +1,7 @@
 package attempts
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -144,5 +145,39 @@ func TestCrashAfterFailedRerunStillSupersedes(t *testing.T) {
 	}
 	if superseding, err := store.Superseded(); err != nil || superseding == nil || superseding.ID != failed.ID {
 		t.Fatalf("Superseded = %v, %v; want %s", superseding, err, failed.ID)
+	}
+}
+
+func TestCorruptOlderFinishedRecordDoesNotBlockReuse(t *testing.T) {
+	store := testStore(t)
+	older := failRerun(t, store, model.StatusAgentFailed)
+	acceptedRun(t, store)
+	if err := os.WriteFile(filepath.Join(older.Dir, "finished.json"), []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CheckReusable("fp"); err != nil {
+		t.Fatalf("a corrupt older finished.json blocked reuse: %v", err)
+	}
+	list, err := store.Enumerate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, attempt := range list {
+		if attempt.ID == older.ID && attempt.Finished != nil {
+			t.Fatalf("corrupt finished.json read as finished: %+v", attempt)
+		}
+	}
+}
+
+func TestResultProjectionIsNotRebuiltFromSupersededPointer(t *testing.T) {
+	store := testStore(t)
+	acceptedRun(t, store)
+	failRerun(t, store, model.StatusAgentFailed)
+	_, err := store.EnsureResultProjection(RunContext{Plugin: "plugin", Scenario: "scenario", Arm: "with", Run: 1})
+	if !errors.Is(err, ErrSuperseded) {
+		t.Fatalf("EnsureResultProjection = %v, want ErrSuperseded", err)
+	}
+	if _, err := os.Stat(store.ResultPath()); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("result.json written from a superseded pointer: %v", err)
 	}
 }

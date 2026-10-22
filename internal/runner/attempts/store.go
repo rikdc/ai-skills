@@ -464,11 +464,14 @@ func (s *Store) Enumerate() ([]*Attempt, error) {
 			Started:  started,
 			Status:   model.StatusInterrupted,
 		}
+		// An unreadable finished.json leaves the attempt unfinished, as a
+		// crash before the record was complete would: it never counts as ok,
+		// and one damaged attempt cannot block reading the rest of the run.
 		finished, err := readFinished(dir, id, kind)
 		if err == nil {
 			attempt.Finished = finished
 			attempt.Status = finished.Status
-		} else if !errors.Is(err, fs.ErrNotExist) {
+		} else if !errors.Is(err, fs.ErrNotExist) && !errors.Is(err, ErrInvalidAttempt) {
 			return nil, err
 		}
 		attempts = append(attempts, attempt)

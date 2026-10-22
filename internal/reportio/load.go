@@ -456,8 +456,8 @@ func loadV3Run(runDir, rel string, ri model.RunInput, rubric []model.Criterion, 
 		return ri, nil
 	}
 
-	// A newer failed or interrupted execution attempt is the run's outcome;
-	// the accepted pointer is then provenance only.
+	// A newer finished, non-ok execution attempt is the run's outcome; the
+	// accepted pointer is then provenance only (see attempts.SupersedingAttempt).
 	if id, started, finished, err := supersedingAttempt(runDir, current.AgentAttempt); err != nil {
 		return ri, err
 	} else if id != "" {

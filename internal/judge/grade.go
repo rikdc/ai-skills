@@ -692,8 +692,8 @@ func GradeSuite(ctx context.Context, cfg Config) (SuiteResult, error) {
 			suite.Total, len(matches), ctx.Err())
 	case provenance:
 		return suite, errs.WithCode(errs.CodeUsage, fmt.Errorf(
-			"%s (graded: %d, already complete: %d, failed: %d)",
-			firstProvenance, suite.Graded, suite.AlreadyComplete, suite.Failed))
+			"%s (graded: %d, already complete: %d, superseded: %d, failed: %d)",
+			firstProvenance, suite.Graded, suite.AlreadyComplete, suite.Superseded, suite.Failed))
 	case suite.Failed > 0:
 		return suite, errs.Operational("grading failed for %d of %d runs",
 			suite.Failed, suite.Total)

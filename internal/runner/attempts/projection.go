@@ -201,9 +201,19 @@ func (s *Store) BuildResult(ctx RunContext) (model.RunResult, error) {
 	return result, nil
 }
 
+// ErrSuperseded reports that a failed rerun replaced the accepted attempt, so
+// current.json no longer describes the run's outcome.
+var ErrSuperseded = errors.New("accepted attempt is superseded by a failed rerun")
+
 // EnsureResultProjection rebuilds result.json when it is absent or differs
-// from the projection of current.json. current.json always wins.
+// from the projection of current.json. current.json wins unless a failed rerun
+// superseded it: then result.json describes that rerun and is left alone.
 func (s *Store) EnsureResultProjection(ctx RunContext) (model.RunResult, error) {
+	if superseding, err := s.Superseded(); err != nil {
+		return model.RunResult{}, err
+	} else if superseding != nil {
+		return model.RunResult{}, fmt.Errorf("%w: %s", ErrSuperseded, superseding.ID)
+	}
 	result, err := s.BuildResult(ctx)
 	if err != nil {
 		return model.RunResult{}, err

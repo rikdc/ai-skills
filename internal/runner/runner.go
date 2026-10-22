@@ -892,10 +892,16 @@ func existingEvidence(attemptDir string) []string {
 }
 
 // writeDiagnostic writes a non-accepted result projection when current.json is
-// absent. It never overwrites an accepted result.
+// absent, or when this attempt supersedes the accepted one (a failed rerun is
+// the run's outcome). Otherwise it never overwrites an accepted result.
 func (r *Runner) writeDiagnostic(state *runState, evidenceSHA string, outcome RunOutcome) error {
-	if _, _, err := state.store.LoadCurrent(); err == nil {
-		return nil
+	supersededID := ""
+	if pointer, _, err := state.store.LoadCurrent(); err == nil {
+		superseding, err := state.store.Superseded()
+		if err != nil || superseding == nil || superseding.ID != state.attempt.ID {
+			return nil
+		}
+		supersededID = pointer.AgentAttempt
 	}
 	usage := state.usage
 	if usage.State == "" {
@@ -910,6 +916,7 @@ func (r *Runner) writeDiagnostic(state *runState, evidenceSHA string, outcome Ru
 		Run:                  outcome.Run,
 		AgentAttempt:         state.attempt.ID,
 		CurrentSHA256:        "",
+		SupersededAttempt:    supersededID,
 		Complete:             false,
 		Status:               outcome.Status,
 		StopReason:           outcome.StopReason,

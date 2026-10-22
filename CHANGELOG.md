@@ -166,7 +166,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only as provenance; the run is no longer reusable or adoptable, so
   `--resume` retries it and `keep-failures` keeps it. `evalctl grade` skips
   it (`superseded`) instead of paying the judge for a hidden score, and
-  `--attempt-artifacts none` keeps its evidence. An unfinished newer attempt
+  `--attempt-artifacts none` keeps its evidence. `result.json` describes the
+  failed rerun (`superseded_attempt` names the replaced one) and is never
+  rebuilt from the replaced pointer. An attempt with an unreadable
+  `finished.json` reads as unfinished instead of failing every reader of the
+  run. An unfinished newer attempt
   (in flight or crashed) neither replaces the accepted result nor hides an
   earlier failed rerun.
 - After an interrupt, `evalctl run`, `suite`, and `grade --suite` stop
@@ -182,11 +186,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`pricing_formula` in the manifest), so one suite never mixes cost bases. A
   priced suite started before this release cannot be resumed.
 - Usage totals are never reported over incomplete data. Combining agent and
-  judge usage that do not report the same components is unknown (a labelled
-  partial), not known. Report cost and token totals, and the deltas between
-  them, are shown only when every run reported the metric (otherwise "—",
-  with the existing coverage line); means still cover the runs that
-  reported. Expenditure is complete only when every applicable attempt
+  judge usage keeps a component (cost included) only when both report it, so
+  a one-sided value never reads as the combined total. Report cost and token
+  totals, and the deltas between them, are shown only when every run whose
+  usage applies reported the metric (otherwise "—", with the coverage line);
+  a failed run, or one that needed no judge, is not counted as missing, and
+  the coverage line and efficiency use the same denominators. Means still
+  cover the runs that reported. Expenditure is complete only when every applicable attempt
   reported every component, so a known attempt without a cost now makes the
   total a lower bound. The attempt store's `result.json` projection and the
   suite's accepted-usage totals use the same rules as the report.

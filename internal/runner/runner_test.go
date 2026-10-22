@@ -659,12 +659,16 @@ func TestFailedRerunKeepsAcceptedCurrent(t *testing.T) {
 	if string(before) != string(after) {
 		t.Fatal("failed rerun replaced the accepted pointer")
 	}
-	afterResult, err := os.ReadFile(filepath.Join(dir, "result.json"))
-	if err != nil {
+	// The failed rerun is the run's outcome: the projection now describes it,
+	// naming the accepted attempt it replaced.
+	var accepted model.RunResult
+	if err := json.Unmarshal(beforeResult, &accepted); err != nil {
 		t.Fatal(err)
 	}
-	if string(beforeResult) != string(afterResult) {
-		t.Fatal("failed rerun replaced the accepted result projection")
+	result := readJSON[model.RunResult](t, filepath.Join(dir, "result.json"))
+	if result.Complete || result.Status != model.StatusAgentFailed || result.AgentAttempt == accepted.AgentAttempt ||
+		result.SupersededAttempt != accepted.AgentAttempt || result.CurrentSHA256 != "" {
+		t.Fatalf("result after failed rerun = %+v, want the rerun superseding %s", result, accepted.AgentAttempt)
 	}
 	all, err := attempts.New(dir).Enumerate()
 	if err != nil {

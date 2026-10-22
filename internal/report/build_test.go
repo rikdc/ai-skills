@@ -267,8 +267,15 @@ func TestCostTotalsIgnoreRunsWithoutApplicableUsage(t *testing.T) {
 		run("with", 1, "ok", items), run("with", 2, "ok", items), failed,
 		run("without", 1, "ok", items), run("without", 2, "ok", items),
 	}, "comparison", 3)
-	cost := report.Build(in).Cost
+	built := report.Build(in)
+	cost := built.Cost
 	with := cost.With.Combined
+	if with.RunsTotal != 2 || cost.With.Agent.RunsTotal != 2 {
+		t.Fatalf("applicable runs = %d/%d, want 2", with.RunsTotal, cost.With.Agent.RunsTotal)
+	}
+	if cli := report.RenderCLI(built, false); !strings.Contains(cli, "total 4/4") || strings.Contains(cli, "(partial)") {
+		t.Fatalf("coverage line counts the failed run:\n%s", cli)
+	}
 	if with.Cost.Total == nil || math.Abs(*with.Cost.Total-0.024) > 1e-9 || with.Cost.RunsTotal != 2 {
 		t.Fatalf("with combined cost = %+v, want the two ok runs", with.Cost)
 	}
@@ -286,8 +293,11 @@ func TestCombinedStatsUseCombine(t *testing.T) {
 	r := run("with", 1, "ok", items)
 	r.JudgeUsage.CostUSD = nil // the judge reports tokens but no cost
 	cost := report.Build(input(rubric, []model.RunInput{r, run("without", 1, "ok", items)}, "comparison", 1)).Cost
-	if tokens := cost.With.Combined.Tokens; tokens.Total != nil || tokens.Mean != nil {
-		t.Fatalf("combined tokens = %+v, want none: the combination is unknown", tokens)
+	// Both report tokens, so combined tokens are exact; only the agent reports
+	// cost, so there is no combined cost.
+	if combined := cost.With.Combined; combined.Cost.Total != nil || combined.Tokens.Input.Total == nil ||
+		*combined.Tokens.Input.Total != 980 {
+		t.Fatalf("combined = %+v, want tokens 980 and no cost", combined)
 	}
 }
 

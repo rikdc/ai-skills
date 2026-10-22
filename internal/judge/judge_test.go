@@ -874,6 +874,31 @@ func TestGradeSkipsSupersededRun(t *testing.T) {
 	}
 }
 
+func TestGradeSuiteCountsSupersededRuns(t *testing.T) {
+	suite := t.TempDir()
+	f := newFixtureAt(t, filepath.Join(suite, "runs", "demo", "basic", "with", "run-1"), standardPending())
+	rerun, err := f.store.Allocate(model.StartedAttempt{Kind: model.KindAgent, RunID: "demo/basic/with/run-1", Fingerprint: "fp"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.store.Finish(rerun.ID, model.FinishedAttempt{
+		Status: model.StatusAgentFailed, StopReason: model.StopProviderError, Usage: knownAgentUsage(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	newFixtureAt(t, filepath.Join(suite, "runs", "demo", "basic", "with", "run-2"), standardPending())
+	fake := newFake(testCommand)
+	result, err := GradeSuite(context.Background(), Config{
+		SuiteDir: suite, Command: testCommand, Timeout: time.Minute, Executor: fake,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Total != 2 || result.Superseded != 1 || result.Graded != 1 || fake.calls != 1 {
+		t.Fatalf("suite result = %+v (calls %d), want one graded and one superseded", result, fake.calls)
+	}
+}
+
 func TestRegradeWithPrunedEvidenceFails(t *testing.T) {
 	f := newFixture(t, standardPending())
 	if _, err := gradeRun(t, f, newFake(testCommand), testCommand, false); err != nil {
